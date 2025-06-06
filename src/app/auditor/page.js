@@ -14,13 +14,13 @@ export default function AuditorDashboard() {
 
   useEffect(() => {
     const userData = localStorage.getItem('clienteLogueado')
-    if (!userData) return router.push('/login')
+    if (!userData) return router.push('/page.js')
     setUsuario(JSON.parse(userData))
   }, [])
 
   const cerrarSesion = () => {
     localStorage.removeItem('clienteLogueado')
-    router.push('/login')
+    router.push('/page.js')
   }
 
   return (
