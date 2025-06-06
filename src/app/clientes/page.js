@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation' // ✅ Válido en App Router
 import { supabase } from '@/lib/supabaseClient'
 
 export default function ClientesPage() {
-  const [usuarios, setClientes] = useState([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 

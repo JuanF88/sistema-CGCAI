@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabaseClient'
 import FormularioRegistro from '@/components/FormularioRegistro'
 import FormularioActualizar from '@/components/FormularioActualizar'
 import VistaBienvenida from '@/components/VistaBienvenida'
