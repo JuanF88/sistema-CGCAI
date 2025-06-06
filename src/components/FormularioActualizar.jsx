@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import styles from './CSS/formulario.module.css'
+import ModalEditar from './ModalEditar'
 
 export default function FormularioActualizar({ usuario }) {
   const [informes, setInformes] = useState([])
@@ -67,6 +68,35 @@ export default function FormularioActualizar({ usuario }) {
     setNoConformidades(n.data || [])
   }
 
+  const transformarFortaleza = (f) => ({
+    informe_id: informeSeleccionado.id,
+    iso_id: f.iso ? parseInt(f.iso) : null,
+    capitulo_id: f.capitulo ? parseInt(f.capitulo) : null,
+    numeral_id: f.numeral ? parseInt(f.numeral) : null,
+    descripcion: f.descripcion || '',
+    razon: f.razon || ''
+  })
+
+  const transformarOportunidad = (o) => ({
+    informe_id: informeSeleccionado.id,
+    iso_id: o.iso ? parseInt(o.iso) : null,
+    capitulo_id: o.capitulo ? parseInt(o.capitulo) : null,
+    numeral_id: o.numeral ? parseInt(o.numeral) : null,
+    descripcion: o.descripcion || '',
+    para_que: o.para_que || ''
+  })
+
+  const transformarNoConformidad = (n) => ({
+    informe_id: informeSeleccionado.id,
+    iso_id: n.iso ? parseInt(n.iso) : null,
+    capitulo_id: n.capitulo ? parseInt(n.capitulo) : null,
+    numeral_id: n.numeral ? parseInt(n.numeral) : null,
+    descripcion: n.descripcion || '',
+    tipo: n.tipo || '',
+    evidencia: n.evidencia || '',
+    norma: n.norma || ''
+  })
+
   const handleActualizar = async (e) => {
     e.preventDefault()
     await supabase.from('informes_auditoria')
@@ -78,25 +108,27 @@ export default function FormularioActualizar({ usuario }) {
     await supabase.from('no_conformidades').delete().eq('informe_id', informeSeleccionado.id)
 
     for (const f of fortalezas)
-      await supabase.from('fortalezas').insert({ informe_id: informeSeleccionado.id, ...f })
+      await supabase.from('fortalezas').insert(transformarFortaleza(f))
+
     for (const o of oportunidades)
-      await supabase.from('oportunidades_mejora').insert({ informe_id: informeSeleccionado.id, ...o })
+      await supabase.from('oportunidades_mejora').insert(transformarOportunidad(o))
+
     for (const n of noConformidades)
-      await supabase.from('no_conformidades').insert({ informe_id: informeSeleccionado.id, ...n })
+      await supabase.from('no_conformidades').insert(transformarNoConformidad(n))
 
     alert("✅ Informe actualizado correctamente")
     setInformeSeleccionado(null)
   }
 
-  const renderSelectDinamico = (i, lista, campo, valor, onChange) => (
+  const renderSelectDinamico = (i, lista, campo, valor, onChange, campoTexto) => (
     <select
       value={valor || ''}
-      onChange={(e) => onChange(i, campo, e.target.value)}
+      onChange={(e) => onChange(i, campo, parseInt(e.target.value))}
       className={styles.inputCampo}
     >
       <option value="">Seleccionar</option>
       {lista.map(op => (
-        <option key={op.id} value={op.id}>{op.iso || op.capitulo || op.numeral}</option>
+        <option key={op.id} value={op.id}>{op[campoTexto]}</option>
       ))}
     </select>
   )
@@ -104,9 +136,10 @@ export default function FormularioActualizar({ usuario }) {
   const renderSubformularios = (lista, setLista, tipo) => lista.map((item, i) => (
     <div key={i} className={styles.subformulario}>
       <button onClick={() => setLista(prev => prev.filter((_, j) => j !== i))} className={styles.eliminarBoton}>✖</button>
-      {renderSelectDinamico(i, listaIso, 'iso', item.iso, (i, f, v) => handleChangeItem(setLista, i, f, v))}
-      {renderSelectDinamico(i, listaCapitulos[item.iso] || [], 'capitulo', item.capitulo, (i, f, v) => handleChangeItem(setLista, i, f, v))}
-      {renderSelectDinamico(i, listaNumerales[item.capitulo] || [], 'numeral', item.numeral, (i, f, v) => handleChangeItem(setLista, i, f, v))}
+      {renderSelectDinamico(i, listaIso, 'iso', item.iso, (i, f, v) => handleChangeItem(setLista, i, f, v), 'iso')}
+      {renderSelectDinamico(i, listaCapitulos[item.iso] || [], 'capitulo', item.capitulo, (i, f, v) => handleChangeItem(setLista, i, f, v), 'capitulo')}
+      {renderSelectDinamico(i, listaNumerales[item.capitulo] || [], 'numeral', item.numeral, (i, f, v) => handleChangeItem(setLista, i, f, v), 'numeral')}
+
       <input type="text" value={item.descripcion || ''} onChange={(e) => handleChangeItem(setLista, i, 'descripcion', e.target.value)} placeholder="Descripción" className={styles.inputCampo} />
       {tipo === 'fortaleza' && (
         <input type="text" value={item.razon || ''} onChange={(e) => handleChangeItem(setLista, i, 'razon', e.target.value)} placeholder="Razón" className={styles.inputCampo} />
@@ -117,7 +150,6 @@ export default function FormularioActualizar({ usuario }) {
       {tipo === 'no_conformidad' && (
         <>
           <input type="text" value={item.tipo || ''} onChange={(e) => handleChangeItem(setLista, i, 'tipo', e.target.value)} placeholder="Tipo" className={styles.inputCampo} />
-          <input type="text" value={item.requisito_incumplido || ''} onChange={(e) => handleChangeItem(setLista, i, 'requisito_incumplido', e.target.value)} placeholder="Requisito" className={styles.inputCampo} />
           <input type="text" value={item.evidencia || ''} onChange={(e) => handleChangeItem(setLista, i, 'evidencia', e.target.value)} placeholder="Evidencia" className={styles.inputCampo} />
           <input type="text" value={item.norma || ''} onChange={(e) => handleChangeItem(setLista, i, 'norma', e.target.value)} placeholder="Norma" className={styles.inputCampo} />
         </>
@@ -149,29 +181,31 @@ export default function FormularioActualizar({ usuario }) {
         ))}
       </ul>
 
-      {informeSeleccionado && (
-        <form onSubmit={handleActualizar} className="mt-10 p-6 bg-white rounded-xl shadow space-y-4">
-          <h3 className="text-xl font-bold text-blue-600">Editar Informe</h3>
-          <input type="date" value={informeSeleccionado.fecha_auditoria} onChange={(e) => setInformeSeleccionado({ ...informeSeleccionado, fecha_auditoria: e.target.value })} className={styles.inputEstilo} />
-          <input type="text" value={informeSeleccionado.proceso} onChange={(e) => setInformeSeleccionado({ ...informeSeleccionado, proceso: e.target.value })} className={styles.inputEstilo} />
-          <textarea value={informeSeleccionado.objetivo || ''} onChange={(e) => setInformeSeleccionado({ ...informeSeleccionado, objetivo: e.target.value })} placeholder="Objetivo" className={styles.inputEstilo} rows={3} />
-          <textarea value={informeSeleccionado.criterios || ''} onChange={(e) => setInformeSeleccionado({ ...informeSeleccionado, criterios: e.target.value })} placeholder="Criterios" className={styles.inputEstilo} rows={3} />
+      <ModalEditar visible={!!informeSeleccionado} onClose={() => setInformeSeleccionado(null)}>
+        {informeSeleccionado && (
+          <form onSubmit={handleActualizar} className="space-y-4">
+            <h3 className="text-xl font-bold text-blue-600">Editar Informe</h3>
+            <input type="date" value={informeSeleccionado.fecha_auditoria} onChange={(e) => setInformeSeleccionado({ ...informeSeleccionado, fecha_auditoria: e.target.value })} className={styles.inputEstilo} />
+            <input type="text" value={informeSeleccionado.proceso} onChange={(e) => setInformeSeleccionado({ ...informeSeleccionado, proceso: e.target.value })} className={styles.inputEstilo} />
+            <textarea value={informeSeleccionado.objetivo || ''} onChange={(e) => setInformeSeleccionado({ ...informeSeleccionado, objetivo: e.target.value })} placeholder="Objetivo" className={styles.inputEstilo} rows={3} />
+            <textarea value={informeSeleccionado.criterios || ''} onChange={(e) => setInformeSeleccionado({ ...informeSeleccionado, criterios: e.target.value })} placeholder="Criterios" className={styles.inputEstilo} rows={3} />
 
-          <h4 className="text-lg font-semibold mt-6 text-green-600">Fortalezas</h4>
-          {renderSubformularios(fortalezas, setFortalezas, 'fortaleza')}
-          <button type="button" onClick={() => setFortalezas(prev => [...prev, {}])} className={`${styles.botonHallazgo} ${styles.verde}`}>➕ Fortaleza</button>
+            <h4 className="text-lg font-semibold mt-6 text-green-600">Fortalezas</h4>
+            {renderSubformularios(fortalezas, setFortalezas, 'fortaleza')}
+            <button type="button" onClick={() => setFortalezas(prev => [...prev, {}])} className={`${styles.botonHallazgo} ${styles.verde}`}>➕ Fortaleza</button>
 
-          <h4 className="text-lg font-semibold mt-6 text-blue-600">Oportunidades de Mejora</h4>
-          {renderSubformularios(oportunidades, setOportunidades, 'oportunidad')}
-          <button type="button" onClick={() => setOportunidades(prev => [...prev, {}])} className={`${styles.botonHallazgo} ${styles.azul}`}>➕ Oportunidad</button>
+            <h4 className="text-lg font-semibold mt-6 text-blue-600">Oportunidades de Mejora</h4>
+            {renderSubformularios(oportunidades, setOportunidades, 'oportunidad')}
+            <button type="button" onClick={() => setOportunidades(prev => [...prev, {}])} className={`${styles.botonHallazgo} ${styles.azul}`}>➕ Oportunidad</button>
 
-          <h4 className="text-lg font-semibold mt-6 text-red-600">No Conformidades</h4>
-          {renderSubformularios(noConformidades, setNoConformidades, 'no_conformidad')}
-          <button type="button" onClick={() => setNoConformidades(prev => [...prev, {}])} className={`${styles.botonHallazgo} ${styles.rojo}`}>➕ No Conformidad</button>
+            <h4 className="text-lg font-semibold mt-6 text-red-600">No Conformidades</h4>
+            {renderSubformularios(noConformidades, setNoConformidades, 'no_conformidad')}
+            <button type="button" onClick={() => setNoConformidades(prev => [...prev, {}])} className={`${styles.botonHallazgo} ${styles.rojo}`}>➕ No Conformidad</button>
 
-          <button type="submit" className={styles.botonGuardar}>Guardar cambios</button>
-        </form>
-      )}
+            <button type="submit" className={styles.botonGuardar}>Guardar cambios</button>
+          </form>
+        )}
+      </ModalEditar>
     </div>
   )
 }
