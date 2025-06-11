@@ -32,8 +32,8 @@ export default function LoginPage() {
         case 'auditor':
           router.push('/auditor')
           break
-        case 'coordinador':
-          router.push('/coordinador')
+        case 'admin':
+          router.push('/admin')
           break
         case 'gestor':
           router.push('/gestor')

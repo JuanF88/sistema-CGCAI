@@ -52,12 +52,6 @@ export default function VistaBienvenida({ usuario }) {
           <h1 className="text-4xl font-extrabold text-sky-700 leading-tight drop-shadow">
             ¡Bienvenido, {usuario.nombre}!
           </h1>
-          <p className="text-gray-600 text-lg mt-1">
-            Dependencia:{' '}
-            <span className="font-semibold text-gray-800">
-              {usuario.dependencia || 'No registrada'}
-            </span>
-          </p>
         </div>
       </div>
 
