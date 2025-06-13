@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 
 export default function VistaAdministrarUsuarios() {
   const [usuarios, setUsuarios] = useState([])
-  const [dependencias, setDependencias] = useState([])
   const [mostrarModal, setMostrarModal] = useState(false)
   const [editando, setEditando] = useState(false)
 
@@ -125,133 +124,129 @@ export default function VistaAdministrarUsuarios() {
     setEditando(false)
   }
 
-  const usuariosPorRol = (rol) => {
-    return usuarios.filter((u) => u.rol === rol)
-  }
-
 
   //VISTA
 
-return (
-  <div className="space-y-6">
-    <h2 className="text-2xl font-bold text-gray-700">Usuarios</h2>
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-700">Usuarios</h2>
 
-    {['admin', 'auditor', 'gestor'].map((rol) => {
-      const color =
-        rol === 'admin'
-          ? 'border-blue-500'
-          : rol === 'auditor'
-          ? 'border-green-500'
-          : 'border-yellow-500'
+      {['admin', 'auditor', 'gestor'].map((rol) => {
+        const color =
+          rol === 'admin'
+            ? 'border-blue-500'
+            : rol === 'auditor'
+              ? 'border-green-500'
+              : 'border-yellow-500'
 
-      return (
-        <div key={rol} className="mb-8">
-          <h3 className="text-xl font-semibold text-gray-700 capitalize mb-2">
-            {rol === 'admin' ? 'Administradores' : rol === 'auditor' ? 'Auditores' : 'Gestores'}
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {usuarios
-              .filter((u) => u.rol === rol)
-              .map((usuario) => (
-                <div
-                  key={usuario.usuario_id}
-                  className={`bg-white p-4 rounded shadow cursor-pointer hover:bg-gray-50 border-l-4 ${color}`}
-                  onClick={() => abrirEdicion(usuario)}
-                >
-                  <p className="font-semibold text-gray-800">
-                    {usuario.nombre} {usuario.apellido}
-                  </p>
-                  <p className="text-sm text-gray-600">{usuario.email}</p>
-                  <p className="text-sm text-gray-500 capitalize">{usuario.rol}</p>
-                </div>
-              ))}
+        return (
+          <div key={rol} className="mb-8">
+            <h3 className="text-xl font-semibold text-gray-700 capitalize mb-2">
+              {rol === 'admin' ? 'Administradores' : rol === 'auditor' ? 'Auditores' : 'Gestores'}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {usuarios
+                .filter((u) => u.rol === rol)
+                .map((usuario) => (
+                  <div
+                    key={usuario.usuario_id}
+                    className={`bg-white p-4 rounded shadow cursor-pointer hover:bg-gray-50 border-l-4 ${color}`}
+                    onClick={() => abrirEdicion(usuario)}
+                  >
+                    <p className="font-semibold text-gray-800">
+                      {usuario.nombre} {usuario.apellido}
+                    </p>
+                    <p className="text-sm text-gray-600">{usuario.email}</p>
+                    <p className="text-sm text-gray-500 capitalize">{usuario.rol}</p>
+                  </div>
+                ))}
+            </div>
           </div>
-        </div>
-      )
-    })}
+        )
+      })}
 
-    <div className="flex justify-center">
-      <button
-        onClick={abrirNuevo}
-        className="text-3xl text-white bg-purple-600 hover:bg-purple-700 rounded-full w-14 h-14 flex items-center justify-center shadow-xl"
-        title="Crear nuevo usuario"
-      >
-        +
-      </button>
-    </div>
-
-    {mostrarModal && (
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md space-y-4">
-          <h3 className="text-xl font-bold text-gray-700">
-            {editando ? 'Editar Usuario' : 'Nuevo Usuario'}
-          </h3>
-
-          <div className="grid grid-cols-2 gap-4">
-            <input
-              type="text"
-              name="nombre"
-              placeholder="Nombre"
-              value={formulario.nombre}
-              onChange={handleChange}
-              className="border p-2 rounded"
-            />
-            <input
-              type="text"
-              name="apellido"
-              placeholder="Apellido"
-              value={formulario.apellido}
-              onChange={handleChange}
-              className="border p-2 rounded"
-            />
-          </div>
-
-          <input
-            type="email"
-            name="email"
-            placeholder="Email"
-            value={formulario.email}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-          />
-
-          <input
-            type="password"
-            name="password"
-            placeholder="Contraseña"
-            value={formulario.password}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-          />
-
-          <select
-            name="rol"
-            value={formulario.rol}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-          >
-            <option value="">Seleccione un rol</option>
-            <option value="auditor">Auditor</option>
-            <option value="admin">Administrador</option>
-            <option value="gestor">Gestor</option>
-          </select>
-
-          <div className="flex justify-end gap-2">
-            <button onClick={cerrarModal} className="text-gray-500 px-4 py-2 rounded hover:text-gray-700">
-              Cancelar
-            </button>
-            <button
-              onClick={handleSubmit}
-              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
-            >
-              {editando ? 'Actualizar' : 'Crear'}
-            </button>
-          </div>
-        </div>
+      <div className="flex justify-center">
+        <button
+          onClick={abrirNuevo}
+          className="text-3xl text-white bg-purple-600 hover:bg-purple-700 rounded-full w-14 h-14 flex items-center justify-center shadow-xl"
+          title="Crear nuevo usuario"
+        >
+          +
+        </button>
       </div>
-    )}
-  </div>
-)
+
+      {mostrarModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md space-y-4">
+            <h3 className="text-xl font-bold text-gray-700">
+              {editando ? 'Editar Usuario' : 'Nuevo Usuario'}
+            </h3>
+
+            <div className="grid grid-cols-2 gap-4">
+              <input
+                type="text"
+                name="nombre"
+                placeholder="Nombre"
+                value={formulario.nombre}
+                onChange={handleChange}
+                className="border p-2 rounded"
+              />
+              <input
+                type="text"
+                name="apellido"
+                placeholder="Apellido"
+                value={formulario.apellido}
+                onChange={handleChange}
+                className="border p-2 rounded"
+              />
+            </div>
+
+            <input
+              type="email"
+              name="email"
+              placeholder="Email"
+              value={formulario.email}
+              onChange={handleChange}
+              className="w-full border p-2 rounded"
+            />
+
+            <input
+              type="password"
+              name="password"
+              placeholder="Contraseña"
+              value={formulario.password}
+              onChange={handleChange}
+              className="w-full border p-2 rounded"
+            />
+
+            <select
+              name="rol"
+              value={formulario.rol}
+              onChange={handleChange}
+              className="w-full border p-2 rounded"
+            >
+              <option value="">Seleccione un rol</option>
+              <option value="auditor">Auditor</option>
+              <option value="admin">Administrador</option>
+              <option value="gestor">Gestor</option>
+            </select>
+
+            <div className="flex justify-end gap-2">
+              <button onClick={cerrarModal} className="text-gray-500 px-4 py-2 rounded hover:text-gray-700">
+                Cancelar
+              </button>
+              <button
+                onClick={handleSubmit}
+                className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+              >
+                {editando ? 'Actualizar' : 'Crear'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 
 
 

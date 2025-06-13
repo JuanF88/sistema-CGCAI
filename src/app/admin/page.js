@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import VistaBienvenida from '@/components/VistaBienvenida'
 import VistaInformesAdmin from '@/components/admin/VistaInformesAdmin'
 import VistaAdministrarUsuarios from '@/components/admin/VistaAdministrarUsuarios'
-import { LogOut, FileText, UserPlus, Home, Users } from 'lucide-react'
+import { LogOut, FileText, UserPlus, Home } from 'lucide-react'
 
 export default function AdminDashboard() {
   const router = useRouter()
