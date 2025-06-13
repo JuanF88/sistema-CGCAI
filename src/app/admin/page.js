@@ -30,52 +30,39 @@ export default function AdminDashboard() {
         <h2 className="text-2xl font-black mb-6 text-center tracking-wider drop-shadow-md uppercase">
           Panel Admin
         </h2>
-
         <nav className="flex-1 space-y-3">
           <button
             onClick={() => setVista('bienvenida')}
-            className={`w-full flex items-center gap-3 px-4 py-2 rounded-xl transition-all font-medium ${
-              vista === 'bienvenida'
+            className={`w-full flex items-center gap-2 px-4 py-2 rounded-xl transition-all font-medium text-sm whitespace-nowrap ${vista === 'bienvenida'
                 ? 'bg-white/30 shadow-inner'
                 : 'hover:bg-white/20 hover:translate-x-1'
-            }`}
+              }`}
           >
-            <Home size={18} /> Inicio
+            <Home size={18} /> <span className="truncate">Inicio</span>
           </button>
 
           <button
             onClick={() => setVista('crearInforme')}
-            className={`w-full flex items-center gap-3 px-4 py-2 rounded-xl transition-all font-medium ${
-              vista === 'crearInforme'
+            className={`w-full flex items-center gap-2 px-4 py-2 rounded-xl transition-all font-medium text-sm whitespace-nowrap ${vista === 'crearInforme'
                 ? 'bg-white/30 shadow-inner'
                 : 'hover:bg-white/20 hover:translate-x-1'
-            }`}
+              }`}
           >
-            <FileText size={18} /> Crear Informe
+            <FileText size={18} /> <span className="truncate">Administrar Auditorías</span>
           </button>
 
           <button
             onClick={() => setVista('crearUsuario')}
-            className={`w-full flex items-center gap-3 px-4 py-2 rounded-xl transition-all font-medium ${
-              vista === 'crearUsuario'
+            className={`w-full flex items-center gap-2 px-4 py-2 rounded-xl transition-all font-medium text-sm whitespace-nowrap ${vista === 'crearUsuario'
                 ? 'bg-white/30 shadow-inner'
                 : 'hover:bg-white/20 hover:translate-x-1'
-            }`}
+              }`}
           >
-            <UserPlus size={18} /> Crear Usuario
+            <UserPlus size={18} /> <span className="truncate">Administrar Usuarios</span>
           </button>
 
-          <button
-            onClick={() => setVista('gestionarUsuarios')}
-            className={`w-full flex items-center gap-3 px-4 py-2 rounded-xl transition-all font-medium ${
-              vista === 'gestionarUsuarios'
-                ? 'bg-white/30 shadow-inner'
-                : 'hover:bg-white/20 hover:translate-x-1'
-            }`}
-          >
-            <Users size={18} /> Usuarios
-          </button>
         </nav>
+
 
         <button
           onClick={cerrarSesion}

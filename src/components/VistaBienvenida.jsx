@@ -1,10 +1,10 @@
 'use client'
 
 import Image from 'next/image'
-import { useEffect, useState } from 'react'
 import Slider from 'react-slick'
 import 'slick-carousel/slick/slick.css'
 import 'slick-carousel/slick/slick-theme.css'
+import styles from './CSS/VistaBienvenida.module.css'
 
 const noticias = [
   {
@@ -37,10 +37,10 @@ export default function VistaBienvenida({ usuario }) {
   }
 
   return (
-    <div className="bg-white p-10 rounded-3xl shadow-2xl animate-fade-in max-w-6xl mx-auto space-y-10 border border-gray-200">
+    <div className={styles.vistaContainer}>
       {/* Bienvenida */}
-      <div className="flex items-center gap-6">
-        <div className="relative w-28 h-28 rounded-full shadow-xl border-4 border-sky-400 overflow-hidden">
+      <div className={styles.bienvenida}>
+        <div className={styles.avatar}>
           <Image
             src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
             alt="Auditor"
@@ -48,46 +48,35 @@ export default function VistaBienvenida({ usuario }) {
             className="object-cover"
           />
         </div>
-        <div>
-          <h1 className="text-4xl font-extrabold text-sky-700 leading-tight drop-shadow">
-            ¡Bienvenido, {usuario.nombre}!
-          </h1>
-        </div>
+        <h1 className={styles.nombreBienvenida}>¡Bienvenido, {usuario.nombre}!</h1>
       </div>
 
+      {/* Noticias */}
+      <div className={styles.noticiasContainer}>
+        <h2 className={styles.noticiasTitulo}>
+          Noticias recientes
+          <span className={styles.decoracion}></span>
+        </h2>
 
-{/* Noticias */}
-<div className="mb-12">
-  {/* Título centrado */}
-  <h2 className="text-3xl font-extrabold text-sky-700 text-center mb-8 tracking-wide relative inline-block w-full">
-    Noticias recientes
-    <span className="block w-16 h-1 bg-sky-400 mt-2 mx-auto rounded-full"></span>
-  </h2>
-
-  {/* Carrusel centrado con límite grande */}
-  <div className="max-w-6xl mx-auto px-4">
-    <Slider {...sliderSettings}>
-      {noticias.map((noticia, index) => (
-        <div key={index} className="relative h-[600px]">
-          <Image
-            src={noticia.src}
-            alt={noticia.titulo}
-            fill
-            className="object-cover rounded-2xl shadow-md"
-          />
-          <div className="absolute inset-0 bg-black/20 rounded-2xl flex flex-col justify-end p-6 text-white">
-            <h3 className="text-2xl font-bold mb-2 drop-shadow">{noticia.titulo}</h3>
-            <p className="text-sm text-gray-200">{noticia.descripcion}</p>
-          </div>
+        <div className={styles.carrusel}>
+          <Slider {...sliderSettings}>
+            {noticias.map((noticia, index) => (
+              <div key={index} className={styles.slide}>
+                <Image
+                  src={noticia.src}
+                  alt={noticia.titulo}
+                  fill
+                  className="object-cover"
+                />
+                <div className={styles.slideOverlay}>
+                  <h3 className={styles.slideTitulo}>{noticia.titulo}</h3>
+                  <p className={styles.slideDescripcion}>{noticia.descripcion}</p>
+                </div>
+              </div>
+            ))}
+          </Slider>
         </div>
-      ))}
-    </Slider>
-  </div>
-</div>
-
-
+      </div>
     </div>
-
-    
   )
 }
