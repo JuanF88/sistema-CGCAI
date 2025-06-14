@@ -201,7 +201,7 @@ export default function FormularioRegistro({ usuario, auditoria }) {
         if (insert.error) throw insert.error
       }
 
-      toast.success('✅ Informe y hallazgos guardados correctamente')
+      toast.success('Informe y hallazgos guardados correctamente')
       localStorage.setItem('vistaAuditor', 'bienvenida')
       router.push('/auditor?vista=bienvenida')
 

@@ -1,11 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { toast } from 'react-toastify'
+import { useRouter } from 'next/navigation'
 
 export default function VistaAdministrarUsuarios() {
   const [usuarios, setUsuarios] = useState([])
   const [mostrarModal, setMostrarModal] = useState(false)
   const [editando, setEditando] = useState(false)
+
+  const router = useRouter()
+  
 
   const [formulario, setFormulario] = useState({
     usuario_id: null,
@@ -25,7 +30,6 @@ export default function VistaAdministrarUsuarios() {
       const dataDeps = await resDeps.json()
 
       setUsuarios(dataUsuarios)
-      setDependencias(dataDeps)
     }
 
     fetchData()
@@ -61,8 +65,7 @@ export default function VistaAdministrarUsuarios() {
           })
         })
       } else {
-        // POST aún no implementado en tu backend, pero puedes prepararlo así:
-        res = await fetch('/api/usuarios', {
+          res = await fetch('/api/usuarios', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formulario)
@@ -82,9 +85,15 @@ export default function VistaAdministrarUsuarios() {
         editando
           ? prev.map((u) => (u.usuario_id === data.usuario_id ? data : u))
           : [...prev, data]
+        
       )
 
       cerrarModal()
+
+      toast.success('Usuario actualizado/creado con éxito')
+      localStorage.setItem('vistaAdmin', 'bienvenida')
+      router.push('/admin?vista=bienvenida')
+
     } catch (err) {
       console.error('❌ Error inesperado en handleSubmit:', err)
       alert('Error inesperado al guardar')

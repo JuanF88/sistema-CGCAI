@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { toast } from 'react-toastify'
+import { useRouter } from 'next/navigation'
 
 export default function VistaInformesAdmin() {
   const [informes, setInformes] = useState([])
@@ -8,6 +10,8 @@ export default function VistaInformesAdmin() {
   const [dependencias, setDependencias] = useState([])
   const [mostrarModal, setMostrarModal] = useState(false)
 
+  const router = useRouter()
+  
   const [nuevoInforme, setNuevoInforme] = useState({
     usuario_id: '',
     dependencia_id: '',
@@ -43,6 +47,7 @@ export default function VistaInformesAdmin() {
         setInformes(dataInformes)
         setAuditores(dataAuditores)
         setDependencias(dataDeps)
+
       } catch (error) {
         console.error('Error general:', error)
       }
@@ -68,6 +73,10 @@ export default function VistaInformesAdmin() {
       setInformes((prev) => [...prev, creado[0]])
       setNuevoInforme({ usuario_id: '', dependencia_id: '' })
       setMostrarModal(false)
+      toast.success('Auditoria asignada con éxito')
+      localStorage.setItem('vistaActual', 'crearInforme')
+      router.push('/admin?vista=crearInforme')
+
     } else {
       const error = await res.text()
       alert('Error al crear informe: ' + error)

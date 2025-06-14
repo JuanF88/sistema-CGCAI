@@ -41,7 +41,7 @@
 .titulo {
   font-size: 2.5rem;
   font-weight: 700;
-  color: #8f2c7ab2;
+  color: #7c3aed;
   text-shadow: 1px 1px 2px #00000052;
   letter-spacing: 0.5px;
 }
@@ -76,7 +76,7 @@
 }
 
 .boton {
-  background: linear-gradient(90deg, #f83729, #2d9cf7);
+  background: linear-gradient(90deg, #7c3aed, #8f2c7ab2);
   color: white;
   padding: 0.75rem;
   font-weight: 600;
