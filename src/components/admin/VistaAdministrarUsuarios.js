@@ -24,7 +24,6 @@ export default function VistaAdministrarUsuarios() {
   useEffect(() => {
     const fetchData = async () => {
       const resUsuarios = await fetch('/api/usuarios')
-      const resDeps = await fetch('/api/dependencias')
 
       const dataUsuarios = await resUsuarios.json()
 
