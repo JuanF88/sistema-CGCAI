@@ -27,7 +27,6 @@ export default function VistaAdministrarUsuarios() {
       const resDeps = await fetch('/api/dependencias')
 
       const dataUsuarios = await resUsuarios.json()
-      const dataDeps = await resDeps.json()
 
       setUsuarios(dataUsuarios)
     }
