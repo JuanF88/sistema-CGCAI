@@ -8,7 +8,7 @@
 /* Sidebar */
 .sidebar {
   width: 260px;
-  background: linear-gradient(to bottom, #7c3aed, #4f46e5);
+  background: linear-gradient(to bottom, #b762f0c2, #4f46e5);
   color: white;
   display: flex;
   flex-direction: column;
