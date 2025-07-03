@@ -5,8 +5,14 @@ export async function GET() {
     .from('informes_auditoria')
     .select(`
       id,
-      dependencia_id,
+      objetivo,
+      criterios,
+      conclusiones,
       fecha_auditoria,
+      asistencia_tipo,
+      fecha_seguimiento,
+      recomendaciones,
+      auditores_acompanantes,
       usuario_id,
       dependencia_id,
       usuarios:usuario_id (
@@ -15,7 +21,10 @@ export async function GET() {
       ),
       dependencias:dependencia_id (
         nombre
-      )
+      ),
+      fortalezas ( id ),
+      oportunidades_mejora ( id ),
+      no_conformidades ( id )
     `)
 
   if (error) {
@@ -30,6 +39,10 @@ export async function POST(req) {
   const body = await req.json()
   const { usuario_id, dependencia_id } = body
 
+  if (!usuario_id || !dependencia_id) {
+    return Response.json({ error: 'Faltan campos requeridos' }, { status: 400 })
+  }
+
   const { data, error } = await supabase
     .from('informes_auditoria')
     .insert([{ usuario_id, dependencia_id }])
@@ -43,10 +56,14 @@ export async function POST(req) {
       ),
       dependencias:dependencia_id (
         nombre
-      )
+      ),
+      fortalezas ( id ),
+      oportunidades_mejora ( id ),
+      no_conformidades ( id )
     `)
 
   if (error) {
+    console.error('❌ Error al crear informe:', error.message)
     return Response.json({ error: error.message }, { status: 500 })
   }
 

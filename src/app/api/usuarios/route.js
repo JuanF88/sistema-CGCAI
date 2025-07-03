@@ -7,7 +7,7 @@ export async function GET(request) {
 
   let query = supabase
     .from('usuarios')
-    .select('usuario_id, nombre, apellido, email, rol, password')
+    .select('usuario_id, nombre, apellido, email, rol, password, estado')
 
   if (rol) {
     query = query.eq('rol', rol)
@@ -32,15 +32,15 @@ export async function PUT(request) {
   }
 
   const body = await request.json()
-  const { nombre, apellido, email, password, rol } = body
+const { nombre, apellido, email, password, rol, estado } = body
 
   console.log('🆔 ID recibido:', id)
   console.log('📝 Intentando actualizar usuario:', body)
 
   const { error: errorUpdate } = await supabase
-    .from('usuarios')
-    .update({ nombre, apellido, email, password, rol })
-    .eq('usuario_id', id)
+  .from('usuarios')
+  .update({ nombre, apellido, email, password, rol, estado })
+  .eq('usuario_id', id)
 
   if (errorUpdate) {
     console.error('❌ Error al actualizar usuario:', errorUpdate)
@@ -64,7 +64,7 @@ export async function PUT(request) {
 
 export async function POST(request) {
   const body = await request.json()
-  const { nombre, apellido, email, password, rol } = body
+const { nombre, apellido, email, password, rol, estado = 'activo' } = body
 
   if (!nombre || !email || !password || !rol) {
     return NextResponse.json(
@@ -74,8 +74,8 @@ export async function POST(request) {
   }
 
   const { data, error } = await supabase
-    .from('usuarios')
-    .insert([{ nombre, apellido, email, password, rol }])
+  .from('usuarios')
+  .insert([{ nombre, apellido, email, password, rol, estado }])
     .select()
     .single()
 

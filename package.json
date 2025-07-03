@@ -17,6 +17,7 @@
     "pdf-lib": "^1.17.1",
     "pizzip": "^3.2.0",
     "react": "^19.0.0",
+    "react-data-table-component": "^7.7.0",
     "react-dom": "^19.0.0",
     "react-slick": "^0.30.3",
     "react-toastify": "^11.0.5",

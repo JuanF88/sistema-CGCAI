@@ -1,4 +1,5 @@
 'use client'
+
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
@@ -18,10 +19,11 @@ export default function LoginPage() {
       .select('*')
       .eq('email', email)
       .eq('password', password)
+      .eq('estado', 'activo') // 🛡️ Solo usuarios activos pueden loguearse
       .single()
 
     if (error || !data) {
-      setErrorMsg('Correo o contraseña incorrectos')
+      setErrorMsg('Correo, contraseña incorrectos o usuario inactivo')
     } else if (!data.rol) {
       setErrorMsg('Este usuario no tiene un rol definido.')
     } else {

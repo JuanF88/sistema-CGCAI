@@ -3,15 +3,51 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'react-toastify'
 import { useRouter } from 'next/navigation'
+import DataTable from 'react-data-table-component'
 
 export default function VistaInformesAdmin() {
   const [informes, setInformes] = useState([])
   const [auditores, setAuditores] = useState([])
   const [dependencias, setDependencias] = useState([])
   const [mostrarModal, setMostrarModal] = useState(false)
-
   const router = useRouter()
-  
+
+  const [busqueda, setBusqueda] = useState('')
+  const [filtroDependencia, setFiltroDependencia] = useState('')
+  const [filtroAuditor, setFiltroAuditor] = useState('')
+  const [filtroAnio, setFiltroAnio] = useState('')
+  const [filtroSemestre, setFiltroSemestre] = useState('')
+
+
+  const informesFiltrados = informes.filter((informe) => {
+    const coincideBusqueda =
+      busqueda === '' ||
+      (informe.usuarios &&
+        (`${informe.usuarios.nombre} ${informe.usuarios.apellido}`.toLowerCase().includes(busqueda.toLowerCase()))) ||
+      (informe.dependencias?.nombre?.toLowerCase().includes(busqueda.toLowerCase())) ||
+      (informe.id?.toString().includes(busqueda))
+
+    const coincideDependencia =
+      filtroDependencia === '' || informe.dependencia_id === parseInt(filtroDependencia)
+
+    const coincideAuditor =
+      filtroAuditor === '' || informe.usuario_id === parseInt(filtroAuditor)
+
+    const coincideAnio =
+      filtroAnio === '' ||
+      (informe.fecha_auditoria &&
+        new Date(informe.fecha_auditoria).getFullYear().toString() === filtroAnio)
+
+    const coincideSemestre =
+      filtroSemestre === '' ||
+      (informe.fecha_auditoria &&
+        ((new Date(informe.fecha_auditoria).getMonth() + 1 <= 6 && filtroSemestre === '1') ||
+          (new Date(informe.fecha_auditoria).getMonth() + 1 > 6 && filtroSemestre === '2')))
+
+    return coincideBusqueda && coincideDependencia && coincideAuditor && coincideAnio && coincideSemestre
+  })
+
+
   const [nuevoInforme, setNuevoInforme] = useState({
     usuario_id: '',
     dependencia_id: '',
@@ -21,38 +57,21 @@ export default function VistaInformesAdmin() {
     const fetchData = async () => {
       try {
         const resInformes = await fetch('/api/informes')
-        if (!resInformes.ok) {
-          const errorText = await resInformes.text()
-          console.error('❌ Error al obtener informes:', errorText)
-          return
-        }
         const dataInformes = await resInformes.json()
 
         const resAuditores = await fetch('/api/usuarios?rol=auditor')
-        if (!resAuditores.ok) {
-          const errorText = await resAuditores.text()
-          console.error('❌ Error al obtener auditores:', errorText)
-          return
-        }
         const dataAuditores = await resAuditores.json()
 
         const resDeps = await fetch('/api/dependencias')
-        if (!resDeps.ok) {
-          const errorText = await resDeps.text()
-          console.error('❌ Error al obtener dependencias:', errorText)
-          return
-        }
         const dataDeps = await resDeps.json()
 
         setInformes(dataInformes)
         setAuditores(dataAuditores)
         setDependencias(dataDeps)
-
       } catch (error) {
-        console.error('Error general:', error)
+        console.error('Error al cargar datos:', error)
       }
     }
-
     fetchData()
   }, [])
 
@@ -60,8 +79,12 @@ export default function VistaInformesAdmin() {
     const { name, value } = e.target
     setNuevoInforme((prev) => ({ ...prev, [name]: value }))
   }
-
   const crearInforme = async () => {
+    if (!nuevoInforme.usuario_id || !nuevoInforme.dependencia_id) {
+      toast.error('Por favor seleccione un auditor y una dependencia');
+      return;
+    }
+
     const res = await fetch('/api/informes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -73,37 +96,193 @@ export default function VistaInformesAdmin() {
       setInformes((prev) => [...prev, creado[0]])
       setNuevoInforme({ usuario_id: '', dependencia_id: '' })
       setMostrarModal(false)
-      toast.success('Auditoria asignada con éxito')
+      toast.success('Auditoría asignada con éxito')
       localStorage.setItem('vistaActual', 'crearInforme')
       router.push('/admin?vista=crearInforme')
-
     } else {
-      const error = await res.text()
-      alert('Error al crear informe: ' + error)
+      try {
+        const error = await res.json()
+        alert('Error al crear informe: ' + (error?.error || 'Error desconocido'))
+      } catch (err) {
+        alert('Error al crear informe: No se pudo leer el mensaje de error')
+      }
     }
   }
+
+  const contarCamposCompletos = (a) => {
+    const campos = [
+      'objetivo',
+      'criterios',
+      'conclusiones',
+      'fecha_auditoria',
+      'asistencia_tipo',
+      'fecha_seguimiento',
+      'recomendaciones',
+      'auditores_acompanantes'
+    ]
+    return campos.reduce((acc, campo) => (a[campo] ? acc + 1 : acc), 0)
+  }
+
+  const calcularAvance = (a) => {
+    const total = 8
+    const completos = contarCamposCompletos(a)
+    const tieneHallazgos =
+      (a.fortalezas?.length || 0) > 0 ||
+      (a.oportunidades_mejora?.length || 0) > 0 ||
+      (a.no_conformidades?.length || 0) > 0
+
+    if (completos < total) return 0
+    return tieneHallazgos ? 100 : 50
+  }
+  const columnas = [
+    {
+      name: 'ID',
+      selector: row => row.id,
+      sortable: true,
+      width: '70px'
+    },
+    {
+      name: 'Año',
+      selector: row => {
+        const fecha = row.fecha_auditoria ? new Date(row.fecha_auditoria) : null
+        return fecha ? fecha.getFullYear() : 'N/A'
+      },
+      sortable: true
+    },
+    {
+      name: 'Semestre',
+      selector: row => {
+        const fecha = row.fecha_auditoria ? new Date(row.fecha_auditoria) : null
+        if (!fecha) return 'N/A'
+        const mes = fecha.getMonth() + 1
+        return mes >= 1 && mes <= 6 ? '1' : '2'
+      },
+      sortable: true
+    },
+    {
+      name: 'Dependencia',
+      selector: row => row.dependencias?.nombre || 'N/A',
+      sortable: true
+    },
+    {
+      name: 'Auditor',
+      selector: row =>
+        row.usuarios ? `${row.usuarios.nombre} ${row.usuarios.apellido}` : 'No asignado',
+      sortable: true
+    },
+    {
+      name: 'Avance',
+      selector: row => calcularAvance(row),
+      sortable: true,
+      cell: row => {
+        const progreso = calcularAvance(row)
+        let color = 'text-gray-600'
+        if (progreso === 100) color = 'text-green-600'
+        else if (progreso >= 50) color = 'text-yellow-600'
+        else color = 'text-red-600'
+
+        return <span className={`font-semibold ${color}`}>{progreso}%</span>
+      }
+    },
+    {
+      name: 'Acciones',
+      cell: row => (
+        <button
+          onClick={() => router.push(`/admin/informe/${row.id}`)}
+          className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+        >
+          Ver más
+        </button>
+      )
+    }
+  ]
+
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-700">Informes de Auditoría</h2>
 
-      {/* Lista de informes */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {informes.map((informe) => (
-          <div key={informe.id} className="bg-white p-4 rounded-lg shadow">
-            <p className="text-sm text-gray-500">ID: {informe.id}</p>
-            <p className="text-lg font-semibold text-gray-800">
-              Dependencia: {informe.dependencias?.nombre || 'N/A'}
-            </p>
-            <p className="text-sm text-gray-600">
-              Auditor: {informe.usuarios ? `${informe.usuarios.nombre} ${informe.usuarios.apellido}` : 'No asignado'}
-            </p>
-          </div>
-        ))}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+        {/* Búsqueda */}
+        <input
+          type="text"
+          placeholder="Buscar por nombre, dependencia o ID"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          className="border p-2 rounded w-full"
+        />
+
+        {/* Dependencia */}
+        <select
+          value={filtroDependencia}
+          onChange={(e) => setFiltroDependencia(e.target.value)}
+          className="border p-2 rounded w-full"
+        >
+          <option value="">Todas las dependencias</option>
+          {dependencias.map((dep) => (
+            <option key={dep.dependencia_id} value={dep.dependencia_id}>
+              {dep.nombre}
+            </option>
+          ))}
+        </select>
+
+        {/* Auditor */}
+        <select
+          value={filtroAuditor}
+          onChange={(e) => setFiltroAuditor(e.target.value)}
+          className="border p-2 rounded w-full"
+        >
+          <option value="">Todos los auditores</option>
+          {auditores.map((a) => (
+            <option key={a.usuario_id} value={a.usuario_id}>
+              {a.nombre} {a.apellido}
+            </option>
+          ))}
+        </select>
+
+        {/* Año */}
+        <select
+          value={filtroAnio}
+          onChange={(e) => setFiltroAnio(e.target.value)}
+          className="border p-2 rounded w-full"
+        >
+          <option value="">Todos los años</option>
+          {[...new Set(informes.map((i) =>
+            i.fecha_auditoria ? new Date(i.fecha_auditoria).getFullYear() : null
+          ))]
+            .filter((a) => a)
+            .sort()
+            .map((anio) => (
+              <option key={anio} value={anio}>{anio}</option>
+            ))}
+        </select>
+
+        {/* Semestre */}
+        <select
+          value={filtroSemestre}
+          onChange={(e) => setFiltroSemestre(e.target.value)}
+          className="border p-2 rounded w-full"
+        >
+          <option value="">Todos los semestres</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+        </select>
       </div>
 
+      {/* Tabla de informes */}
+      <DataTable
+        columns={columnas}
+        data={informesFiltrados}
+        pagination
+        highlightOnHover
+        responsive
+        striped
+        noDataComponent="No hay informes registrados."
+      />
+
+
       {/* Botón para agregar nuevo */}
-      <div className="flex justify-center">
+      <div className="flex justify-center mt-4">
         <button
           onClick={() => setMostrarModal(true)}
           className="text-3xl text-white bg-emerald-600 hover:bg-emerald-700 rounded-full w-14 h-14 flex items-center justify-center shadow-xl"

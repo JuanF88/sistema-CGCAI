@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'react-toastify'
 import { useRouter } from 'next/navigation'
+import DataTable from 'react-data-table-component'
 
 export default function VistaAdministrarUsuarios() {
   const [usuarios, setUsuarios] = useState([])
@@ -10,7 +11,6 @@ export default function VistaAdministrarUsuarios() {
   const [editando, setEditando] = useState(false)
 
   const router = useRouter()
-  
 
   const [formulario, setFormulario] = useState({
     usuario_id: null,
@@ -18,18 +18,16 @@ export default function VistaAdministrarUsuarios() {
     apellido: '',
     email: '',
     password: '',
-    rol: ''
+    rol: '',
+    estado: 'activo'
   })
 
   useEffect(() => {
     const fetchData = async () => {
       const resUsuarios = await fetch('/api/usuarios')
-
       const dataUsuarios = await resUsuarios.json()
-
       setUsuarios(dataUsuarios)
     }
-
     fetchData()
   }, [])
 
@@ -40,13 +38,10 @@ export default function VistaAdministrarUsuarios() {
 
   const handleSubmit = async () => {
     try {
-      console.info('📤 Formulario a enviar:', formulario)
-
       let res, data
 
       if (editando) {
         if (!formulario.usuario_id) {
-          console.error('⚠️ Falta usuario_id para actualizar:', formulario)
           alert('Error: No se especificó el ID del usuario a actualizar.')
           return
         }
@@ -54,16 +49,10 @@ export default function VistaAdministrarUsuarios() {
         res = await fetch(`/api/usuarios?id=${formulario.usuario_id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            nombre: formulario.nombre,
-            apellido: formulario.apellido,
-            email: formulario.email,
-            rol: formulario.rol,
-            password: formulario.password
-          })
+          body: JSON.stringify(formulario)
         })
       } else {
-          res = await fetch('/api/usuarios', {
+        res = await fetch('/api/usuarios', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formulario)
@@ -72,32 +61,25 @@ export default function VistaAdministrarUsuarios() {
 
       if (!res.ok) {
         const err = await res.json()
-        console.error('❌ Error en respuesta:', err)
         alert('Error al guardar: ' + (err?.error || 'Desconocido'))
         return
       }
 
       data = await res.json()
-
       setUsuarios((prev) =>
         editando
           ? prev.map((u) => (u.usuario_id === data.usuario_id ? data : u))
           : [...prev, data]
-        
       )
 
       cerrarModal()
-
       toast.success('Usuario actualizado/creado con éxito')
       localStorage.setItem('vistaAdmin', 'bienvenida')
       router.push('/admin?vista=bienvenida')
-
     } catch (err) {
-      console.error('❌ Error inesperado en handleSubmit:', err)
       alert('Error inesperado al guardar')
     }
   }
-
 
   const abrirEdicion = (usuario) => {
     setFormulario({ ...usuario })
@@ -112,7 +94,8 @@ export default function VistaAdministrarUsuarios() {
       apellido: '',
       email: '',
       password: '',
-      rol: ''
+      rol: '',
+      estado: 'activo'
     })
     setEditando(false)
     setMostrarModal(true)
@@ -125,52 +108,66 @@ export default function VistaAdministrarUsuarios() {
       apellido: '',
       email: '',
       password: '',
-      rol: ''
+      rol: '',
+      estado: 'activo'
     })
     setMostrarModal(false)
     setEditando(false)
   }
 
-
-  //VISTA
+  const columnas = [
+    {
+      name: 'ID',
+      selector: row => row.usuario_id,
+      sortable: true,
+      width: '80px'
+    },
+    {
+      name: 'Nombre',
+      selector: row => `${row.nombre} ${row.apellido}`,
+      sortable: true,
+    },
+    {
+      name: 'Email',
+      selector: row => row.email,
+      sortable: true,
+    },
+    {
+      name: 'Rol',
+      selector: row => row.rol,
+      sortable: true,
+    },
+    {
+      name: 'Estado',
+      selector: row => row.estado,
+      sortable: true,
+    },
+    {
+      name: 'Acciones',
+      cell: row => (
+        <button
+          onClick={() => abrirEdicion(row)}
+          className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+        >
+          Editar
+        </button>
+      )
+    }
+  ]
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-700">Usuarios</h2>
 
-      {['admin', 'auditor', 'gestor'].map((rol) => {
-        const color =
-          rol === 'admin'
-            ? 'border-blue-500'
-            : rol === 'auditor'
-              ? 'border-green-500'
-              : 'border-yellow-500'
-
-        return (
-          <div key={rol} className="mb-8">
-            <h3 className="text-xl font-semibold text-gray-700 capitalize mb-2">
-              {rol === 'admin' ? 'Administradores' : rol === 'auditor' ? 'Auditores' : 'Gestores'}
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {usuarios
-                .filter((u) => u.rol === rol)
-                .map((usuario) => (
-                  <div
-                    key={usuario.usuario_id}
-                    className={`bg-white p-4 rounded shadow cursor-pointer hover:bg-gray-50 border-l-4 ${color}`}
-                    onClick={() => abrirEdicion(usuario)}
-                  >
-                    <p className="font-semibold text-gray-800">
-                      {usuario.nombre} {usuario.apellido}
-                    </p>
-                    <p className="text-sm text-gray-600">{usuario.email}</p>
-                    <p className="text-sm text-gray-500 capitalize">{usuario.rol}</p>
-                  </div>
-                ))}
-            </div>
-          </div>
-        )
-      })}
+      <DataTable
+        columns={columnas}
+        data={usuarios}
+        pagination
+        highlightOnHover
+        responsive
+        striped
+        noDataComponent="No hay usuarios registrados."
+      />
 
       <div className="flex justify-center">
         <button
@@ -238,6 +235,16 @@ export default function VistaAdministrarUsuarios() {
               <option value="gestor">Gestor</option>
             </select>
 
+            <select
+              name="estado"
+              value={formulario.estado}
+              onChange={handleChange}
+              className="w-full border p-2 rounded"
+            >
+              <option value="activo">Activo</option>
+              <option value="inactivo">Inactivo</option>
+            </select>
+
             <div className="flex justify-end gap-2">
               <button onClick={cerrarModal} className="text-gray-500 px-4 py-2 rounded hover:text-gray-700">
                 Cancelar
@@ -254,8 +261,4 @@ export default function VistaAdministrarUsuarios() {
       )}
     </div>
   )
-
-
-
-
 }
