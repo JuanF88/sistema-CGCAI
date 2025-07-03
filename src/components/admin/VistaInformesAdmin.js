@@ -103,7 +103,7 @@ export default function VistaInformesAdmin() {
       try {
         const error = await res.json()
         alert('Error al crear informe: ' + (error?.error || 'Error desconocido'))
-      } catch (err) {
+      } catch (error) {
         alert('Error al crear informe: No se pudo leer el mensaje de error')
       }
     }

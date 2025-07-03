@@ -60,8 +60,8 @@ export default function VistaAdministrarUsuarios() {
       }
 
       if (!res.ok) {
-        const err = await res.json()
-        alert('Error al guardar: ' + (err?.error || 'Desconocido'))
+        const error = await res.json()
+        alert('Error al guardar: ' + (error?.error || 'Desconocido'))
         return
       }
 
