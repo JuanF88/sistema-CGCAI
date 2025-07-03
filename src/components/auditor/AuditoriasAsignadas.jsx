@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import FormularioRegistro from './FormularioRegistro'
 import styles from '@/components/CSS/AuditoriasAsignadas.module.css'
+import { generarInformeAuditoriaDocx } from '@/components/auditor/Utilidades/generarInformeAuditoria.jsx'
 
 export default function AuditoriasAsignadas({ usuario, reset }) {
   const [auditorias, setAuditorias] = useState([])
@@ -91,24 +92,85 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
           return (
             <div
               key={a.id}
-              onClick={() => setAuditoriaSeleccionada(a)}
               className={`${styles.card} ${progreso === 100 ? styles.cardCompleta : ''}`}
             >
-              <p className={styles.nombreDep}>🏢 {nombreDep}</p>
+              <div className={styles.cardContenido} onClick={() => setAuditoriaSeleccionada(a)}>
+                <p className={styles.nombreDep}>🏢 {nombreDep}</p>
 
-              <div className={styles.barraProgreso}>
-                <div
-                  className={progreso === 100 ? styles.progresoVerde : styles.progresoAmarillo}
-                  style={{ width: `${progreso}%` }}
-                ></div>
+                <div className={styles.barraProgreso}>
+                  <div
+                    className={progreso === 100 ? styles.progresoVerde : styles.progresoAmarillo}
+                    style={{ width: `${progreso}%` }}
+                  ></div>
+                </div>
+
+                <p className={styles.estado}>
+                  {progreso === 0 && '📝 Incompleta'}
+                  {progreso === 50 && '🧩 Campos listos. Asignar hallazgos'}
+                  {progreso === 100 && '✅ Informe con hallazgos cargados'}
+                </p>
               </div>
 
-              <p className={styles.estado}>
-                {progreso === 0 && '📝 Incompleta'}
-                {progreso === 50 && '🧩 Campos listos. Asignar hallazgos'}
-                {progreso === 100 && '✅ Informe con hallazgos cargados'}
-              </p>
+              {progreso === 100 && (
+
+
+
+                <button className={styles.botonDescarga} onClick={async (e) => {
+                  e.stopPropagation();
+
+                  const [fort, opor, noConfor] = await Promise.all([
+                    supabase
+                      .from('fortalezas')
+                      .select(`
+        *,
+        iso:iso_id ( iso ),
+        capitulo:capitulo_id ( capitulo ),
+        numeral:numeral_id ( numeral )
+      `)
+                      .eq('informe_id', a.id),
+
+                    supabase
+                      .from('oportunidades_mejora')
+                      .select(`
+        *,
+        iso:iso_id ( iso ),
+        capitulo:capitulo_id ( capitulo ),
+        numeral:numeral_id ( numeral )
+      `)
+                      .eq('informe_id', a.id),
+
+                    supabase
+                      .from('no_conformidades')
+                      .select(`
+        *,
+        iso:iso_id ( iso ),
+        capitulo:capitulo_id ( capitulo ),
+        numeral:numeral_id ( numeral )
+      `)
+                      .eq('informe_id', a.id),
+                  ]);
+
+                  console.log('🧾 Informe:', a);
+                  console.log('✅ Fortalezas:', fort.data);
+                  console.log('✅ Oportunidades de mejora:', opor.data);
+                  console.log('✅ No conformidades:', noConfor.data);
+                  console.log('👤 Usuario:', usuario);
+
+                  await generarInformeAuditoriaDocx(
+                    a,
+                    fort.data || [],
+                    opor.data || [],
+                    noConfor.data || [],
+                    usuario
+                  );
+                }}>
+                  📄 Descargar DOCX
+                </button>
+
+
+              )}
             </div>
+
           )
         })
       )}

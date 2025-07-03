@@ -25,13 +25,13 @@
 }
 
 .tituloEstilo {
-  font-size: 2.0rem;
+  font-size: 40px;
   font-weight: 500;
   color: #8f2c7ab2;
   text-shadow: 1px 1px 2px #00000052;
   letter-spacing: 0.5px;
   text-align: center;
-  margin-bottom: 10px;
+  margin-bottom: 40px;
 }
 
 .verde {
@@ -100,7 +100,7 @@
   /* border-gray-300 */
   border-radius: 0.75rem;
   /* rounded */
-  margin-bottom: 1rem;
+  margin-bottom: 2rem;
   /* mb-4 */
   position: relative;
   display: flex;
@@ -112,7 +112,7 @@
 }
 
 .fortalezaBg {
-  background-color: #f9fafb;
+  background-color: #c3ffb133;
   /* bg-gray-50 */
 }
 
@@ -156,6 +156,45 @@
 .inputCampo:focus {
   border-color: #6366f1;
   /* border-indigo-500 */
+}
+
+.etiqueta {
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+  color: #7e008a;
+  /* gray-700 */
+  display: block;
+}
+
+.etiquetaTituloFortalezas {
+  margin-top: 1.25rem;
+  margin-bottom: 1.25rem;
+  font-weight: 800;
+  color: #009721;
+  /* Tailwind gray-700 */
+  text-align: center;
+  font-size: 40px;
+}
+
+.etiquetaTituloOportunidades {
+  margin-top: 1.25rem;
+  margin-bottom: 1.25rem;
+  font-weight: 800;
+  color: #002397;
+  /* Tailwind gray-700 */
+  text-align: center;
+  font-size: 40px;
+}
+
+.etiquetaTituloNoConformidad {
+  margin-top: 1.25rem;
+  margin-bottom: 1.25rem;
+  font-weight: 800;
+  color: #970021;
+  /* Tailwind gray-700 */
+  text-align: center;
+  font-size: 40px;
 }
 
 @keyframes fadeIn {

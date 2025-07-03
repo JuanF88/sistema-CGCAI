@@ -26,16 +26,43 @@
 }
 
 .card {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.2rem;
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+  transition: box-shadow 0.3s ease;
   cursor: pointer;
-  border-radius: 0.75rem;
-  padding: 1rem;
-  transition: all 0.3s ease;
-  border: 2px solid #ecc94b;
-  margin-bottom: 1.2rem; /* 👈 Espaciado entre tarjetas */
 }
+
 .card:hover {
-  background-color: #fefcbf;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
+
+.cardContenido {
+  flex: 1;
+}
+
+.botonDescarga {
+  margin-left: 1rem;
+  padding: 0.6rem 1rem;
+  background-color: #1dac30;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.botonDescarga:hover {
+  background-color: #0c4205;
+}
+
 
 .cardCompleta {
   border-color: #48bb78;
