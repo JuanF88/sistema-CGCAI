@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { LogOut, FileText, Home } from 'lucide-react'
 import styles from '@/components/CSS/AuditorDashboard.module.css'
 import VistaActual from '@/components/auditor/VistaActual'
+import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from "@vercel/analytics/next"
 
 export default function AuditorDashboard() {
   const router = useRouter()
@@ -25,6 +27,8 @@ export default function AuditorDashboard() {
 
   return (
     <div className={styles.dashboardContainer}>
+      <SpeedInsights />
+      <Analytics />
       {/* Panel lateral */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarContent}>
@@ -37,9 +41,8 @@ export default function AuditorDashboard() {
                 setVista('bienvenida')
                 window.history.pushState({}, '', '/auditor?vista=bienvenida')
               }}
-              className={`${styles.navButton} ${
-                vista === 'bienvenida' ? styles.active : ''
-              }`}
+              className={`${styles.navButton} ${vista === 'bienvenida' ? styles.active : ''
+                }`}
             >
               <Home size={18} /> <span>Inicio</span>
             </button>
@@ -50,9 +53,8 @@ export default function AuditorDashboard() {
                 setResetAuditorias(prev => !prev)
                 window.history.pushState({}, '', '/auditor?vista=asignadas')
               }}
-              className={`${styles.navButton} ${
-                vista === 'asignadas' ? styles.active : ''
-              }`}
+              className={`${styles.navButton} ${vista === 'asignadas' ? styles.active : ''
+                }`}
             >
               <FileText size={18} /> <span>Auditorías asignadas</span>
             </button>

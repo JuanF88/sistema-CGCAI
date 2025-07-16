@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation'
 import { LogOut, FileText, UserPlus, Home} from 'lucide-react'
 import { Lightbulb } from 'lucide-react'
 import { BarChart } from 'lucide-react'
-
+import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from "@vercel/analytics/next"
 
 import styles from '@/components/CSS/AdminDashboard.module.css'
-import VistaActualAdmin from '@/components/admin/VistaActual'
 
 
 import VistaBienvenida from '@/components/VistaBienvenida'
@@ -36,6 +36,8 @@ export default function AdminDashboard() {
 
   return (
     <div className={styles.dashboardContainer}>
+      <SpeedInsights />
+      <Analytics />
       {/* Panel lateral */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarContent}>

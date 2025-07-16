@@ -95,12 +95,10 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
               className={`${styles.card} ${progreso === 100 ? styles.cardCompleta : ''}`}
             >
               <div className={styles.cardContenido} onClick={() => setAuditoriaSeleccionada(a)}>
-<p className={styles.nombreDep}>
-  🏢 | {nombreDep} | 📅 {new Date(a.fecha_auditoria).getFullYear()} | 🧾 Auditoría #{a.id}
-</p>
-
-
-
+                <p className={styles.nombreDep}>
+                  🏢 | {nombreDep} | 📅 {new Date(a.fecha_auditoria).getFullYear()} | 🧾 Auditoría #{a.id}
+                </p>
+                
                 <div className={styles.barraProgreso}>
                   <div
                     className={progreso === 100 ? styles.progresoVerde : styles.progresoAmarillo}
