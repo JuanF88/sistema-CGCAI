@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, FileText, UserPlus, Home } from 'lucide-react'
+import { LogOut, FileText, UserPlus, Home} from 'lucide-react'
+import { Lightbulb } from 'lucide-react'
+import { BarChart } from 'lucide-react'
 
 
 import styles from '@/components/CSS/AdminDashboard.module.css'
@@ -12,6 +14,8 @@ import VistaActualAdmin from '@/components/admin/VistaActual'
 import VistaBienvenida from '@/components/VistaBienvenida'
 import VistaInformesAdmin from '@/components/admin/VistaInformesAdmin'
 import VistaAdministrarUsuarios from '@/components/admin/VistaAdministrarUsuarios'
+import VistaAdministrarHallazgos from '@/components/admin/VistaAdministrarHallazgos'
+import VistaEstadisticas from '@/components/admin/VistaEstadisticas'
 
 
 export default function AdminDashboard() {
@@ -71,6 +75,27 @@ export default function AdminDashboard() {
               <UserPlus size={18} /> <span>Administrar Usuarios</span>
             </button>
 
+            <button
+              onClick={() => {
+                setVista('administrarHallazgos')
+                window.history.pushState({}, '', '/admin?vista=administrarHallazgos')
+              }}
+              className={`${styles.navButton} ${vista === 'administrarHallazgos' ? styles.active : ''}`}
+            >
+              <Lightbulb size={18} /> <span>Reporte de Hallazgos</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setVista('estadisticas')
+                window.history.pushState({}, '', '/admin?vista=estadisticas')
+              }}
+              className={`${styles.navButton} ${vista === 'estadisticas' ? styles.active : ''}`}
+            >
+              <BarChart size={18} /> <span>Estadísticas</span>
+            </button>
+
+
         </nav>
 
         </div>
@@ -88,6 +113,8 @@ export default function AdminDashboard() {
   {vista === 'bienvenida' && usuario && <VistaBienvenida usuario={usuario} />}
   {vista === 'crearInforme' && <VistaInformesAdmin />}
   {vista === 'crearUsuario' && <VistaAdministrarUsuarios />}
+  {vista === 'administrarHallazgos' && <VistaAdministrarHallazgos />}
+  {vista === 'estadisticas' && <VistaEstadisticas />}
   {vista === 'gestionarUsuarios' && (
     <p className="text-lg text-gray-700">Aquí irá la gestión de usuarios</p>
   )}

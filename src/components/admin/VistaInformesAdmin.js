@@ -11,13 +11,17 @@ export default function VistaInformesAdmin() {
   const [dependencias, setDependencias] = useState([])
   const [mostrarModal, setMostrarModal] = useState(false)
   const router = useRouter()
-
   const [busqueda, setBusqueda] = useState('')
   const [filtroDependencia, setFiltroDependencia] = useState('')
   const [filtroAuditor, setFiltroAuditor] = useState('')
   const [filtroAnio, setFiltroAnio] = useState('')
   const [filtroSemestre, setFiltroSemestre] = useState('')
 
+  const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false)
+  const [informeAEliminar, setInformeAEliminar] = useState(null)
+
+  const [mostrarDetalle, setMostrarDetalle] = useState(false)
+  const [informeDetalle, setInformeDetalle] = useState(null)
 
   const informesFiltrados = informes.filter((informe) => {
     const coincideBusqueda =
@@ -103,9 +107,30 @@ export default function VistaInformesAdmin() {
       try {
         const error = await res.json()
         alert('Error al crear informe: ' + (error?.error || 'Error desconocido'))
-      } catch (error) {
+      } catch (err) {
         alert('Error al crear informe: No se pudo leer el mensaje de error')
       }
+    }
+  }
+
+  const eliminarInforme = async (id) => {
+    try {
+      const res = await fetch('/api/informes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+
+      if (res.ok) {
+        setInformes(prev => prev.filter(inf => inf.id !== id))
+        toast.success('Informe eliminado correctamente')
+      } else {
+        const error = await res.json()
+        toast.error('Error al eliminar: ' + (error?.error || 'desconocido'))
+      }
+    } catch (err) {
+      console.error('Error al eliminar:', err)
+      toast.error('Error inesperado al eliminar informe')
     }
   }
 
@@ -187,14 +212,32 @@ export default function VistaInformesAdmin() {
     {
       name: 'Acciones',
       cell: row => (
-        <button
-          onClick={() => router.push(`/admin/informe/${row.id}`)}
-          className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
-        >
-          Ver más
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setInformeDetalle(row)
+              setMostrarDetalle(true)
+            }}
+            className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-sm"
+          >
+            Ver más
+          </button>
+
+
+          <button
+            onClick={() => {
+              setInformeAEliminar(row.id)
+              setMostrarConfirmacion(true)
+            }}
+            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-sm"
+          >
+            Eliminar
+          </button>
+
+        </div>
       )
     }
+
   ]
 
 
@@ -296,7 +339,7 @@ export default function VistaInformesAdmin() {
       {mostrarModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md space-y-4">
-            <h3 className="text-xl font-bold text-gray-700">Nuevo Informe</h3>
+            <h3 className="text-xl font-bold text-gray-700">Nueva Auditoria</h3>
 
             <div>
               <label className="block text-sm font-medium">Dependencia</label>
@@ -349,6 +392,68 @@ export default function VistaInformesAdmin() {
           </div>
         </div>
       )}
+
+      {mostrarConfirmacion && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md space-y-4">
+            <h3 className="text-lg font-bold text-gray-800">¿Eliminar informe?</h3>
+            <p className="text-sm text-gray-600">Esta acción eliminará el informe y todos sus hallazgos asociados. ¿Estás seguro?</p>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setMostrarConfirmacion(false)}
+                className="px-4 py-2 rounded text-gray-500 hover:text-gray-700"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  await eliminarInforme(informeAEliminar)
+                  setMostrarConfirmacion(false)
+                }}
+                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mostrarDetalle && informeDetalle && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-gray-700">Detalle del Informe</h3>
+
+            <div className="space-y-2 text-sm text-gray-800">
+              <p><strong>ID:</strong> {informeDetalle.id}</p>
+              <p><strong>Auditor Responsable:</strong> {informeDetalle.usuarios?.nombre} {informeDetalle.usuarios?.apellido}</p>
+              <p><strong>Dependencia:</strong> {informeDetalle.dependencias?.nombre}</p>
+              <p><strong>Fecha de Auditoría:</strong> {informeDetalle.fecha_auditoria || 'N/A'}</p>
+              <p><strong>Tipo de Asistencia:</strong> {informeDetalle.asistencia_tipo || 'N/A'}</p>
+              <p><strong>Fecha de Seguimiento:</strong> {informeDetalle.fecha_seguimiento || 'N/A'}</p>
+              <p><strong>Acompañantes:</strong> {informeDetalle.auditores_acompanantes?.join(', ') || 'N/A'}</p>
+              <p><strong>Objetivo:</strong> {informeDetalle.objetivo || 'N/A'}</p>
+              <p><strong>Criterios:</strong> {informeDetalle.criterios || 'N/A'}</p>
+              <p><strong>Conclusiones:</strong> {informeDetalle.conclusiones || 'N/A'}</p>
+              <p><strong>Recomendaciones:</strong> {informeDetalle.recomendaciones || 'N/A'}</p>
+              <p><strong>Fortalezas:</strong> {informeDetalle.fortalezas?.length || 0}</p>
+              <p><strong>Oportunidades de Mejora:</strong> {informeDetalle.oportunidades_mejora?.length || 0}</p>
+              <p><strong>No Conformidades:</strong> {informeDetalle.no_conformidades?.length || 0}</p>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => setMostrarDetalle(false)}
+                className="px-4 py-2 rounded text-gray-600 hover:text-gray-800 border border-gray-300"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
