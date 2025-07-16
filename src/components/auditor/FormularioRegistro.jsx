@@ -35,7 +35,7 @@ export default function FormularioRegistro({ usuario, auditoria }) {
       if (data) setListaIso(data)
     }
     cargarISO()
-  }, [])
+  }, [router])
 
   useEffect(() => {
     if (auditoria) {

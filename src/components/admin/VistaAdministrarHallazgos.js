@@ -82,7 +82,7 @@ export default function VistaHallazgosAdmin() {
 
     useEffect(() => {
         fetchHallazgos()
-    }, [])
+    }, [router])
 
     useEffect(() => {
         const fetchHallazgos = async () => {
@@ -93,7 +93,7 @@ export default function VistaHallazgosAdmin() {
         }
 
         fetchHallazgos()
-    }, [])
+    }, [router])
 
     const handleUploadExcel = async (e) => {
         setEstaCargando(true)

@@ -27,7 +27,7 @@ export default function AdminDashboard() {
     const userData = localStorage.getItem('clienteLogueado')
     if (!userData) return router.push('/')
     setUsuario(JSON.parse(userData))
-  }, [])
+  }, [router])
 
   const cerrarSesion = () => {
     localStorage.removeItem('clienteLogueado')

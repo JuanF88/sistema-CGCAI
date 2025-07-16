@@ -23,7 +23,7 @@ export default function ClientesPage() {
 
     
     fetchClientes()
-  }, [])
+  }, [router])
 
   return (
     <div style={{ padding: '2rem' }}>

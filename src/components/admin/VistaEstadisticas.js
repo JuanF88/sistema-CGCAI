@@ -121,8 +121,7 @@ const dataFiltrada = dataResumen.filter(item => {
     }
 
     fetchData()
-  }, [])
-
+  }, [router])
 
   console.log('Ejemplo de dataFiltrada:', dataFiltrada[0])
 

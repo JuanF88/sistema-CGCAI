@@ -29,7 +29,7 @@ export default function VistaAdministrarUsuarios() {
       setUsuarios(dataUsuarios)
     }
     fetchData()
-  }, [])
+  }, [router])
 
   const handleChange = (e) => {
     const { name, value } = e.target

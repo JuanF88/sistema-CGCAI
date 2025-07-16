@@ -7,7 +7,7 @@ export default function VistaInformesAdmin() {
   const [auditores, setAuditores] = useState([])
   const [mostrarModal, setMostrarModal] = useState(false)
   const [nuevoInforme, setNuevoInforme] = useState({ programa: '', usuario_id: '' })
-
+  
   useEffect(() => {
     const fetchData = async () => {
       const [resInformes, resAuditores] = await Promise.all([
@@ -22,7 +22,7 @@ export default function VistaInformesAdmin() {
       setAuditores(dataAuditores)
     }
     fetchData()
-  }, [])
+  }, [router])
 
   const handleChange = (e) => {
     const { name, value } = e.target

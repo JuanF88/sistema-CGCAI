@@ -16,7 +16,7 @@ export default function AuditorDashboard() {
     const userData = localStorage.getItem('clienteLogueado')
     if (!userData) return router.push('/')
     setUsuario(JSON.parse(userData))
-  }, [])
+  }, [router])
 
   const cerrarSesion = () => {
     localStorage.removeItem('clienteLogueado')

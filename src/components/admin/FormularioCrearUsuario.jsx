@@ -12,6 +12,7 @@ export default function FormularioCrearUsuario() {
     rol: '',
     dependencia_id: '',
   })
+  const router = useRouter()
 
   useEffect(() => {
     const fetchDependencias = async () => {
@@ -21,8 +22,8 @@ export default function FormularioCrearUsuario() {
     }
 
     fetchDependencias()
-  }, [])
-
+  }, [router])
+  
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormulario((prev) => ({ ...prev, [name]: value }))
