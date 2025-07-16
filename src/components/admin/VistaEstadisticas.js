@@ -45,7 +45,6 @@ const Button = ({ children, className = '', variant = 'default', ...props }) => 
 }
 
 const Select = SelectPrimitive.Root
-const SelectGroup = SelectPrimitive.Group
 const SelectValue = SelectPrimitive.Value
 
 const SelectTrigger = SelectPrimitive.Trigger
@@ -121,7 +120,7 @@ const dataFiltrada = dataResumen.filter(item => {
     }
 
     fetchData()
-  }, [router])
+  }, [])
 
   console.log('Ejemplo de dataFiltrada:', dataFiltrada[0])
 

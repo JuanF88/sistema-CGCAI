@@ -76,7 +76,7 @@ export default function VistaAdministrarUsuarios() {
       toast.success('Usuario actualizado/creado con éxito')
       localStorage.setItem('vistaAdmin', 'bienvenida')
       router.push('/admin?vista=bienvenida')
-    } catch (err) {
+    } catch {
       alert('Error inesperado al guardar')
     }
   }
