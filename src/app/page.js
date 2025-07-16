@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import styles from '@/app/styles/Login.module.css'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -47,7 +48,15 @@ export default function LoginPage() {
   return (
     <div className={styles.container}>
       <div className={styles.card}>
-        <img src="/logo-universidad.png" alt="Logo Universidad" className={styles.logo} />
+
+
+<Image
+  src="/logo-universidad.png"
+  alt="Logo Universidad"
+  width={150} // o el valor que necesites
+  height={150}
+  priority
+/>
         <h1 className={styles.titulo}>BIENVENIDO</h1>
         <h2 className={styles.subtitulo}>Sistema CGACAI - Auditorías Internas</h2>
         <form onSubmit={handleLogin} className={styles.form}>

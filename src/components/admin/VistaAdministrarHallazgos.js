@@ -82,7 +82,7 @@ export default function VistaHallazgosAdmin() {
 
     useEffect(() => {
         fetchHallazgos()
-    }, [router])
+    }, [])
 
     useEffect(() => {
         const fetchHallazgos = async () => {
@@ -93,7 +93,7 @@ export default function VistaHallazgosAdmin() {
         }
 
         fetchHallazgos()
-    }, [router])
+    }, [])
 
     const handleUploadExcel = async (e) => {
         setEstaCargando(true)
@@ -131,7 +131,7 @@ export default function VistaHallazgosAdmin() {
         const totalValidas = filasValidas.length
         let procesadas = 0
 
-        for (const [index, row] of rows.entries()) {
+        for (const [row] of rows.entries()) {
             if (cancelarCarga) {
                 alert('Carga cancelada por el usuario.')
                 break
@@ -139,10 +139,7 @@ export default function VistaHallazgosAdmin() {
 
             const [
                 ,
-                informeId,
                 anioRaw,
-                semestreRaw,
-                auditorRaw,
                 dependenciaNombre,
                 tipo,
                 iso,
