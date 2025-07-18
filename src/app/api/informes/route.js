@@ -15,6 +15,7 @@ export async function GET() {
       auditores_acompanantes,
       usuario_id,
       dependencia_id,
+      validado,
       usuarios:usuario_id (
         nombre,
         apellido
@@ -55,10 +56,9 @@ export async function DELETE(req) {
   return Response.json({ mensaje: 'Informe eliminado correctamente' })
 }
 
-
 export async function POST(req) {
   const body = await req.json()
-  const { usuario_id, dependencia_id } = body
+  const { usuario_id, dependencia_id, validado = false } = body
 
   if (!usuario_id || !dependencia_id) {
     return Response.json({ error: 'Faltan campos requeridos' }, { status: 400 })
@@ -66,11 +66,12 @@ export async function POST(req) {
 
   const { data, error } = await supabase
     .from('informes_auditoria')
-    .insert([{ usuario_id, dependencia_id }])
+    .insert([{ usuario_id, dependencia_id, validado }])
     .select(`
       id,
       usuario_id,
       dependencia_id,
+      validado,
       usuarios:usuario_id (
         nombre,
         apellido

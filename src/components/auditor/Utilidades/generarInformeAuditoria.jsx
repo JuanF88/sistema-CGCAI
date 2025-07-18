@@ -1,14 +1,20 @@
 import { createReport } from 'docx-templates'
 
-export async function generarInformeAuditoriaDocx(
+export async function generarInformeAuditoria(
   auditoria,
   fortalezas = [],
   oportunidades = [],
   noConformidades = [],
   usuario
 ) {
-  const response = await fetch('/plantillas/Informe-General-Auditoria-PLANTILLA-CORREGIDA.docx') // Usa aquí la plantilla actual
+  const response = await fetch('/plantillas/Informe-General-Auditoria-PLANTILLA-CORREGIDA.docx')
   const templateArrayBuffer = await response.arrayBuffer()
+
+  const fechaActual = new Date().toLocaleDateString('es-CO', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
 
   const datos = {
     fecha: auditoria.fecha_auditoria || '',
@@ -21,7 +27,9 @@ export async function generarInformeAuditoriaDocx(
     criterios: auditoria.criterios || '',
     conclusiones: auditoria.conclusiones || '',
     recomendaciones: auditoria.recomendaciones || '',
+    fecha_seguimiento: auditoria.fecha_seguimiento || '',
     nombre: (usuario?.nombre || '') + ' ' + (usuario?.apellido || ''),
+    fecha_actual: fechaActual,
 
     fortalezas: fortalezas.map(f => ({
       iso_id: f.iso?.iso || '',
@@ -46,17 +54,14 @@ export async function generarInformeAuditoriaDocx(
       descripcion: nc.descripcion || '',
       evidencia: nc.evidencia || ''
     }))
-
-
   }
-
 
   const buffer = await createReport({
     template: templateArrayBuffer,
     data: datos,
     cmdDelimiter: ['+++', '+++'],
-    processLineBreaks: true, // opcional pero recomendable para saltos de línea
-    noSandbox: true // si estás en navegador, esto puede ser necesario
+    processLineBreaks: true,
+    noSandbox: true
   })
 
   const blob = new Blob([buffer], {
