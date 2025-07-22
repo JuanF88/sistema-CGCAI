@@ -20,7 +20,7 @@ export default function LoginPage() {
       .select('*')
       .eq('email', email)
       .eq('password', password)
-      .eq('estado', 'activo') // 🛡️ Solo usuarios activos pueden loguearse
+      .eq('estado', 'activo')
       .single()
 
     if (error || !data) {
@@ -50,13 +50,13 @@ export default function LoginPage() {
       <div className={styles.card}>
 
 
-<Image
-  src="/logo-universidad.png"
-  alt="Logo Universidad"
-  width={150} // o el valor que necesites
-  height={150}
-  priority
-/>
+        <Image
+          src="/logo-universidad.png"
+          alt="Logo Universidad"
+          width={150}
+          height={150}
+          priority
+        />
         <h1 className={styles.titulo}>BIENVENIDO</h1>
         <h2 className={styles.subtitulo}>Sistema CGACAI - Auditorías Internas</h2>
         <form onSubmit={handleLogin} className={styles.form}>
