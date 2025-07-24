@@ -58,7 +58,7 @@ export default function LoginPage() {
           priority
         />
         <h1 className={styles.titulo}>BIENVENIDO</h1>
-        <h2 className={styles.subtitulo}>Sistema CGACAI - Auditorías Internas</h2>
+        <h2 className={styles.subtitulo}>Sistema CGCyAI - Auditorías Internas</h2>
         <form onSubmit={handleLogin} className={styles.form}>
           <input
             type="email"
