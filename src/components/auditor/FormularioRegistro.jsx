@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'react-toastify'
 import { supabase } from '@/lib/supabaseClient'
 import styles from './formulario.module.css'
+import { useRef } from 'react'
 
 export default function FormularioRegistro({ usuario, auditoria }) {
   const [form, setForm] = useState({
@@ -25,7 +26,11 @@ export default function FormularioRegistro({ usuario, auditoria }) {
   const [listaCapitulos, setListaCapitulos] = useState({})
   const [listaNumerales, setListaNumerales] = useState({})
   const [loading, setLoading] = useState(false)
+  const [errores, setErrores] = useState({})
 
+  const fortalezaRef = useRef(null)
+  const oportunidadRef = useRef(null)
+  const noConformidadRef = useRef(null)
 
   const router = useRouter()
 
@@ -149,10 +154,31 @@ export default function FormularioRegistro({ usuario, auditoria }) {
     setNoConformidades(nuevas)
   }
 
+
+  const validarFormulario = () => {
+    const nuevosErrores = {}
+
+    if (!form.fecha_auditoria) nuevosErrores.fecha_auditoria = 'La fecha de auditoría es obligatoria.'
+    if (!form.asistencia_tipo) nuevosErrores.asistencia_tipo = 'El tipo de asistencia es obligatorio.'
+    if (!form.objetivo.trim()) nuevosErrores.objetivo = 'El objetivo es obligatorio.'
+    if (!form.criterios.trim()) nuevosErrores.criterios = 'Los criterios son obligatorios.'
+    if (!form.conclusiones.trim()) nuevosErrores.conclusiones = 'Las conclusiones son obligatorias.'
+    if (!form.fecha_seguimiento) nuevosErrores.fecha_seguimiento = 'La fecha de seguimiento es obligatoria.'
+    if (!form.recomendaciones.trim()) nuevosErrores.recomendaciones = 'Las recomendaciones son obligatorias.'
+
+    setErrores(nuevosErrores)
+    return Object.keys(nuevosErrores).length === 0
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (loading) return // prevenir doble clic
+    if (loading) return
+
+    if (!validarFormulario()) {
+      toast.error('Por favor completa todos los campos obligatorios.')
+      return
+    }
     setLoading(true)
 
     const payload = {
@@ -241,11 +267,20 @@ export default function FormularioRegistro({ usuario, auditoria }) {
   }
 
 
+
   return (
     <div className="bg-white p-8 rounded-xl shadow-lg max-w-4xl mx-auto animate-fade-in">
       <h2 className={styles.tituloEstilo}>
         {auditoria ? 'Llenar Informe de Auditoría' : 'Nuevo Informe de Auditoría'}
+
       </h2>
+
+      {auditoria && (
+        <p className={styles.subtituloAuditoria}>
+          🏢 | {auditoria.dependencias?.nombre || 'Dependencia no encontrada'} | 📅 {new Date(auditoria.fecha_auditoria).getFullYear()} | 🧾 Auditoría #{auditoria.id}
+        </p>
+      )}
+
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Campos del informe */}
@@ -258,6 +293,7 @@ export default function FormularioRegistro({ usuario, auditoria }) {
           onChange={handleChange}
           className={styles.inputEstilo}
         />
+        {errores.fecha_auditoria && <p className={styles.errorTexto}>{errores.fecha_auditoria}</p>}
 
         <label className={styles.etiqueta} htmlFor="asistencia_tipo">Tipo de proceso (Digital/Físico)</label>
         <select
@@ -270,6 +306,7 @@ export default function FormularioRegistro({ usuario, auditoria }) {
           <option value="Digital">Digital</option>
           <option value="Físico">Físico</option>
         </select>
+        {errores.asistencia_tipo && <p className={styles.errorTexto}>{errores.asistencia_tipo}</p>}
 
         <label className={styles.etiqueta} htmlFor="auditores_acompanantes">Auditores acompañantes</label>
         <input
@@ -280,6 +317,7 @@ export default function FormularioRegistro({ usuario, auditoria }) {
           onChange={handleChange}
           className={styles.inputEstilo}
         />
+        {errores.auditores_acompanantes && <p className={styles.errorTexto}>{errores.auditores_acompanantes}</p>}
 
         <label className={styles.etiqueta} htmlFor="objetivo">Objetivo</label>
         <textarea
@@ -289,6 +327,7 @@ export default function FormularioRegistro({ usuario, auditoria }) {
           onChange={handleChange}
           className={styles.inputEstilo}
         />
+        {errores.objetivo && <p className={styles.errorTexto}>{errores.objetivo}</p>}
 
         <label className={styles.etiqueta} htmlFor="criterios">Criterios</label>
         <textarea
@@ -298,6 +337,7 @@ export default function FormularioRegistro({ usuario, auditoria }) {
           onChange={handleChange}
           className={styles.inputEstilo}
         />
+        {errores.criterios && <p className={styles.errorTexto}>{errores.criterios}</p>}
 
         <label className={styles.etiqueta} htmlFor="conclusiones">Conclusiones</label>
         <textarea
@@ -307,6 +347,7 @@ export default function FormularioRegistro({ usuario, auditoria }) {
           onChange={handleChange}
           className={styles.inputEstilo}
         />
+        {errores.conclusiones && <p className={styles.errorTexto}>{errores.conclusiones}</p>}
 
         <label className={styles.etiqueta} htmlFor="fecha_seguimiento">Fecha de seguimiento</label>
         <input
@@ -317,6 +358,7 @@ export default function FormularioRegistro({ usuario, auditoria }) {
           onChange={handleChange}
           className={styles.inputEstilo}
         />
+        {errores.fecha_seguimiento && <p className={styles.errorTexto}>{errores.fecha_seguimiento}</p>}
 
         <label className={styles.etiqueta} htmlFor="recomendaciones">Recomendaciones</label>
         <textarea
@@ -326,12 +368,18 @@ export default function FormularioRegistro({ usuario, auditoria }) {
           onChange={handleChange}
           className={styles.inputEstilo}
         />
+        {errores.recomendaciones && <p className={styles.errorTexto}>{errores.recomendaciones}</p>}
 
 
         {/* Subformulario de fortalezas */}
         <h3 className={styles.etiquetaTituloFortalezas}>Fortalezas</h3>
         {fortalezas.map((f, i) => (
-          <div key={i} className={`${styles.subformulario} ${styles.fortalezaBg} relative`}>
+          <div
+            key={i}
+            ref={i === fortalezas.length - 1 ? fortalezaRef : null}
+            className={`${styles.subformulario} ${styles.fortalezaBg} relative`}
+          >
+
             {/* Botón para eliminar */}
             <button
               type="button"
@@ -418,7 +466,12 @@ export default function FormularioRegistro({ usuario, auditoria }) {
         {/* Subformulario de oportunidades de mejora */}
         <h3 className={styles.etiquetaTituloOportunidades}>Oportunidades de Mejora</h3>
         {oportunidades.map((o, i) => (
-          <div key={i} className={`${styles.subformulario} ${styles.oportunidadBg} relative`}>
+          <div
+            key={i}
+            ref={i === oportunidades.length - 1 ? oportunidadRef : null}
+            className={`${styles.subformulario} ${styles.oportunidadBg} relative`}
+          >
+
             {/* Botón para eliminar */}
             <button
               type="button"
@@ -501,7 +554,11 @@ export default function FormularioRegistro({ usuario, auditoria }) {
 
         <h3 className={styles.etiquetaTituloNoConformidad}>No Conformidades</h3>
         {noConformidades.map((n, i) => (
-          <div key={i} className={`${styles.subformulario} ${styles.noConformidadBg} relative`}>
+          <div
+            key={i}
+            ref={i === noConformidades.length - 1 ? noConformidadRef : null}
+            className={`${styles.subformulario} ${styles.noConformidadBg} relative`}
+          >
             {/* Botón para eliminar */}
             <button
               type="button"
@@ -578,9 +635,55 @@ export default function FormularioRegistro({ usuario, auditoria }) {
           </div>
         ))}
 
-        <button type="button" onClick={() => setFortalezas([...fortalezas, { iso: '', capitulo: '', numeral: '', descripcion: '', razon: '' }])} className={`${styles.botonHallazgo} ${styles.verde}`}>➕ Fortaleza</button>
-        <button type="button" onClick={() => setOportunidades([...oportunidades, { iso: '', capitulo: '', numeral: '', descripcion: '', para_que: '' }])} className={`${styles.botonHallazgo} ${styles.azul}`}>➕ Oportunidad</button>
-        <button type="button" onClick={() => setNoConformidades([...noConformidades, { iso: '', capitulo: '', numeral: '', descripcion: '', evidencia: '' }])} className={`${styles.botonHallazgo} ${styles.rojo}`}> ➕ No Conformidad </button>
+        <button
+          type="button"
+          onClick={() => {
+            setFortalezas([...fortalezas, { iso: '', capitulo: '', numeral: '', descripcion: '', razon: '' }])
+            setTimeout(() => {
+              if (fortalezaRef.current) {
+                const offsetTop = fortalezaRef.current.getBoundingClientRect().top + window.pageYOffset
+                window.scrollTo({ top: offsetTop - 200, behavior: 'smooth' })
+              }
+            }, 100)
+          }}
+          className={`${styles.botonHallazgo} ${styles.verde}`}
+        >
+          ➕ Fortaleza
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setOportunidades([...oportunidades, { iso: '', capitulo: '', numeral: '', descripcion: '', para_que: '' }])
+            setTimeout(() => {
+              if (oportunidadRef.current) {
+                const offsetTop = oportunidadRef.current.getBoundingClientRect().top + window.pageYOffset
+                window.scrollTo({ top: offsetTop - 200, behavior: 'smooth' })
+              }
+            }, 100)
+          }}
+          className={`${styles.botonHallazgo} ${styles.azul}`}
+        >
+          ➕ Oportunidad
+        </button>
+
+
+        <button
+          type="button"
+          onClick={() => {
+            setNoConformidades([...noConformidades, { iso: '', capitulo: '', numeral: '', descripcion: '', evidencia: '' }])
+            setTimeout(() => {
+              if (noConformidadRef.current) {
+                const offsetTop = noConformidadRef.current.getBoundingClientRect().top + window.pageYOffset
+                window.scrollTo({ top: offsetTop - 200, behavior: 'smooth' })
+              }
+            }, 100)
+          }}
+          className={`${styles.botonHallazgo} ${styles.rojo}`}
+        >
+          ➕ No Conformidad
+        </button>
+
 
         <button
           type="submit"

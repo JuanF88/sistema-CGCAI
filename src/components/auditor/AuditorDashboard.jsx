@@ -76,6 +76,8 @@ export default function AuditorDashboard() {
           />
         </Suspense>
       </main>
+
     </div>
+    
   )
 }

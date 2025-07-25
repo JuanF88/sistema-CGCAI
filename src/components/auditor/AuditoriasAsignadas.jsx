@@ -21,22 +21,28 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
       const { data, error } = await supabase
         .from('informes_auditoria')
         .select(`
-          id,
-          objetivo,
-          criterios,
-          conclusiones,
-          fecha_auditoria,
-          asistencia_tipo,
-          fecha_seguimiento,
-          recomendaciones,
-          auditores_acompanantes,
-          validado,
-          dependencia_id,
-          dependencias ( nombre ),
-          fortalezas ( id ),
-          oportunidades_mejora ( id ),
-          no_conformidades ( id )
-        `)
+  id,
+  objetivo,
+  criterios,
+  conclusiones,
+  fecha_auditoria,
+  asistencia_tipo,
+  fecha_seguimiento,
+  recomendaciones,
+  auditores_acompanantes,
+  validado,
+  dependencia_id,
+  dependencias (
+    nombre,
+    plan_auditoria (
+      enlace
+    )
+  ),
+  fortalezas ( id ),
+  oportunidades_mejora ( id ),
+  no_conformidades ( id )
+`)
+
         .eq('usuario_id', usuario.usuario_id)
 
       if (!error) setAuditorias(data)
@@ -136,12 +142,26 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
         auditorias.map((a) => {
           const progreso = progresoAuditoria(a)
           const nombreDep = a.dependencias?.nombre || 'Dependencia no encontrada'
+          console.log('Plan auditoria:', a.dependencias?.plan_auditoria);
 
           return (
             <div
               key={a.id}
               className={`${styles.card} ${progreso === 100 ? styles.cardCompleta : ''}`}
             >
+              {/* Aquí se renderiza el botón */}
+              {a.dependencias?.plan_auditoria?.[0]?.enlace && (
+                <a
+                  href={a.dependencias.plan_auditoria[0].enlace}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.botonPlanFlotante}
+                >
+                  🗂️ Plan de auditoría encontrado
+                </a>
+              )}
+
+
               <div className={styles.cardContenido}>
                 <div className={styles.infoAuditoria}>
                   <p className={styles.nombreDep}>
@@ -170,12 +190,15 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
                 </div>
 
                 <div className={styles.botonesAccion}>
-                  <button
-                    className={styles.botonEditar}
-                    onClick={() => setAuditoriaSeleccionada(a)}
-                  >
-                    ✏️ Editar
-                  </button>
+                  {progreso < 100 && (
+                    <button
+                      className={styles.botonEditar}
+                      onClick={() => setAuditoriaSeleccionada(a)}
+                    >
+                      ✏️ Editar
+                    </button>
+                  )}
+
                   {progreso >= 80 && (
                     <button className={styles.botonDescarga} onClick={async (e) => {
                       e.stopPropagation();
@@ -226,7 +249,7 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
                         usuario
                       );
                     }}>
-                      📄 Descargar DOCX
+                      📄 Descargar Infome
                     </button>
                   )}
 

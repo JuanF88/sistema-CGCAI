@@ -21,7 +21,7 @@
   background: rgba(255, 255, 255, 0.95);
   padding: 2rem;
   border-radius: 1rem;
-  max-width: 400px;
+  max-width: 500px;
   width: 100%;
   text-align: center;
   box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
@@ -33,9 +33,10 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-.logo {
-  width: 90px;
-  margin: 0 auto 1rem;
+.logoContainer {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
 }
 
 .titulo {

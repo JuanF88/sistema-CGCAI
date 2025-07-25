@@ -124,6 +124,11 @@
   border-color: #6366f1; /* border-indigo-500 */
 }
 
+.card {
+  position: relative;
+}
+
+
 @keyframes fadeIn {
   from {
     opacity: 0;

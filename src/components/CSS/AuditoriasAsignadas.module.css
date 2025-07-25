@@ -14,8 +14,8 @@
 .titulo {
   font-size: 2.5rem;
   font-weight: 500;
-  color: #8f2c7ab2;
-  margin-bottom: 1rem;
+  color: #cc43aeb2;
+  margin-bottom: 2rem;
   text-align: center;
   text-shadow: 1px 1px 2px #00000052;
 }
@@ -31,7 +31,7 @@
   flex-direction: column;
   padding: 1.2rem;
   background-color: #fff;
-  border: 1px solid #ddd;
+  border: 1px solid #555555;
   border-radius: 12px;
   margin-bottom: 2.5rem;
   transition: box-shadow 0.3s ease;
@@ -284,6 +284,52 @@
 
 .botonEditar:hover {
   background-color: #2d3748;
+}
+
+/* Estilo para el botón flotante del plan */
+.botonPlan {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background-color: #ede9fe;
+  color: #4c1d95;
+  padding: 0.4rem 0.8rem;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.botonPlan:hover {
+  background-color: #c4b5fd;
+  transform: scale(1.05);
+  color: #2e1065;
+}
+
+.botonPlanFlotante {
+  position: absolute;
+  top: -1.0rem;
+  right: -0.8rem;
+  background-color: #ede9fe;
+  color: #4c1d95;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+  z-index: 10;
+  border: 2px solid white;
+}
+
+.botonPlanFlotante:hover {
+  background-color: #c4b5fd;
+  transform: scale(1.05);
+  color: #2e1065;
 }
 
 @keyframes fade-in {

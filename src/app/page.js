@@ -49,14 +49,16 @@ export default function LoginPage() {
     <div className={styles.container}>
       <div className={styles.card}>
 
-
-        <Image
-          src="/logo-universidad.png"
-          alt="Logo Universidad"
-          width={150}
-          height={150}
-          priority
-        />
+        <div className={styles.logoContainer}>
+          <Image
+            src="/logo-universidad.png"
+            alt="Logo Universidad"
+            width={190}
+            height={190}
+            priority
+            className={styles.logo}
+          />
+        </div>
         <h1 className={styles.titulo}>BIENVENIDO</h1>
         <h2 className={styles.subtitulo}>Sistema CGCyAI - Auditorías Internas</h2>
         <form onSubmit={handleLogin} className={styles.form}>
