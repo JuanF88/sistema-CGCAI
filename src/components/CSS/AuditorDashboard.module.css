@@ -22,7 +22,7 @@
   box-shadow: 2px 0 12px rgba(0, 0, 0, 0.2);
   border-top-right-radius: 1.5rem;
   border-bottom-right-radius: 1.5rem;
-  overflow-y: auto;
+  overflow: visible;
 }
 
 .sidebarContent {
@@ -44,6 +44,7 @@
   flex-direction: column;
   gap: 1.0rem;
   overflow-x: hidden;
+  
 }
 
 .navButton {
@@ -59,11 +60,12 @@
   transition: all 0.2s ease-in-out;
   white-space: nowrap;
   border: none;
+  
+
 }
 
 .navButton:hover {
   background-color: rgba(255, 255, 255, 0.2);
-  transform: translateX(4px);
 }
 
 .active {
