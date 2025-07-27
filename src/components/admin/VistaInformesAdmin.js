@@ -210,6 +210,17 @@ export default function VistaInformesAdmin() {
       }
     },
     {
+      name: 'Validado',
+      selector: row => row.validado,
+      sortable: true,
+      cell: row => (
+        <span className={`font-semibold ${row.validado ? 'text-green-600' : 'text-red-500'}`}>
+          {row.validado ? 'Sí' : 'No'}
+        </span>
+      )
+    },
+
+    {
       name: 'Acciones',
       cell: row => (
         <div className="flex gap-2">
