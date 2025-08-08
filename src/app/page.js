@@ -45,22 +45,26 @@ export default function LoginPage() {
     }
   }
 
+  const isFormValid = email.trim() !== '' && password.trim() !== ''
+
   return (
     <div className={styles.container}>
       <div className={styles.card}>
-
         <div className={styles.logoContainer}>
           <Image
-            src="/logo-universidad.png"
+            src="/logoBlanco.png"
             alt="Logo Universidad"
-            width={190}
-            height={190}
+            width={120}
+            height={120}
             priority
             className={styles.logo}
           />
         </div>
-        <h1 className={styles.titulo}>BIENVENIDO</h1>
-        <h2 className={styles.subtitulo}>Sistema CGCyAI - Auditorías Internas</h2>
+
+        <h2 className={styles.subtitulo}>Sistema CGC-AI</h2>
+        <h1 className={styles.titulo}>Auditorías Internas</h1>
+        <h2 className={styles.subtitulo}>Iniciar Sesión</h2>
+
         <form onSubmit={handleLogin} className={styles.form}>
           <input
             type="email"
@@ -79,7 +83,14 @@ export default function LoginPage() {
             required
           />
           {errorMsg && <p className={styles.error}>{errorMsg}</p>}
-          <button type="submit" className={styles.boton}>Entrar</button>
+
+          <button
+            type="submit"
+            className={styles.boton}
+            disabled={!isFormValid} // 👈 Desactiva si el form no es válido
+          >
+            ENTRAR
+          </button>
         </form>
       </div>
     </div>

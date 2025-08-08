@@ -5,11 +5,31 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  font-family: 'Poppins', sans-serif;
-  background: linear-gradient(270deg, rgb(248, 122, 122), rgb(122, 122, 245), rgb(243, 128, 128));
-  background-size: 600% 600%;
+  font-family: 'Poppins';
+
+  background-image:
+    linear-gradient(270deg, rgba(37, 50, 103, 0.9), rgba(157, 112, 209, 0.9), rgba(65, 38, 106, 0.9)),
+    url('/fondo.png'); /* 👉 asegúrate que esté en public/ */
+
+  background-size: 600% 600%, cover;
+  background-position: center;
+  background-repeat: no-repeat;
   animation: fondoAnimado 20s ease infinite;
 }
+
+
+.card {
+  position: relative; /* 👈 para que el logo absoluto se posicione respecto a esta tarjeta */
+  background: rgba(255, 255, 255, 0.95);
+  padding: 2rem 2rem 1rem 2rem; /* ajusta padding bottom si es necesario */
+  border-radius: 1rem;
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+  animation: fade-in 0.7s ease-in-out;
+}
+
 
 @keyframes fondoAnimado {
   0% { background-position: 0% 50%; }
@@ -26,6 +46,7 @@
   text-align: center;
   box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
   animation: fade-in 0.7s ease-in-out;
+  margin-top: 100px;
 }
 
 @keyframes fade-in {
@@ -34,25 +55,28 @@
 }
 
 .logoContainer {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 1rem;
+  position: absolute;
+  top: -220px; /* mitad de la altura de la imagen, ajústalo si cambias el tamaño */
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  padding: 0.5rem;
 }
+
 
 .titulo {
   font-size: 2.5rem;
   font-weight: 700;
-  color: #7c3aed;
+  color: #660099;
   text-shadow: 1px 1px 2px #00000052;
   letter-spacing: 0.5px;
+  margin-bottom: 20px;
 }
 
 .subtitulo {
-  font-size: 1.0rem;
-  font-weight: 500;
-  color: #4f0c6e;
-  margin-top: 1rem;
-  margin-bottom: 1.0rem;
+  font-size: 1.3rem;
+  font-weight: 100;
+  color: #660099;
 }
 
 .form {
@@ -77,16 +101,26 @@
 }
 
 .boton {
+  display: inline-block; /* 👈 hace que el botón solo ocupe lo necesario */
   background: linear-gradient(90deg, #7c3aed, #8f2c7ab2);
   color: white;
-  padding: 0.75rem;
-  font-weight: 600;
-  font-size: 1rem;
+  padding: 0.75rem 1.5rem; /* 👈 controlas espacio vertical y horizontal */
+  font-weight: 700;
+  font-size: 1.2rem;
   border: none;
-  border-radius: 0.6rem;
+  border-radius: 1rem;
   cursor: pointer;
   transition: all 0.3s ease;
+  align-self: center; /* si usas flex en el form, esto lo centra horizontalmente */
 }
+
+.boton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+}
+
 
 .boton:hover {
   filter: brightness(1.1);

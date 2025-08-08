@@ -1,110 +1,124 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
 
 .vistaContainer {
-  background: rgb(255, 255, 255);
   font-family: 'Poppins', sans-serif;
-  padding: 1.5rem;
-  border-radius: 5rem;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-  max-width: 90%;
-  margin: auto;
-  animation: fade-in 0.8s ease-in-out;
-  border: 1px solid #e2e8f0;
-}
-
-.bienvenida {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  margin-bottom: 0.2rem;
-}
-
-.avatar {
-  position: relative;
-  width: 7rem;
-  height: 7rem;
-  border-radius: 50%;
-  border: 4px solid #8505b8;
-  overflow: hidden;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.15);
-}
-
-.nombreBienvenida {
-  font-size: 2.25rem;
-  font-weight: 500;
-  color: #8f2c7ab2;
-  text-shadow: 1px 1px 2px #00000052;
-}
-
-.noticiasContainer {
-  margin-top: -2rem;
-}
-
-.noticiasTitulo {
-  font-size: 1.9rem;
-  font-weight: 500;
-  text-align: center;
-  color: #8f2c7ab2;
-  text-shadow: 1px 1px 2px #00000052;
-  margin-bottom: 2rem;
-  position: relative;
-}
-
-.decoracion {
-  display: block;
-  width: 4rem;
-  height: 0.25rem;
-  background: #4f0c6e;
-  margin: 0.5rem auto 0;
-  border-radius: 9999px;
-}
-
-.carrusel {
   max-width: 100%;
-  padding: 0 1rem;
-  
+  animation: fade-in 0.8s ease-in-out;
+  overflow: hidden;
+}
+
+.carruselContainer {
+  width: 100%;    
+  height: 70vh;
+  position: relative;
+  z-index: 1;
+  background-color: white;
 }
 
 .slide {
   position: relative;
-  height: 600px;
-  border-radius: 5.25rem;
+  height: 70vh;
+  width: 100vw;
+  border-radius: 0;
   overflow: hidden;
 }
+/* Aumenta tamaño y cambia color de todos los dots */
+.vistaContainer :global(.slick-dots li button:before) {
+  font-size: 16px; /* Tamaño del punto */
+  color: #cccccc;  /* Color normal */
+  opacity: 1;
+}
 
-.slideOverlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.116);
+/* Dot activo con color personalizado */
+.vistaContainer :global(.slick-dots li.slick-active button:before) {
+  color: #db8bca; /* Color activo */
+    font-size: 26px; /* Tamaño del punto */
+
+  opacity: 1;
+}
+
+/* Ajustes opcionales para separación y posición */
+.vistaContainer :global(.slick-dots) {
+  bottom: 12px;
+}
+
+.vistaContainer :global(.slick-dots li) {
+  margin: 0 6px;
+}
+
+
+.resumenContenedor {
+  margin-top: 0rem;
+  padding: 2rem;
+  background-color: white;
+}
+
+.resumenTitulo {
+  font-size: 1.8rem;
+  font-weight: 600;
+  text-align: left;
+  color: #5c0f7a;
+  margin-bottom: 1.5rem;
+}
+
+
+.resumenTarjetas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  justify-content: center;
+}
+
+.resumenTarjeta {
+  flex: 1 1 220px;
+  height: 140px; /* ✅ Hacerlas más cuadradas */
+  padding: 1.5rem;
+  border-radius: 1rem;
+  text-align: center;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  border-left: 6px solid transparent; /* se sobrescribe por cada tipo */
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  padding: 2.5rem;
-  color: white;
-  
+  justify-content: center;
 }
 
-.slideTitulo {
-  font-size: 1.5rem;
-  font-weight: bold;
-  text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8);
+/* 🎯 Colores pastel personalizados */
+.tarjetaAsignadas {
+  background-color: #ffe6e6;
+  border-color: #f8aeae;
+}
+
+.tarjetaProceso {
+  background-color: #fffbea;
+  border-color: rgb(221, 220, 183);
+}
+
+.tarjetaPorValidar {
+  background-color: #f5f0ff;
+  border-color: #e9d8fd;
+}
+
+.tarjetaCompletadas {
+  background-color: #f0fff4;
+  border-color: #84c586;
+}
+
+/* 🪄 Interacción */
+.resumenTarjeta:hover {
+  transform: scale(1.03);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.resumenLabel {
+  font-weight: 600;
+  font-size: 1.3rem;
   margin-bottom: 0.5rem;
-  background-color: #b762f091;
+  color: #333;
 }
 
-.slideDescripcion {
-  background-color: #4e46e591;
-  font-size: 1.25rem;
-  color: #e0e0e0;
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.resumenValor {
+  font-size: 2.4rem;
+  font-weight: bold;
+  color: #4a148c;
 }

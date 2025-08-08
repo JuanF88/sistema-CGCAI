@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import VistaBienvenida from '@/components/VistaBienvenida'
 import AuditoriasAsignadas from '@/components/auditor/AuditoriasAsignadas'
+import CajadeHerramientas from '@/components/auditor/CajadeHerramientas'
+
 
 export default function VistaActual({ usuario, reset, setReset }) {
   const searchParams = useSearchParams()
@@ -22,6 +24,9 @@ export default function VistaActual({ usuario, reset, setReset }) {
       {vista === 'bienvenida' && <VistaBienvenida usuario={usuario} />}
       {vista === 'asignadas' && (
         <AuditoriasAsignadas usuario={usuario} reset={reset} />
+      )}
+      {vista === 'caja' && (
+        <CajadeHerramientas usuario={usuario} reset={reset} />
       )}
     </>
   )

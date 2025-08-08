@@ -43,6 +43,18 @@ export default function FormularioRegistro({ usuario, auditoria }) {
   }, [router])
 
   useEffect(() => {
+    const textareas = document.querySelectorAll(`.${styles.textareaAuto}`)
+    textareas.forEach(textarea => {
+      textarea.style.height = 'auto'
+      textarea.style.height = `${textarea.scrollHeight}px`
+      textarea.addEventListener('input', () => {
+        textarea.style.height = 'auto'
+        textarea.style.height = `${textarea.scrollHeight}px`
+      })
+    })
+  }, [])
+
+  useEffect(() => {
     if (auditoria) {
       setForm({
         fecha_auditoria: auditoria.fecha_auditoria || '',
@@ -269,110 +281,154 @@ export default function FormularioRegistro({ usuario, auditoria }) {
 
 
   return (
-    <div className="bg-white p-8 rounded-xl shadow-lg max-w-4xl mx-auto animate-fade-in">
+    <div className={styles.fondo}>
       <h2 className={styles.tituloEstilo}>
-        {auditoria ? 'Llenar Informe de Auditoría' : 'Nuevo Informe de Auditoría'}
-
+        {auditoria ? (
+          <>
+            Llenar Informe de <strong>Auditoría</strong>
+          </>
+        ) : (
+          <>
+            Nuevo Informe de <strong>Auditoría</strong>
+          </>
+        )}
       </h2>
 
       {auditoria && (
-        <p className={styles.subtituloAuditoria}>
-          🏢 | {auditoria.dependencias?.nombre || 'Dependencia no encontrada'} | 📅 {new Date(auditoria.fecha_auditoria).getFullYear()} | 🧾 Auditoría #{auditoria.id}
-        </p>
+        <div className={styles.tarjetaAuditoria}>
+          <div className={styles.badgeAuditoria}>🧾 Auditoría #{auditoria.id}</div>
+          <div className={styles.tarjetaContenido}>
+            <div className={styles.tarjetaIzquierda}>
+              🏢 {auditoria.dependencias?.nombre || 'Dependencia no encontrada'}
+            </div>
+            <div className={styles.tarjetaDerecha}>
+              📅 {new Date(auditoria.fecha_auditoria).getFullYear()}
+            </div>
+          </div>
+        </div>
       )}
 
 
       <form onSubmit={handleSubmit} className="space-y-4">
+
         {/* Campos del informe */}
-        <label className={styles.etiqueta} htmlFor="fecha_auditoria">Fecha de la auditoría</label>
-        <input
-          type="date"
-          id="fecha_auditoria"
-          name="fecha_auditoria"
-          value={form.fecha_auditoria}
-          onChange={handleChange}
-          className={styles.inputEstilo}
-        />
-        {errores.fecha_auditoria && <p className={styles.errorTexto}>{errores.fecha_auditoria}</p>}
 
-        <label className={styles.etiqueta} htmlFor="asistencia_tipo">Tipo de proceso (Digital/Físico)</label>
-        <select
-          id="asistencia_tipo"
-          name="asistencia_tipo"
-          value={form.asistencia_tipo}
-          onChange={handleChange}
-          className={styles.inputEstilo}
-        >
-          <option value="Digital">Digital</option>
-          <option value="Físico">Físico</option>
-        </select>
-        {errores.asistencia_tipo && <p className={styles.errorTexto}>{errores.asistencia_tipo}</p>}
+        <div className={styles.contenedorFechas}>
+          <div className={styles.tarjetaCampo}>
+            <label className={styles.etiqueta} htmlFor="fecha_auditoria">Fecha de la auditoría</label>
+            <input
+              type="date"
+              id="fecha_auditoria"
+              name="fecha_auditoria"
+              value={form.fecha_auditoria}
+              onChange={handleChange}
+              className={styles.inputEstilo}
+            />
+            {errores.fecha_auditoria && <p className={styles.errorTexto}>{errores.fecha_auditoria}</p>}
+          </div>
 
-        <label className={styles.etiqueta} htmlFor="auditores_acompanantes">Auditores acompañantes</label>
-        <input
-          type="text"
-          id="auditores_acompanantes"
-          name="auditores_acompanantes"
-          value={form.auditores_acompanantes}
-          onChange={handleChange}
-          className={styles.inputEstilo}
-        />
-        {errores.auditores_acompanantes && <p className={styles.errorTexto}>{errores.auditores_acompanantes}</p>}
+          <div className={styles.tarjetaCampo}>
+            <label className={styles.etiqueta} htmlFor="fecha_seguimiento">Fecha de seguimiento</label>
+            <input
+              type="date"
+              id="fecha_seguimiento"
+              name="fecha_seguimiento"
+              value={form.fecha_seguimiento}
+              onChange={handleChange}
+              className={styles.inputEstilo}
+            />
+            {errores.fecha_seguimiento && <p className={styles.errorTexto}>{errores.fecha_seguimiento}</p>}
+          </div>
+        </div>
 
-        <label className={styles.etiqueta} htmlFor="objetivo">Objetivo</label>
-        <textarea
-          id="objetivo"
-          name="objetivo"
-          value={form.objetivo}
-          onChange={handleChange}
-          className={styles.inputEstilo}
-        />
-        {errores.objetivo && <p className={styles.errorTexto}>{errores.objetivo}</p>}
 
-        <label className={styles.etiqueta} htmlFor="criterios">Criterios</label>
-        <textarea
-          id="criterios"
-          name="criterios"
-          value={form.criterios}
-          onChange={handleChange}
-          className={styles.inputEstilo}
-        />
-        {errores.criterios && <p className={styles.errorTexto}>{errores.criterios}</p>}
+        <div className={styles.contenedorFechas}>
+          <div className={styles.tarjetaCampo}>
+            <label className={styles.etiqueta} htmlFor="asistencia_tipo">Tipo de proceso</label>
+            <select
+              id="asistencia_tipo"
+              name="asistencia_tipo"
+              value={form.asistencia_tipo}
+              onChange={handleChange}
+              className={styles.inputEstilo}
+            >
+              <option value="Digital">Digital</option>
+              <option value="Físico">Físico</option>
+            </select>
+            {errores.asistencia_tipo && <p className={styles.errorTexto}>{errores.asistencia_tipo}</p>}
+          </div>
+          <div className={styles.tarjetaCampo}>
+            <label className={styles.etiqueta} htmlFor="auditores_acompanantes">Auditores acompañantes (separados por ,)</label>
+            <input
+              type="text"
+              id="auditores_acompanantes"
+              name="auditores_acompanantes"
+              value={form.auditores_acompanantes}
+              onChange={handleChange}
+              className={styles.inputEstilo}
+            />
+            {errores.auditores_acompanantes && <p className={styles.errorTexto}>{errores.auditores_acompanantes}</p>}
+          </div>
+        </div>
 
-        <label className={styles.etiqueta} htmlFor="conclusiones">Conclusiones</label>
-        <textarea
-          id="conclusiones"
-          name="conclusiones"
-          value={form.conclusiones}
-          onChange={handleChange}
-          className={styles.inputEstilo}
-        />
-        {errores.conclusiones && <p className={styles.errorTexto}>{errores.conclusiones}</p>}
 
-        <label className={styles.etiqueta} htmlFor="fecha_seguimiento">Fecha de seguimiento</label>
-        <input
-          type="date"
-          id="fecha_seguimiento"
-          name="fecha_seguimiento"
-          value={form.fecha_seguimiento}
-          onChange={handleChange}
-          className={styles.inputEstilo}
-        />
-        {errores.fecha_seguimiento && <p className={styles.errorTexto}>{errores.fecha_seguimiento}</p>}
 
-        <label className={styles.etiqueta} htmlFor="recomendaciones">Recomendaciones</label>
-        <textarea
-          id="recomendaciones"
-          name="recomendaciones"
-          value={form.recomendaciones}
-          onChange={handleChange}
-          className={styles.inputEstilo}
-        />
-        {errores.recomendaciones && <p className={styles.errorTexto}>{errores.recomendaciones}</p>}
+
+        <div className={styles.tarjetaCampo}>
+          <label className={styles.etiqueta} htmlFor="objetivo">Objetivo</label>
+          <textarea
+            id="objetivo"
+            name="objetivo"
+            value={form.objetivo}
+            onChange={handleChange}
+            className={`${styles.inputEstilo} ${styles.textareaAuto}`}
+            rows={1}
+          />
+          {errores.objetivo && <p className={styles.errorTexto}>{errores.objetivo}</p>}
+        </div>
+
+        <div className={styles.tarjetaCampo}>
+          <label className={styles.etiqueta} htmlFor="criterios">Criterios</label>
+          <textarea
+            id="criterios"
+            name="criterios"
+            value={form.criterios}
+            onChange={handleChange}
+            className={`${styles.inputEstilo} ${styles.textareaAuto}`}
+            rows={1}
+          />
+          {errores.criterios && <p className={styles.errorTexto}>{errores.criterios}</p>}
+        </div>
+
+        <div className={styles.tarjetaCampo}>
+          <label className={styles.etiqueta} htmlFor="conclusiones">Conclusiones</label>
+          <textarea
+            id="conclusiones"
+            name="conclusiones"
+            value={form.conclusiones}
+            onChange={handleChange}
+            className={`${styles.inputEstilo} ${styles.textareaAuto}`}
+            rows={1}
+          />
+          {errores.conclusiones && <p className={styles.errorTexto}>{errores.conclusiones}</p>}
+        </div>
+
+        <div className={styles.tarjetaCampo}>
+          <label className={styles.etiqueta} htmlFor="recomendaciones">Recomendaciones</label>
+          <textarea
+            id="recomendaciones"
+            name="recomendaciones"
+            value={form.recomendaciones}
+            onChange={handleChange}
+            className={`${styles.inputEstilo} ${styles.textareaAuto}`}
+            rows={1}
+          />
+          {errores.recomendaciones && <p className={styles.errorTexto}>{errores.recomendaciones}</p>}
+        </div>
+
 
 
         {/* Subformulario de fortalezas */}
-        <h3 className={styles.etiquetaTituloFortalezas}>Fortalezas</h3>
         {fortalezas.map((f, i) => (
           <div
             key={i}
@@ -464,7 +520,6 @@ export default function FormularioRegistro({ usuario, auditoria }) {
 
 
         {/* Subformulario de oportunidades de mejora */}
-        <h3 className={styles.etiquetaTituloOportunidades}>Oportunidades de Mejora</h3>
         {oportunidades.map((o, i) => (
           <div
             key={i}
@@ -550,9 +605,6 @@ export default function FormularioRegistro({ usuario, auditoria }) {
 
 
         {/* Subformulario de no conformidades*/}
-
-
-        <h3 className={styles.etiquetaTituloNoConformidad}>No Conformidades</h3>
         {noConformidades.map((n, i) => (
           <div
             key={i}

@@ -1,6 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
 
-
 .dashboardContainer {
   display: flex;
   font-family: 'Poppins', sans-serif;
@@ -11,8 +10,8 @@
   top: 0;
   left: 0;
   height: 100vh;
-  width: 16rem;
-  background: linear-gradient(to bottom, #b762f0c2, #8f2c7ab2);
+  width: 20rem;
+  background-color: #660099; /* color de respaldo si la imagen no carga */
   color: white;
   display: flex;
   flex-direction: column;
@@ -20,20 +19,53 @@
   padding: 1.5rem;
   z-index: 50;
   box-shadow: 2px 0 12px rgba(0, 0, 0, 0.2);
-  border-top-right-radius: 1.5rem;
-  border-bottom-right-radius: 1.5rem;
-  overflow: visible;
+
+  overflow: hidden; /* importante para contener el ::before */
 }
 
-.sidebarContent {
-  overflow-y: auto;
+.sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0%;
+  left: 0px; 
+  width: 100%;
+  height: 100%;
+  background-image: url('/BannerPagina.png');
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
+  background-size: 130%;
+  opacity: 1; /* controla la visibilidad */
+  z-index: 0;
+  pointer-events: none;
+}
+
+.sidebarContent,
+.sidebarFooter {
+  position: relative;
+  z-index: 1;
+}
+
+.avatar {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  margin: 0 auto 0.5rem;
+  border: 2px solid white;
+  object-fit: cover;
+}
+
+.username {
+  text-align: center;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
 }
 
 .title {
   text-align: center;
   font-size: 1.5rem;
   font-weight: 700;
-  margin-bottom: 2.5rem;
+  margin-bottom: 2rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
@@ -42,26 +74,23 @@
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 1.0rem;
-  overflow-x: hidden;
-  
+  gap: 1rem;
 }
 
 .navButton {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 1rem;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
   border-radius: 0.75rem;
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: 1rem;
   background: transparent;
   cursor: pointer;
   transition: all 0.2s ease-in-out;
   white-space: nowrap;
   border: none;
-  
-
+  color: white;
 }
 
 .navButton:hover {
@@ -73,9 +102,21 @@
   box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.2);
 }
 
-.logout {
+.sidebarFooter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
   margin-top: 2rem;
-  background-color: rgba(239, 68, 68, 0.25);
+}
+
+.logoBottom {
+  width: 100px;
+  filter: brightness(0) invert(1);
+}
+
+.logout {
+  background-color: rgba(195, 94, 199, 0.795);
   color: #fee2e2;
   padding: 0.5rem 1rem;
   border-radius: 0.75rem;
@@ -90,28 +131,15 @@
 }
 
 .logout:hover {
-  background-color: rgba(239, 68, 68, 0.5);
+  background-color: rgba(82, 0, 114, 0.5);
   color: #fecaca;
   transform: scale(1.02);
 }
 
 .mainContent {
-  margin-left: 16rem;
+  margin-left: 20rem; /* coincidir con sidebar */
   flex: 1;
   background-color: #f9fafb;
-  padding: 2.5rem;
   min-height: 100vh;
   overflow-y: auto;
-}
-
-.logo {
-  width: 100px;
-  margin: 0 auto 1rem;
-  filter: brightness(0) invert(1);
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 20px;
-
 }

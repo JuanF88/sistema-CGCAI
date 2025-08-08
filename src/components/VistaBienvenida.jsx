@@ -1,5 +1,6 @@
 'use client'
-
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabaseClient'
 import Image from 'next/image'
 import Slider from 'react-slick'
 import 'slick-carousel/slick/slick.css'
@@ -8,23 +9,20 @@ import styles from './CSS/VistaBienvenida.module.css'
 
 const noticias = [
   {
-    src: '/noticias/noticia1.jpg',
-    titulo: 'Lanzamiento del nuevo sistema de auditoría',
-    descripcion: 'Se implementó una nueva herramienta para la gestión interna con mejor control de procesos.',
+    src: '/noticias/noticia4.jpg'
   },
   {
-    src: '/noticias/noticia2.png',
-    titulo: 'Capacitación obligatoria',
-    descripcion: 'Todos los auditores deben asistir al entrenamiento de procesos ISO la próxima semana.',
+    src: '/noticias/noticia5.png',
   },
   {
-    src: '/noticias/noticia3.jpg',
-    titulo: 'Reconocimiento al equipo',
-    descripcion: 'El equipo de control interno recibió reconocimiento por su desempeño en 2024.',
+    src: '/noticias/noticia6.jpg',
   },
 ]
 
-export default function VistaBienvenida({ usuario }) {
+export default function VistaBienvenida({ usuario}) {
+  const [auditorias, setAuditorias] = useState([])
+
+
   const sliderSettings = {
     dots: true,
     infinite: true,
@@ -36,45 +34,121 @@ export default function VistaBienvenida({ usuario }) {
     arrows: false,
   }
 
+    useEffect(() => {
+      const cargarAsignadas = async () => {
+        const { data, error } = await supabase
+          .from('informes_auditoria')
+          .select(`
+            id,
+            objetivo,
+            criterios,
+            conclusiones,
+            fecha_auditoria,
+            asistencia_tipo,
+            fecha_seguimiento,
+            recomendaciones,
+            auditores_acompanantes,
+            validado,
+            dependencia_id,
+            dependencias (
+              nombre,
+              plan_auditoria (
+                enlace
+              )
+            ),
+            fortalezas ( id ),
+            oportunidades_mejora ( id ),
+            no_conformidades ( id )
+          `)
+          .eq('usuario_id', usuario.usuario_id)
+  
+        if (!error) setAuditorias(data)
+        else console.error('Error cargando auditorías:', error)
+      }
+  
+      cargarAsignadas()
+    }, [usuario])
+  const contarCamposCompletos = (a) => {
+    const campos = [
+      'objetivo',
+      'criterios',
+      'conclusiones',
+      'fecha_auditoria',
+      'asistencia_tipo',
+      'fecha_seguimiento',
+      'recomendaciones',
+      'auditores_acompanantes'
+    ]
+    return campos.reduce((acc, campo) => (a[campo] ? acc + 1 : acc), 0)
+  }
+
+  const progresoAuditoria = (a) => {
+    const total = 8
+    const completos = contarCamposCompletos(a)
+    const tieneHallazgos =
+      (a.fortalezas?.length || 0) > 0 ||
+      (a.oportunidades_mejora?.length || 0) > 0 ||
+      (a.no_conformidades?.length || 0) > 0
+
+    if (completos < total) return 0
+    if (tieneHallazgos && !a.validado) return 80
+    if (tieneHallazgos && a.validado) return 100
+    return 50
+  }
+
+  const agrupadas = {
+    pendientes: auditorias.filter(a => progresoAuditoria(a) === 0),
+    enProceso: auditorias.filter(a => progresoAuditoria(a) === 50),
+    porValidar: auditorias.filter(a => progresoAuditoria(a) === 80),
+    completadas: auditorias.filter(a => progresoAuditoria(a) === 100),
+  }
+
+  const pendientes = auditorias.length - (
+    (agrupadas.porValidar?.length || 0) +
+    (agrupadas.completadas?.length || 0) +
+    (agrupadas.enProceso?.length || 0)
+  )
+
   return (
     <div className={styles.vistaContainer}>
-      {/* Bienvenida */}
-      <div className={styles.bienvenida}>
-        <div className={styles.avatar}>
-          <Image
-            src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
-            alt="Auditor"
-            fill
-            className="object-cover"
-          />
-        </div>
-        <h1 className={styles.nombreBienvenida}>¡Bienvenido, {usuario.nombre}!</h1>
+      {/* Carrusel de noticias */}
+      <div className={styles.carruselContainer}>
+        <Slider {...sliderSettings}>
+          {noticias.map((noticia, index) => (
+            <div key={index} className={styles.slide}>
+              <Image
+                src={noticia.src}
+                alt=""
+                fill
+                className={styles.slideImagen}
+              />
+
+            </div>
+          ))}
+        </Slider>
       </div>
 
-      {/* Noticias */}
-      <div className={styles.noticiasContainer}>
-        <h2 className={styles.noticiasTitulo}>
-          Noticias recientes
-          <span className={styles.decoracion}></span>
-        </h2>
-
-        <div className={styles.carrusel}>
-          <Slider {...sliderSettings}>
-            {noticias.map((noticia, index) => (
-              <div key={index} className={styles.slide}>
-                <Image
-                  src={noticia.src}
-                  alt={noticia.titulo}
-                  fill
-                  className="object-cover"
-                />
-                <div className={styles.slideOverlay}>
-                  <h3 className={styles.slideTitulo}>{noticia.titulo}</h3>
-                  <p className={styles.slideDescripcion}>{noticia.descripcion}</p>
-                </div>
-              </div>
-            ))}
-          </Slider>
+      {/* Resumen de actividades */}
+      <div className={styles.resumenContenedor}>
+        <h2 className={styles.resumenTitulo}>Bienvenido de nuevo, <strong> {usuario.nombre} </strong></h2>
+        
+        <div className={styles.resumenTarjetas}>
+          <div className={`${styles.resumenTarjeta} ${styles.tarjetaAsignadas}`}>
+            <p className={styles.resumenLabel}>Pendientes</p>
+            <p className={styles.resumenValor}>{pendientes}</p>
+          </div>
+          <div className={`${styles.resumenTarjeta} ${styles.tarjetaProceso}`}>
+            <p className={styles.resumenLabel}>En Proceso</p>
+            <p className={styles.resumenValor}>{agrupadas.enProceso?.length || 0}</p>
+          </div>
+          <div className={`${styles.resumenTarjeta} ${styles.tarjetaPorValidar}`}>
+            <p className={styles.resumenLabel}>Por Validar</p>
+            <p className={styles.resumenValor}>{agrupadas.porValidar?.length || 0}</p>
+          </div>
+          <div className={`${styles.resumenTarjeta} ${styles.tarjetaCompletadas}`}>
+            <p className={styles.resumenLabel}>Completadas</p>
+            <p className={styles.resumenValor}>{agrupadas.completadas?.length || 0}</p>
+          </div>
         </div>
       </div>
     </div>

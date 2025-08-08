@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, FileText, Home } from 'lucide-react'
+import { LogOut, FileText, Home, Wrench } from 'lucide-react'
 import styles from '@/components/CSS/AuditorDashboard.module.css'
 import VistaActual from '@/components/auditor/VistaActual'
 import { SpeedInsights } from "@vercel/speed-insights/next"
@@ -29,10 +29,15 @@ export default function AuditorDashboard() {
     <div className={styles.dashboardContainer}>
       <SpeedInsights />
       <Analytics />
+
       {/* Panel lateral */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarContent}>
-          <img src="/logo-universidad.png" alt="Logo Universidad" className={styles.logo} />
+
+          {/* Imagen superior */}
+          <img src="/profe.jpg" alt="Avatar" className={styles.avatar} />
+          {usuario && <p className={styles.username}>👨‍🏫 {usuario.nombre}</p>}
+
           <h2 className={styles.title}>Panel Auditor</h2>
 
           <nav className={styles.nav}>
@@ -41,10 +46,9 @@ export default function AuditorDashboard() {
                 setVista('bienvenida')
                 window.history.pushState({}, '', '/auditor?vista=bienvenida')
               }}
-              className={`${styles.navButton} ${vista === 'bienvenida' ? styles.active : ''
-                }`}
+              className={`${styles.navButton} ${vista === 'bienvenida' ? styles.active : ''}`}
             >
-              <Home size={18} /> <span>Inicio</span>
+              <Home size={20} /> <span>Inicio</span>
             </button>
 
             <button
@@ -53,17 +57,30 @@ export default function AuditorDashboard() {
                 setResetAuditorias(prev => !prev)
                 window.history.pushState({}, '', '/auditor?vista=asignadas')
               }}
-              className={`${styles.navButton} ${vista === 'asignadas' ? styles.active : ''
-                }`}
+              className={`${styles.navButton} ${vista === 'asignadas' ? styles.active : ''}`}
             >
-              <FileText size={18} /> <span>Auditorías asignadas</span>
+              <FileText size={20} /> <span>Auditorías</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setVista('caja')
+                setResetAuditorias(prev => !prev)
+                window.history.pushState({}, '', '/auditor?vista=caja')
+              }}
+              className={`${styles.navButton} ${vista === 'caja' ? styles.active : ''}`}
+            >
+<Wrench size={20} /> <span>Caja de Herramientas</span>
             </button>
           </nav>
         </div>
 
-        <button onClick={cerrarSesion} className={styles.logout}>
-          <LogOut size={16} /> Cerrar sesión
-        </button>
+        <div className={styles.sidebarFooter}>
+          <img src="/logoBlanco.png" alt="Logo Universidad" className={styles.logoBottom} />
+          <button onClick={cerrarSesion} className={styles.logout}>
+            <LogOut size={16} /> Cerrar sesión
+          </button>
+        </div>
       </aside>
 
       {/* Contenido principal */}
@@ -76,8 +93,6 @@ export default function AuditorDashboard() {
           />
         </Suspense>
       </main>
-
     </div>
-    
   )
 }
