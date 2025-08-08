@@ -42,7 +42,11 @@ export default function FormularioRegistro({ usuario, auditoria }) {
     cargarISO()
   }, [router])
 
-  useEffect(() => {
+  useEffect(() => { ajustarTextareas() }, [fortalezas])
+  useEffect(() => { ajustarTextareas() }, [oportunidades])
+  useEffect(() => { ajustarTextareas() }, [noConformidades])
+
+  const ajustarTextareas = () => {
     const textareas = document.querySelectorAll(`.${styles.textareaAuto}`)
     textareas.forEach(textarea => {
       textarea.style.height = 'auto'
@@ -52,7 +56,8 @@ export default function FormularioRegistro({ usuario, auditoria }) {
         textarea.style.height = `${textarea.scrollHeight}px`
       })
     })
-  }, [])
+  }
+
 
   useEffect(() => {
     if (auditoria) {
@@ -435,307 +440,353 @@ export default function FormularioRegistro({ usuario, auditoria }) {
             ref={i === fortalezas.length - 1 ? fortalezaRef : null}
             className={`${styles.subformulario} ${styles.fortalezaBg} relative`}
           >
+            {/* Título de Fortaleza */}
+            <div className={styles.subtituloFormulario}>💪 Fortaleza #{i + 1}</div>
 
-            {/* Botón para eliminar */}
+            {/* Botón de eliminar */}
             <button
               type="button"
               onClick={() => setFortalezas(prev => prev.filter((_, j) => j !== i))}
-              className="absolute top-2 right-2 text-red-500 hover:text-red-700 text-xl font-bold"
+              className={styles.botonEliminar}
               title="Eliminar fortaleza"
             >
               ✖
             </button>
 
-            <label className={styles.etiqueta} htmlFor={`iso-${i}`}>ISO</label>
-            <select
-              id={`iso-${i}`}
-              value={f.iso}
-              onChange={async (e) => {
-                const isoId = parseInt(e.target.value)
-                handleFortalezaChange(i, 'iso', isoId)
-                handleFortalezaChange(i, 'capitulo', '')
-                handleFortalezaChange(i, 'numeral', '')
-                await cargarCapitulos(isoId)
-              }}
-              className={styles.inputCampo}
-            >
-              <option value="">Seleccionar ISO</option>
-              {listaIso.map(iso => (
-                <option key={iso.id} value={iso.id}>{iso.iso}</option>
-              ))}
-            </select>
 
-            <label className={styles.etiqueta} htmlFor={`capitulo-${i}`}>Capítulo</label>
-            <select
-              id={`capitulo-${i}`}
-              value={f.capitulo}
-              onChange={async (e) => {
-                const capId = parseInt(e.target.value)
-                handleFortalezaChange(i, 'capitulo', capId)
-                handleFortalezaChange(i, 'numeral', '')
-                await cargarNumerales(capId)
-              }}
-              disabled={!f.iso}
-              className={styles.inputCampo}
-            >
-              <option value="">Capítulo</option>
-              {(listaCapitulos[f.iso] || []).map(c => (
-                <option key={c.id} value={c.id}>{c.capitulo}</option>
-              ))}
-            </select>
+            {/* ISO, Capítulo y Numeral en una sola fila */}
+            <div className={styles.grupoFila}>
+              <div className={styles.campoAgrupado}>
+                <label className={styles.etiqueta} htmlFor={`iso-${i}`}>ISO</label>
+                <select
+                  id={`iso-${i}`}
+                  value={f.iso}
+                  onChange={async (e) => {
+                    const isoId = parseInt(e.target.value)
+                    handleFortalezaChange(i, 'iso', isoId)
+                    handleFortalezaChange(i, 'capitulo', '')
+                    handleFortalezaChange(i, 'numeral', '')
+                    await cargarCapitulos(isoId)
+                  }}
+                  className={styles.inputCampo}
+                >
+                  <option value="">Seleccionar ISO</option>
+                  {listaIso.map(iso => (
+                    <option key={iso.id} value={iso.id}>{iso.iso}</option>
+                  ))}
+                </select>
+              </div>
 
-            <label className={styles.etiqueta} htmlFor={`numeral-${i}`}>Numeral</label>
-            <select
-              id={`numeral-${i}`}
-              value={f.numeral}
-              onChange={(e) => handleFortalezaChange(i, 'numeral', parseInt(e.target.value))}
-              disabled={!f.capitulo}
-              className={styles.inputCampo}
-            >
-              <option value="">Numeral</option>
-              {(listaNumerales[f.capitulo] || []).map(n => (
-                <option key={n.id} value={n.id}>{n.numeral}</option>
-              ))}
-            </select>
+              <div className={styles.campoAgrupado}>
+                <label className={styles.etiqueta} htmlFor={`capitulo-${i}`}>Capítulo</label>
+                <select
+                  id={`capitulo-${i}`}
+                  value={f.capitulo}
+                  onChange={async (e) => {
+                    const capId = parseInt(e.target.value)
+                    handleFortalezaChange(i, 'capitulo', capId)
+                    handleFortalezaChange(i, 'numeral', '')
+                    await cargarNumerales(capId)
+                  }}
+                  disabled={!f.iso}
+                  className={styles.inputCampo}
+                >
+                  <option value="">Capítulo</option>
+                  {(listaCapitulos[f.iso] || []).map(c => (
+                    <option key={c.id} value={c.id}>{c.capitulo}</option>
+                  ))}
+                </select>
+              </div>
 
+              <div className={styles.campoAgrupado}>
+                <label className={styles.etiqueta} htmlFor={`numeral-${i}`}>Numeral</label>
+                <select
+                  id={`numeral-${i}`}
+                  value={f.numeral}
+                  onChange={(e) => handleFortalezaChange(i, 'numeral', parseInt(e.target.value))}
+                  disabled={!f.capitulo}
+                  className={styles.inputCampo}
+                >
+                  <option value="">Numeral</option>
+                  {(listaNumerales[f.capitulo] || []).map(n => (
+                    <option key={n.id} value={n.id}>{n.numeral}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Descripción */}
             <label className={styles.etiqueta} htmlFor={`descripcion-${i}`}>Descripción</label>
-            <input
-              type="text"
+            <textarea
               id={`descripcion-${i}`}
               value={f.descripcion}
               onChange={(e) => handleFortalezaChange(i, 'descripcion', e.target.value)}
-              className={styles.inputCampo}
+              className={`${styles.textareaAdaptable} ${styles.textareaAuto}`}
+              rows={1}
             />
 
+            {/* Razón */}
             <label className={styles.etiqueta} htmlFor={`razon-${i}`}>Razón</label>
-            <input
-              type="text"
+
+            <textarea
               id={`razon-${i}`}
               value={f.razon}
               onChange={(e) => handleFortalezaChange(i, 'razon', e.target.value)}
-              className={styles.inputCampo}
+              className={`${styles.textareaAdaptable} ${styles.textareaAuto}`}
+              rows={1}
             />
           </div>
         ))}
 
-
-        {/* Subformulario de oportunidades de mejora */}
+        {/* Subformulario de Oportunidades */}
         {oportunidades.map((o, i) => (
           <div
             key={i}
             ref={i === oportunidades.length - 1 ? oportunidadRef : null}
             className={`${styles.subformulario} ${styles.oportunidadBg} relative`}
           >
+            {/* Título de Oportunidad */}
+            <div className={styles.subtituloFormulario}>📈 Oportunidad #{i + 1}</div>
 
             {/* Botón para eliminar */}
             <button
               type="button"
               onClick={() => setOportunidades(prev => prev.filter((_, j) => j !== i))}
-              className="absolute top-2 right-2 text-red-500 hover:text-red-700 text-xl font-bold"
+              className={styles.botonEliminar}
               title="Eliminar oportunidad"
             >
               ✖
             </button>
 
-            <label className={styles.etiqueta} htmlFor={`oportunidad-iso-${i}`}>ISO</label>
-            <select
-              id={`oportunidad-iso-${i}`}
-              value={o.iso}
-              onChange={async (e) => {
-                const isoId = parseInt(e.target.value)
-                handleOportunidadChange(i, 'iso', isoId)
-                handleOportunidadChange(i, 'capitulo', '')
-                handleOportunidadChange(i, 'numeral', '')
-                await cargarCapitulos(isoId)
-              }}
-              className={styles.inputCampo}
-            >
-              <option value="">Seleccionar ISO</option>
-              {listaIso.map(iso => <option key={iso.id} value={iso.id}>{iso.iso}</option>)}
-            </select>
+            {/* ISO, Capítulo y Numeral en una sola fila */}
+            <div className={styles.grupoFila}>
+              <div className={styles.campoAgrupado}>
+                <label className={styles.etiqueta} htmlFor={`oportunidad-iso-${i}`}>ISO</label>
+                <select
+                  id={`oportunidad-iso-${i}`}
+                  value={o.iso}
+                  onChange={async (e) => {
+                    const isoId = parseInt(e.target.value)
+                    handleOportunidadChange(i, 'iso', isoId)
+                    handleOportunidadChange(i, 'capitulo', '')
+                    handleOportunidadChange(i, 'numeral', '')
+                    await cargarCapitulos(isoId)
+                  }}
+                  className={styles.inputCampo}
+                >
+                  <option value="">Seleccionar ISO</option>
+                  {listaIso.map(iso => <option key={iso.id} value={iso.id}>{iso.iso}</option>)}
+                </select>
+              </div>
 
-            <label className={styles.etiqueta} htmlFor={`oportunidad-capitulo-${i}`}>Capítulo</label>
-            <select
-              id={`oportunidad-capitulo-${i}`}
-              value={o.capitulo}
-              onChange={async (e) => {
-                const capId = parseInt(e.target.value)
-                handleOportunidadChange(i, 'capitulo', capId)
-                handleOportunidadChange(i, 'numeral', '')
-                await cargarNumerales(capId)
-              }}
-              disabled={!o.iso}
-              className={styles.inputCampo}
-            >
-              <option value="">Capítulo</option>
-              {(listaCapitulos[o.iso] || []).map(c => <option key={c.id} value={c.id}>{c.capitulo}</option>)}
-            </select>
+              <div className={styles.campoAgrupado}>
+                <label className={styles.etiqueta} htmlFor={`oportunidad-capitulo-${i}`}>Capítulo</label>
+                <select
+                  id={`oportunidad-capitulo-${i}`}
+                  value={o.capitulo}
+                  onChange={async (e) => {
+                    const capId = parseInt(e.target.value)
+                    handleOportunidadChange(i, 'capitulo', capId)
+                    handleOportunidadChange(i, 'numeral', '')
+                    await cargarNumerales(capId)
+                  }}
+                  disabled={!o.iso}
+                  className={styles.inputCampo}
+                >
+                  <option value="">Capítulo</option>
+                  {(listaCapitulos[o.iso] || []).map(c => <option key={c.id} value={c.id}>{c.capitulo}</option>)}
+                </select>
+              </div>
 
-            <label className={styles.etiqueta} htmlFor={`oportunidad-numeral-${i}`}>Numeral</label>
-            <select
-              id={`oportunidad-numeral-${i}`}
-              value={o.numeral}
-              onChange={(e) => handleOportunidadChange(i, 'numeral', parseInt(e.target.value))}
-              disabled={!o.capitulo}
-              className={styles.inputCampo}
-            >
-              <option value="">Numeral</option>
-              {(listaNumerales[o.capitulo] || []).map(n => <option key={n.id} value={n.id}>{n.numeral}</option>)}
-            </select>
+              <div className={styles.campoAgrupado}>
+                <label className={styles.etiqueta} htmlFor={`oportunidad-numeral-${i}`}>Numeral</label>
+                <select
+                  id={`oportunidad-numeral-${i}`}
+                  value={o.numeral}
+                  onChange={(e) => handleOportunidadChange(i, 'numeral', parseInt(e.target.value))}
+                  disabled={!o.capitulo}
+                  className={styles.inputCampo}
+                >
+                  <option value="">Numeral</option>
+                  {(listaNumerales[o.capitulo] || []).map(n => <option key={n.id} value={n.id}>{n.numeral}</option>)}
+                </select>
+              </div>
+            </div>
 
+            {/* Descripción */}
             <label className={styles.etiqueta} htmlFor={`oportunidad-descripcion-${i}`}>Descripción</label>
-            <input
-              type="text"
+            <textarea
               id={`oportunidad-descripcion-${i}`}
               value={o.descripcion}
               onChange={(e) => handleOportunidadChange(i, 'descripcion', e.target.value)}
-              className={styles.inputCampo}
+              className={`${styles.textareaAdaptable} ${styles.textareaAuto}`}
+              rows={2}
             />
 
+            {/* ¿Para qué? */}
             <label className={styles.etiqueta} htmlFor={`oportunidad-para-que-${i}`}>¿Para qué?</label>
-            <input
-              type="text"
+            <textarea
               id={`oportunidad-para-que-${i}`}
               value={o.para_que}
               onChange={(e) => handleOportunidadChange(i, 'para_que', e.target.value)}
-              className={styles.inputCampo}
+              className={`${styles.textareaAdaptable} ${styles.textareaAuto}`}
+              rows={2}
             />
           </div>
         ))}
-
-
-        {/* Subformulario de no conformidades*/}
         {noConformidades.map((n, i) => (
           <div
             key={i}
             ref={i === noConformidades.length - 1 ? noConformidadRef : null}
             className={`${styles.subformulario} ${styles.noConformidadBg} relative`}
           >
+            {/* Título de No Conformidad */}
+            <div className={styles.subtituloFormulario}>🚫 No Conformidad #{i + 1}</div>
+
             {/* Botón para eliminar */}
             <button
               type="button"
               onClick={() => setNoConformidades(prev => prev.filter((_, j) => j !== i))}
-              className="absolute top-2 right-2 text-red-500 hover:text-red-700 text-xl font-bold"
+              className={styles.botonEliminar}
               title="Eliminar no conformidad"
             >
               ✖
             </button>
 
-            <label className={styles.etiqueta} htmlFor={`noConformidad-iso-${i}`}>ISO</label>
-            <select
-              id={`noConformidad-iso-${i}`}
-              value={n.iso}
-              onChange={async (e) => {
-                const isoId = parseInt(e.target.value)
-                handleNoConformidadChange(i, 'iso', isoId)
-                handleNoConformidadChange(i, 'capitulo', '')
-                handleNoConformidadChange(i, 'numeral', '')
-                await cargarCapitulos(isoId)
-              }}
-              className={styles.inputCampo}
-            >
-              <option value="">Seleccionar ISO</option>
-              {listaIso.map(iso => <option key={iso.id} value={iso.id}>{iso.iso}</option>)}
-            </select>
+            {/* ISO, Capítulo y Numeral en una sola fila */}
+            <div className={styles.grupoFila}>
+              <div className={styles.campoAgrupado}>
+                <label className={styles.etiqueta} htmlFor={`noConformidad-iso-${i}`}>ISO</label>
+                <select
+                  id={`noConformidad-iso-${i}`}
+                  value={n.iso}
+                  onChange={async (e) => {
+                    const isoId = parseInt(e.target.value)
+                    handleNoConformidadChange(i, 'iso', isoId)
+                    handleNoConformidadChange(i, 'capitulo', '')
+                    handleNoConformidadChange(i, 'numeral', '')
+                    await cargarCapitulos(isoId)
+                  }}
+                  className={styles.inputCampo}
+                >
+                  <option value="">Seleccionar ISO</option>
+                  {listaIso.map(iso => <option key={iso.id} value={iso.id}>{iso.iso}</option>)}
+                </select>
+              </div>
 
-            <label className={styles.etiqueta} htmlFor={`noConformidad-capitulo-${i}`}>Capítulo</label>
-            <select
-              id={`noConformidad-capitulo-${i}`}
-              value={n.capitulo}
-              onChange={async (e) => {
-                const capId = parseInt(e.target.value)
-                handleNoConformidadChange(i, 'capitulo', capId)
-                handleNoConformidadChange(i, 'numeral', '')
-                await cargarNumerales(capId)
-              }}
-              disabled={!n.iso}
-              className={styles.inputCampo}
-            >
-              <option value="">Capítulo</option>
-              {(listaCapitulos[n.iso] || []).map(c => <option key={c.id} value={c.id}>{c.capitulo}</option>)}
-            </select>
+              <div className={styles.campoAgrupado}>
+                <label className={styles.etiqueta} htmlFor={`noConformidad-capitulo-${i}`}>Capítulo</label>
+                <select
+                  id={`noConformidad-capitulo-${i}`}
+                  value={n.capitulo}
+                  onChange={async (e) => {
+                    const capId = parseInt(e.target.value)
+                    handleNoConformidadChange(i, 'capitulo', capId)
+                    handleNoConformidadChange(i, 'numeral', '')
+                    await cargarNumerales(capId)
+                  }}
+                  disabled={!n.iso}
+                  className={styles.inputCampo}
+                >
+                  <option value="">Capítulo</option>
+                  {(listaCapitulos[n.iso] || []).map(c => <option key={c.id} value={c.id}>{c.capitulo}</option>)}
+                </select>
+              </div>
 
-            <label className={styles.etiqueta} htmlFor={`noConformidad-numeral-${i}`}>Numeral</label>
-            <select
-              id={`noConformidad-numeral-${i}`}
-              value={n.numeral}
-              onChange={(e) => handleNoConformidadChange(i, 'numeral', parseInt(e.target.value))}
-              disabled={!n.capitulo}
-              className={styles.inputCampo}
-            >
-              <option value="">Numeral</option>
-              {(listaNumerales[n.capitulo] || []).map(nu => <option key={nu.id} value={nu.id}>{nu.numeral}</option>)}
-            </select>
+              <div className={styles.campoAgrupado}>
+                <label className={styles.etiqueta} htmlFor={`noConformidad-numeral-${i}`}>Numeral</label>
+                <select
+                  id={`noConformidad-numeral-${i}`}
+                  value={n.numeral}
+                  onChange={(e) => handleNoConformidadChange(i, 'numeral', parseInt(e.target.value))}
+                  disabled={!n.capitulo}
+                  className={styles.inputCampo}
+                >
+                  <option value="">Numeral</option>
+                  {(listaNumerales[n.capitulo] || []).map(nu => <option key={nu.id} value={nu.id}>{nu.numeral}</option>)}
+                </select>
+              </div>
+            </div>
 
+            {/* Descripción */}
             <label className={styles.etiqueta} htmlFor={`noConformidad-descripcion-${i}`}>Descripción</label>
-            <input
-              type="text"
+            <textarea
               id={`noConformidad-descripcion-${i}`}
               value={n.descripcion}
               onChange={(e) => handleNoConformidadChange(i, 'descripcion', e.target.value)}
-              className={styles.inputCampo}
+              className={`${styles.textareaAdaptable} ${styles.textareaAuto}`}
+              rows={2}
             />
 
+            {/* Evidencia */}
             <label className={styles.etiqueta} htmlFor={`noConformidad-evidencia-${i}`}>Evidencia</label>
-            <input
-              type="text"
+            <textarea
               id={`noConformidad-evidencia-${i}`}
               value={n.evidencia}
               onChange={(e) => handleNoConformidadChange(i, 'evidencia', e.target.value)}
-              className={styles.inputCampo}
+              className={`${styles.textareaAdaptable} ${styles.textareaAuto}`}
+              rows={2}
             />
           </div>
         ))}
 
-        <button
-          type="button"
-          onClick={() => {
-            setFortalezas([...fortalezas, { iso: '', capitulo: '', numeral: '', descripcion: '', razon: '' }])
-            setTimeout(() => {
-              if (fortalezaRef.current) {
-                const offsetTop = fortalezaRef.current.getBoundingClientRect().top + window.pageYOffset
-                window.scrollTo({ top: offsetTop - 200, behavior: 'smooth' })
-              }
-            }, 100)
-          }}
-          className={`${styles.botonHallazgo} ${styles.verde}`}
-        >
-          ➕ Fortaleza
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setOportunidades([...oportunidades, { iso: '', capitulo: '', numeral: '', descripcion: '', para_que: '' }])
-            setTimeout(() => {
-              if (oportunidadRef.current) {
-                const offsetTop = oportunidadRef.current.getBoundingClientRect().top + window.pageYOffset
-                window.scrollTo({ top: offsetTop - 200, behavior: 'smooth' })
-              }
-            }, 100)
-          }}
-          className={`${styles.botonHallazgo} ${styles.azul}`}
-        >
-          ➕ Oportunidad
-        </button>
 
 
-        <button
-          type="button"
-          onClick={() => {
-            setNoConformidades([...noConformidades, { iso: '', capitulo: '', numeral: '', descripcion: '', evidencia: '' }])
-            setTimeout(() => {
-              if (noConformidadRef.current) {
-                const offsetTop = noConformidadRef.current.getBoundingClientRect().top + window.pageYOffset
-                window.scrollTo({ top: offsetTop - 200, behavior: 'smooth' })
-              }
-            }, 100)
-          }}
-          className={`${styles.botonHallazgo} ${styles.rojo}`}
-        >
-          ➕ No Conformidad
-        </button>
 
+        <div className={styles.botonesHallazgoGrupo}>
+          <button
+            type="button"
+            onClick={() => {
+              setFortalezas([...fortalezas, { iso: '', capitulo: '', numeral: '', descripcion: '', razon: '' }])
+              setTimeout(() => {
+                if (fortalezaRef.current) {
+                  const offsetTop = fortalezaRef.current.getBoundingClientRect().top + window.pageYOffset
+                  window.scrollTo({ top: offsetTop - 200, behavior: 'smooth' })
+                }
+              }, 100)
+            }}
+            className={`${styles.botonHallazgo} ${styles.verde}`}
+          >
+            <span className={styles.botonIcono}>+</span>
+            Fortalezas
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setOportunidades([...oportunidades, { iso: '', capitulo: '', numeral: '', descripcion: '', para_que: '' }])
+              setTimeout(() => {
+                if (oportunidadRef.current) {
+                  const offsetTop = oportunidadRef.current.getBoundingClientRect().top + window.pageYOffset
+                  window.scrollTo({ top: offsetTop - 200, behavior: 'smooth' })
+                }
+              }, 100)
+            }}
+            className={`${styles.botonHallazgo} ${styles.azul}`}
+          >
+            <span className={styles.botonIcono}>+</span>
+            Oportunidades de Mejora
+          </button>
+
+
+          <button
+            type="button"
+            onClick={() => {
+              setNoConformidades([...noConformidades, { iso: '', capitulo: '', numeral: '', descripcion: '', evidencia: '' }])
+              setTimeout(() => {
+                if (noConformidadRef.current) {
+                  const offsetTop = noConformidadRef.current.getBoundingClientRect().top + window.pageYOffset
+                  window.scrollTo({ top: offsetTop - 200, behavior: 'smooth' })
+                }
+              }, 100)
+            }}
+            className={`${styles.botonHallazgo} ${styles.rojo}`}
+          >
+            <span className={styles.botonIcono}> + </span>
+            No Conformidades
+          </button>
+
+        </div>
 
         <button
           type="submit"
