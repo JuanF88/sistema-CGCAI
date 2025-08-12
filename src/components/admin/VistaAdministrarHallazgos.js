@@ -165,10 +165,7 @@ const handleUploadExcel = async (e) => {
       return idx >= 0 ? idx : null;
     };
 
-    const cInformeID    = findCol('informe id');
     const cAno          = findCol('año', 'ano');
-    const cSemestre     = findCol('semestre');
-    const cAuditor      = findCol('auditor');
     const cDependencia  = findCol('dependencia');
     const cTipo         = findCol('tipo de hallazgo', 'tipo');
     const cISO          = findCol('iso');
