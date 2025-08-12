@@ -9,6 +9,8 @@ import { supabase } from '@/lib/supabaseClient'
 
 import { Dialog } from '@headlessui/react' // Asegúrate de tenerlo instalado con: npm install @headlessui/react
 import { CloudUpload } from 'lucide-react' // npm install lucide-react
+import { toast } from 'react-toastify'
+
 
 export const exportarExcel = async (hallazgos) => {
     const workbook = new ExcelJS.Workbook()
@@ -95,186 +97,233 @@ export default function VistaHallazgosAdmin() {
         fetchHallazgos()
     }, [])
 
-    const handleUploadExcel = async (e) => {
-        setEstaCargando(true)
-        setProgresoCarga(0)
-        setCancelarCarga(false)
 
-        const file = e.target.files[0]
-        if (!file) return
+const handleUploadExcel = async (e) => {
+  setEstaCargando(true);
+  setProgresoCarga(0);
+  setCancelarCarga(false);
 
-        const workbook = new ExcelJS.Workbook()
-        await workbook.xlsx.load(await file.arrayBuffer())
-        const worksheet = workbook.getWorksheet('Hallazgos') || workbook.worksheets[0]
+  const norm = (v) => (v == null ? '' : String(v))
+    .replace(/\u00A0/g, ' ')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 
-        const rows = worksheet.getSheetValues().slice(2) // Omitir encabezado
+  const cellToString = (v) => {
+    if (v == null) return '';
+    if (typeof v === 'object') {
+      if ('text' in v && v.text) return String(v.text);
+      if ('result' in v && v.result != null) return String(v.result);
+      if ('richText' in v && Array.isArray(v.richText))
+        return v.richText.map(t => t.text ?? '').join('');
+      if ('hyperlink' in v && v.hyperlink) return String(v.hyperlink);
+      if ('formula' in v && v.formula) return String(v.result ?? '');
+    }
+    return String(v);
+  };
 
-        // 1. Filtrar solo filas válidas
-        const filasValidas = rows.filter(row => {
-            const [
-                ,
-                ,
-                anioRaw,
-                ,
-                ,
-                dependenciaNombre,
-                tipo,
-                ,
-                ,
-                ,
-                descripcion
-            ] = row || []
+  const read = (row, idx) => cellToString(row?.[idx]);
 
-            return anioRaw && dependenciaNombre && tipo && descripcion
-        })
+  try {
+    const file = e.target.files[0];
+    if (!file) return;
 
-        const totalValidas = filasValidas.length
-        let procesadas = 0
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(await file.arrayBuffer());
+    const worksheet = workbook.getWorksheet('Hallazgos') || workbook.worksheets[0];
 
-        for (const [row] of rows.entries()) {
-            if (cancelarCarga) {
-                alert('Carga cancelada por el usuario.')
-                break
-            }
-
-            const [
-                ,
-                anioRaw,
-                dependenciaNombre,
-                tipo,
-                iso,
-                capitulo,
-                numeral,
-                descripcion
-            ] = row
-
-            if (!tipo || !descripcion || !dependenciaNombre || !anioRaw) continue
-
-            const anio = parseInt(anioRaw.toString().trim())
-
-            // Buscar dependencia
-            const { data: depData } = await supabase
-                .from('dependencias')
-                .select('dependencia_id')
-                .ilike('nombre', dependenciaNombre.toString().trim())
-                .maybeSingle()
-
-            if (!depData) {
-                console.warn(`Dependencia "${dependenciaNombre}" no encontrada, fila ignorada.`)
-                continue
-            }
-
-            // Buscar o crear informe
-            const { data: existingInforme } = await supabase
-                .from('informes_auditoria')
-                .select('id')
-                .eq('dependencia_id', depData.dependencia_id)
-                .gte('fecha_auditoria', `${anio}-01-01`)
-                .lte('fecha_auditoria', `${anio}-12-31`)
-                .maybeSingle()
-
-            let informeIdUsar = existingInforme?.id
-
-            if (!informeIdUsar) {
-                const { data: nuevoInforme, error: insertError } = await supabase
-                    .from('informes_auditoria')
-                    .insert({
-                        fecha_auditoria: `${anio}-07-01`,
-                        fecha_seguimiento: `${anio}-07-01`,
-                        usuario_id: 1,
-                        dependencia_id: depData.dependencia_id,
-                        asistencia_tipo: 'Digital',
-                        auditores_acompanantes: ['N/A'],
-                        objetivo: 'Registro automático de hallazgos históricos',
-                        criterios: 'Importación Excel',
-                        conclusiones: 'N/A',
-                        recomendaciones: 'N/A'
-                    })
-                    .select()
-                    .single()
-
-                if (insertError || !nuevoInforme) {
-                    console.error(`Error creando informe:`, insertError?.message)
-                    continue
-                }
-
-                informeIdUsar = nuevoInforme.id
-            }
-
-            // Buscar ISO
-            const { data: isoData } = await supabase
-                .from('iso')
-                .select('id')
-                .eq('iso', iso?.toString().trim())
-                .maybeSingle()
-
-            if (!isoData) {
-                console.warn(`ISO "${iso}" no encontrado, fila ignorada.`)
-                continue
-            }
-
-            const { data: capData } = await supabase
-                .from('capitulos')
-                .select('id')
-                .eq('capitulo', capitulo?.toString().trim())
-                .eq('iso_id', isoData.id)
-                .maybeSingle()
-
-            if (!capData) {
-                console.warn(`Capítulo "${capitulo}" no encontrado, fila ignorada.`)
-                continue
-            }
-
-            const { data: numData } = await supabase
-                .from('numerales')
-                .select('id')
-                .eq('numeral', numeral?.toString().trim())
-                .eq('capitulo_id', capData.id)
-                .maybeSingle()
-
-            if (!numData) {
-                console.warn(`Numeral "${numeral}" no encontrado, fila ignorada.`)
-                continue
-            }
-
-            // Determinar tabla destino
-            const tipoNormalizado = tipo?.toString().trim().toLowerCase()
-            let tableName = 'no_conformidades'
-
-            if (tipoNormalizado.includes('fortaleza')) {
-                tableName = 'fortalezas'
-            } else if (tipoNormalizado.includes('mejora')) {
-                tableName = 'oportunidades_mejora'
-            }
-
-            const { error: insertError } = await supabase.from(tableName).insert({
-                informe_id: informeIdUsar,
-                descripcion: descripcion?.toString().trim(),
-                iso_id: isoData.id,
-                capitulo_id: capData.id,
-                numeral_id: numData.id
-            })
-
-            if (insertError) {
-                console.error(`Error insertando en ${tableName}:`, insertError.message)
-                continue
-            }
-
-            // ✅ Actualizar progreso real
-            procesadas++
-            setProgresoCarga(Math.round((procesadas / totalValidas) * 100))
-            await new Promise(resolve => setTimeout(resolve, 30))
-        }
-
-        await fetchHallazgos()
-        setEstaCargando(false)
-        setArchivoExcel(null)
-        setIsModalOpen(false)
-        setProgresoCarga(100)
-
-        if (!cancelarCarga) alert('Importación completada correctamente.')
+    const all = worksheet.getSheetValues();
+    if (!all || all.length < 2) {
+      toast.error('La hoja está vacía o no se pudo leer.');
+      return;
     }
 
+    let headerRowIdx = 1;
+    for (let i = 1; i < Math.min(all.length, 6); i++) {
+      const r = all[i];
+      if (!Array.isArray(r)) continue;
+      const joined = norm(r.map(cellToString).join(' | '));
+      if (
+        joined.includes('informe id') &&
+        (joined.includes('año') || joined.includes('ano')) &&
+        joined.includes('dependencia') &&
+        (joined.includes('tipo de hallazgo') || joined.includes('tipo')) &&
+        joined.includes('descripcion')
+      ) {
+        headerRowIdx = i;
+        break;
+      }
+    }
+
+    const headerRaw = (all[headerRowIdx] || []).map(cellToString);
+    const findCol = (...aliases) => {
+      const idx = headerRaw.findIndex(h => {
+        const H = norm(h);
+        return aliases.some(a => H === a || H.includes(a));
+      });
+      return idx >= 0 ? idx : null;
+    };
+
+    const cInformeID    = findCol('informe id');
+    const cAno          = findCol('año', 'ano');
+    const cSemestre     = findCol('semestre');
+    const cAuditor      = findCol('auditor');
+    const cDependencia  = findCol('dependencia');
+    const cTipo         = findCol('tipo de hallazgo', 'tipo');
+    const cISO          = findCol('iso');
+    const cCapitulo     = findCol('capitulo', 'capítulo');
+    const cNumeral      = findCol('numeral');
+    const cDescripcion  = findCol('descripcion', 'descripción');
+
+    if (cAno == null || cDependencia == null || cTipo == null || cDescripcion == null) {
+      toast.error('No se pudieron detectar correctamente las columnas clave (Año, Dependencia, Tipo, Descripción).');
+      return;
+    }
+
+    const rows = (all.slice(headerRowIdx + 1) || []).filter(Array.isArray);
+    const filasValidas = rows.filter(r => {
+      const anioRaw = read(r, cAno);
+      const dep     = read(r, cDependencia);
+      const tipo    = read(r, cTipo);
+      const desc    = read(r, cDescripcion);
+      return norm(anioRaw) && norm(dep) && norm(tipo) && norm(desc);
+    });
+
+    if (filasValidas.length === 0) {
+      toast.error('No se encontraron filas válidas en el Excel (revisa Año, Dependencia, Tipo y Descripción).');
+      return;
+    }
+
+    let procesadas = 0;
+    let insertadas = 0;
+    const totalValidas = filasValidas.length;
+
+    for (const r of rows) {
+      if (cancelarCarga) { 
+        toast('Carga cancelada por el usuario.');
+        break;
+      }
+
+      const anioRaw           = read(r, cAno);
+      const dependenciaNombre = read(r, cDependencia);
+      const tipo              = read(r, cTipo);
+      const iso               = cISO != null ? read(r, cISO) : '';
+      const capitulo          = cCapitulo != null ? read(r, cCapitulo) : '';
+      const numeral           = cNumeral != null ? read(r, cNumeral) : '';
+      const descripcion       = read(r, cDescripcion);
+
+      if (!norm(anioRaw) || !norm(dependenciaNombre) || !norm(tipo) || !norm(descripcion)) continue;
+
+      const anio = parseInt(norm(anioRaw), 10);
+      if (!Number.isFinite(anio)) continue;
+
+      const depNombre = (dependenciaNombre ?? '').toString().trim();
+      const tipoStr   = (tipo ?? '').toString().trim();
+      const isoStr    = (iso ?? '').toString().trim();
+      const capStr    = (capitulo ?? '').toString().trim();
+      const numStr    = (numeral ?? '').toString().trim();
+      const descStr   = (descripcion ?? '').toString().trim();
+
+      const { data: depData } = await supabase
+        .from('dependencias')
+        .select('dependencia_id')
+        .ilike('nombre', depNombre)
+        .limit(1)
+        .maybeSingle();
+      if (!depData) continue;
+
+      const { data: existingInforme } = await supabase
+        .from('informes_auditoria')
+        .select('id')
+        .eq('dependencia_id', depData.dependencia_id)
+        .gte('fecha_auditoria', `${anio}-01-01`)
+        .lte('fecha_auditoria', `${anio}-12-31`)
+        .limit(1)
+        .maybeSingle();
+
+      let informeIdUsar = existingInforme?.id;
+      if (!informeIdUsar) {
+        const { data: nuevoInforme } = await supabase
+          .from('informes_auditoria')
+          .insert({
+            fecha_auditoria: `${anio}-07-01`,
+            fecha_seguimiento: `${anio}-07-01`,
+            usuario_id: 1,
+            dependencia_id: depData.dependencia_id,
+            asistencia_tipo: 'Digital',
+            auditores_acompanantes: ['N/A'],
+            objetivo: 'Registro automático de hallazgos históricos',
+            criterios: 'Importación Excel',
+            conclusiones: 'N/A',
+            recomendaciones: 'N/A'
+          })
+          .select('id')
+          .single();
+        if (!nuevoInforme) continue;
+        informeIdUsar = nuevoInforme.id;
+      }
+
+      const { data: isoData } = await supabase
+        .from('iso')
+        .select('id')
+        .eq('iso', isoStr)
+        .limit(1)
+        .maybeSingle();
+      if (!isoData) continue;
+
+      const { data: capData } = await supabase
+        .from('capitulos')
+        .select('id')
+        .eq('capitulo', capStr)
+        .eq('iso_id', isoData.id)
+        .limit(1)
+        .maybeSingle();
+      if (!capData) continue;
+
+      const { data: numData } = await supabase
+        .from('numerales')
+        .select('id')
+        .eq('numeral', numStr)
+        .eq('capitulo_id', capData.id)
+        .limit(1)
+        .maybeSingle();
+      if (!numData) continue;
+
+      let tableName = 'no_conformidades';
+      if (tipoStr.toLowerCase().includes('fortaleza')) tableName = 'fortalezas';
+      else if (tipoStr.toLowerCase().includes('mejora')) tableName = 'oportunidades_mejora';
+
+      const { error: insertErr } = await supabase.from(tableName).insert({
+        informe_id: informeIdUsar,
+        descripcion: descStr,
+        iso_id: isoData.id,
+        capitulo_id: capData.id,
+        numeral_id: numData.id
+      });
+      if (insertErr) continue;
+
+      insertadas++;
+      procesadas++;
+      setProgresoCarga(Math.round((procesadas / totalValidas) * 100));
+      await new Promise(res => setTimeout(res, 10));
+    }
+
+    await fetchHallazgos();
+    setProgresoCarga(100);
+    if (!cancelarCarga) {
+      toast.success(`Importación completada: ${insertadas} de ${totalValidas} filas insertadas.`);
+    }
+
+  } catch (err) {
+    console.error('Error general en importación:', err);
+    toast.error('Ocurrió un error leyendo el Excel o durante la importación. Revisa la consola.');
+  } finally {
+    setEstaCargando(false);
+    setArchivoExcel(null);
+    setIsModalOpen(false);
+  }
+};
 
 
     const columnas = [

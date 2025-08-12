@@ -9,13 +9,13 @@ import styles from './CSS/VistaBienvenida.module.css'
 
 const noticias = [
   {
-    src: '/noticias/noticia4.jpg'
+    src: '/noticias/noticia7.png'
   },
   {
-    src: '/noticias/noticia5.png',
+    src: '/noticias/noticia8.png',
   },
   {
-    src: '/noticias/noticia6.jpg',
+    src: '/noticias/noticia9.png',
   },
 ]
 

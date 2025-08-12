@@ -8,8 +8,8 @@
   font-family: 'Poppins';
 
   background-image:
-    linear-gradient(270deg, rgba(37, 50, 103, 0.9), rgba(157, 112, 209, 0.9), rgba(65, 38, 106, 0.9)),
-    url('/fondo.png'); /* 👉 asegúrate que esté en public/ */
+    linear-gradient(270deg, #002b9e, rgba(59, 116, 182, 0.9), #002b9e),
+    url('/fondoLogin.png'); /* 👉 asegúrate que esté en public/ */
 
   background-size: 600% 600%, cover;
   background-position: center;
@@ -67,7 +67,7 @@
 .titulo {
   font-size: 2.5rem;
   font-weight: 700;
-  color: #660099;
+  color: #002b9e;
   text-shadow: 1px 1px 2px #00000052;
   letter-spacing: 0.5px;
   margin-bottom: 20px;
@@ -76,7 +76,7 @@
 .subtitulo {
   font-size: 1.3rem;
   font-weight: 100;
-  color: #660099;
+  color: #002b9e;
 }
 
 .form {
@@ -102,7 +102,7 @@
 
 .boton {
   display: inline-block; /* 👈 hace que el botón solo ocupe lo necesario */
-  background: linear-gradient(90deg, #7c3aed, #8f2c7ab2);
+  background: linear-gradient(90deg, #0043b7, #002b9e);
   color: white;
   padding: 0.75rem 1.5rem; /* 👈 controlas espacio vertical y horizontal */
   font-weight: 700;

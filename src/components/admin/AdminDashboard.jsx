@@ -41,8 +41,10 @@ export default function AdminDashboard() {
       {/* Panel lateral */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarContent}>
-          <img src="/logo-universidad.png" alt="Logo Universidad" className={styles.logo} />
-          <h2 className={styles.title}>Panel Admin</h2>
+
+          <img src="/profe.jpg" alt="Avatar" className={styles.avatar} />
+          {usuario && <p className={styles.username}>{usuario.nombre}</p>}
+
 
           <nav className={styles.nav}>
             <button
@@ -52,7 +54,7 @@ export default function AdminDashboard() {
               }}
               className={`${styles.navButton} ${vista === 'bienvenida' ? styles.active : ''}`}
             >
-              <Home size={18} /> <span>Inicio</span>
+              <Home size={20} /> <span>Inicio</span>
             </button>
 
 
@@ -102,12 +104,12 @@ export default function AdminDashboard() {
 
         </div>
 
-        <button
-          onClick={cerrarSesion}
-          className="mt-10 text-sm text-red-100 hover:text-red-400 flex items-center justify-center gap-2 bg-red-600/30 hover:bg-red-600/50 px-3 py-2 rounded-xl transition-all duration-300"
-        >
-          <LogOut size={16} /> Cerrar sesión
-        </button>
+        <div className={styles.sidebarFooter}>
+          <img src="/logoBlanco.png" alt="Logo Universidad" className={styles.logoBottom} />
+          <button onClick={cerrarSesion} className={styles.logout}>
+            <LogOut size={16} /> Cerrar sesión
+          </button>
+        </div>
       </aside>
 
       {/* Contenido principal */}

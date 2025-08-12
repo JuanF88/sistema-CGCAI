@@ -31,7 +31,7 @@
 
 /* Dot activo con color personalizado */
 .vistaContainer :global(.slick-dots li.slick-active button:before) {
-  color: #db8bca; /* Color activo */
+  color: #6482d6; /* Color activo */
     font-size: 26px; /* Tamaño del punto */
 
   opacity: 1;
@@ -57,7 +57,7 @@
   font-size: 1.8rem;
   font-weight: 600;
   text-align: left;
-  color: #5c0f7a;
+  color: #002b9e;
   margin-bottom: 1.5rem;
 }
 
@@ -120,5 +120,5 @@
 .resumenValor {
   font-size: 2.4rem;
   font-weight: bold;
-  color: #4a148c;
+  color: #002b9e;
 }

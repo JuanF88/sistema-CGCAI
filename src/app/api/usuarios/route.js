@@ -87,3 +87,32 @@ const { nombre, apellido, email, password, rol, estado = 'activo' } = body
   console.log('✅ Usuario creado:', data)
   return NextResponse.json(data)
 }
+
+export async function DELETE(request) {
+  const { searchParams } = new URL(request.url)
+  const id = Number(searchParams.get('id'))
+
+  if (!id) {
+    return NextResponse.json({ error: 'ID de usuario no proporcionado' }, { status: 400 })
+  }
+
+  // Si tus RLS no permiten DELETE con el cliente actual, ver opción B (admin)
+  const { data, error } = await supabase
+    .from('usuarios')
+    .delete()
+    .eq('usuario_id', id)
+    .select('usuario_id')       // devuelve el registro eliminado
+    .maybeSingle()
+
+  if (error) {
+    // Si hay FK, Postgres puede lanzar error de restricción
+    const status = /foreign key/i.test(error.message) ? 409 : 500
+    return NextResponse.json({ error: error.message }, { status })
+  }
+
+  if (!data) {
+    return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
+  }
+
+  return NextResponse.json({ ok: true, deleted: data })
+}

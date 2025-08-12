@@ -335,7 +335,7 @@
 .nombreBienvenida {
   font-size: 2.2rem;
   font-weight: 300;
-  color: #660099;
+  color: #002b9e;
   text-align: left;
   margin-bottom: 1rem;
 }
@@ -371,7 +371,7 @@
 .resumenNumero {
   font-size: 2rem;
   font-weight: 700;
-  color: #660099;
+  color: #002b9e;
 }
 
 .tarjetaAsignadas {

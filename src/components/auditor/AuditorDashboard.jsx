@@ -36,7 +36,7 @@ export default function AuditorDashboard() {
 
           {/* Imagen superior */}
           <img src="/profe.jpg" alt="Avatar" className={styles.avatar} />
-          {usuario && <p className={styles.username}>👨‍🏫 {usuario.nombre}</p>}
+          {usuario && <p className={styles.username}>{usuario.nombre}</p>}
 
           <h2 className={styles.title}>Panel Auditor</h2>
 

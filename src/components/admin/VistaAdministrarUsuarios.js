@@ -10,6 +10,11 @@ export default function VistaAdministrarUsuarios() {
   const [mostrarModal, setMostrarModal] = useState(false)
   const [editando, setEditando] = useState(false)
 
+  // Eliminación
+  const [eliminandoId, setEliminandoId] = useState(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [usuarioAEliminar, setUsuarioAEliminar] = useState(null)
+
   const router = useRouter()
 
   const [formulario, setFormulario] = useState({
@@ -36,13 +41,48 @@ export default function VistaAdministrarUsuarios() {
     setFormulario((prev) => ({ ...prev, [name]: value }))
   }
 
+  // --- Eliminación con modal ---
+  const solicitarEliminacion = (usuario) => {
+    setUsuarioAEliminar(usuario)
+    setConfirmOpen(true)
+  }
+
+  const confirmarEliminacion = async () => {
+    if (!usuarioAEliminar) return
+    try {
+      setEliminandoId(usuarioAEliminar.usuario_id)
+      const res = await fetch(`/api/usuarios?id=${usuarioAEliminar.usuario_id}`, { method: 'DELETE' })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        throw new Error(err?.error || 'Error al eliminar')
+      }
+
+      // Optimista: quita de la tabla
+      setUsuarios(prev => prev.filter(u => u.usuario_id !== usuarioAEliminar.usuario_id))
+      toast.success('Usuario eliminado')
+      setConfirmOpen(false)
+      setUsuarioAEliminar(null)
+    } catch (e) {
+      toast.error(e.message || 'No se pudo eliminar')
+    } finally {
+      setEliminandoId(null)
+    }
+  }
+
+  const cancelarEliminacion = () => {
+    setConfirmOpen(false)
+    setUsuarioAEliminar(null)
+  }
+  // --- fin eliminación ---
+
   const handleSubmit = async () => {
     try {
       let res, data
 
       if (editando) {
         if (!formulario.usuario_id) {
-          alert('Error: No se especificó el ID del usuario a actualizar.')
+          toast.error('No se especificó el ID del usuario a actualizar.')
           return
         }
 
@@ -60,8 +100,8 @@ export default function VistaAdministrarUsuarios() {
       }
 
       if (!res.ok) {
-        const err = await res.json()
-        alert('Error al guardar: ' + (err?.error || 'Desconocido'))
+        const err = await res.json().catch(() => null)
+        toast.error('Error al guardar: ' + (err?.error || 'Desconocido'))
         return
       }
 
@@ -77,7 +117,7 @@ export default function VistaAdministrarUsuarios() {
       localStorage.setItem('vistaAdmin', 'bienvenida')
       router.push('/admin?vista=bienvenida')
     } catch {
-      alert('Error inesperado al guardar')
+      toast.error('Error inesperado al guardar')
     }
   }
 
@@ -145,12 +185,27 @@ export default function VistaAdministrarUsuarios() {
     {
       name: 'Acciones',
       cell: row => (
-        <button
-          onClick={() => abrirEdicion(row)}
-          className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
-        >
-          Editar
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => abrirEdicion(row)}
+            className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+          >
+            Editar
+          </button>
+
+          <button
+            onClick={() => solicitarEliminacion(row)}
+            disabled={eliminandoId === row.usuario_id}
+            className={`px-2 py-1 rounded text-white ${
+              eliminandoId === row.usuario_id
+                ? 'bg-red-300 cursor-not-allowed'
+                : 'bg-red-600 hover:bg-red-700'
+            }`}
+            title="Eliminar usuario"
+          >
+            {eliminandoId === row.usuario_id ? 'Eliminando...' : 'Eliminar'}
+          </button>
+        </div>
       )
     }
   ]
@@ -172,13 +227,14 @@ export default function VistaAdministrarUsuarios() {
       <div className="flex justify-center">
         <button
           onClick={abrirNuevo}
-          className="text-3xl text-white bg-purple-600 hover:bg-purple-700 rounded-full w-14 h-14 flex items-center justify-center shadow-xl"
+          className="text-3xl text-white bg-blue-600 hover:bg-blue-700 rounded-full w-14 h-14 flex items-center justify-center shadow-xl"
           title="Crear nuevo usuario"
         >
           +
         </button>
       </div>
 
+      {/* Modal crear/editar */}
       {mostrarModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md space-y-4">
@@ -246,14 +302,58 @@ export default function VistaAdministrarUsuarios() {
             </select>
 
             <div className="flex justify-end gap-2">
-              <button onClick={cerrarModal} className="text-gray-500 px-4 py-2 rounded hover:text-gray-700">
+              <button onClick={cerrarModal} className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
                 Cancelar
               </button>
               <button
                 onClick={handleSubmit}
-                className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
               >
                 {editando ? 'Actualizar' : 'Crear'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación de eliminación */}
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={cancelarEliminacion} />
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <div className="flex items-start gap-3">
+              <div className="shrink-0 rounded-full bg-red-100 p-2">
+                <span className="text-red-600 text-xl">⚠️</span>
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold text-gray-800">Eliminar usuario</h3>
+                <p className="text-sm text-gray-600">
+                  Vas a eliminar a{' '}
+                  <span className="font-medium">
+                    {usuarioAEliminar?.nombre} {usuarioAEliminar?.apellido}
+                  </span>{' '}
+                  ({usuarioAEliminar?.email}). Esta acción no se puede deshacer.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                onClick={cancelarEliminacion}
+                className="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarEliminacion}
+                disabled={eliminandoId === usuarioAEliminar?.usuario_id}
+                className={`px-4 py-2 rounded text-white ${
+                  eliminandoId === usuarioAEliminar?.usuario_id
+                    ? 'bg-red-300 cursor-not-allowed'
+                    : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {eliminandoId === usuarioAEliminar?.usuario_id ? 'Eliminando…' : 'Eliminar'}
               </button>
             </div>
           </div>
