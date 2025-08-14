@@ -233,7 +233,7 @@ const SeccionAuditorias = ({ titulo, lista, className }) => {
   return (
     <div className={styles.contenedor}>
       <div className={styles.encabezadoAuditor}>
-        <h1 className={styles.nombreBienvenida}>¡Bienvenido de nuevo, {usuario.nombre}!</h1>
+        <h1 className={styles.nombreBienvenida}>Administrador de Auditorías</h1>
         <div className={styles.resumenContenedor}>
           <div className={`${styles.resumenTarjeta} ${styles.tarjetaAsignadas}`}>
             <p className={styles.resumenTitulo}>Pendientes</p>

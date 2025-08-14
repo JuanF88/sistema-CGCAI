@@ -174,6 +174,11 @@ export default function VistaInformesAdmin() {
       },
       sortable: true
     },
+        {
+      name: 'Fecha Audtoria',
+      selector: row =>  row.fecha_auditoria|| 'N/A',
+      sortable: true
+    },
     {
       name: 'Semestre',
       selector: row => {
@@ -219,6 +224,51 @@ export default function VistaInformesAdmin() {
         </span>
       )
     },
+
+    {
+      // FORTALEZAS
+      name: <div className="w-full flex justify-end pr-1">F</div>,
+      selector: row => row.fortalezas?.length ?? 0,
+      sortable: true,
+      width: '80px',
+      cell: row => (
+        <div className="w-full flex justify-end pr-1">
+          <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold text-xs">
+            {row.fortalezas?.length ?? 0}
+          </span>
+        </div>
+      ),
+    },
+    {
+      // OPORTUNIDADES DE MEJORA
+      name: <div className="w-full flex justify-end pr-1">OM</div>,
+      selector: row => row.oportunidades_mejora?.length ?? 0,
+      sortable: true,
+      width: '80px',
+      cell: row => (
+        <div className="w-full flex justify-end pr-1">
+          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold text-xs">
+            {row.oportunidades_mejora?.length ?? 0}
+          </span>
+        </div>
+      ),
+    },
+    {
+      // NO CONFORMIDADES
+      name: <div className="w-full flex justify-end pr-1">NC</div>,
+      selector: row => row.no_conformidades?.length ?? 0,
+      sortable: true,
+      width: '80px',
+      cell: row => (
+        <div className="w-full flex justify-end pr-1">
+          <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold text-xs">
+            {row.no_conformidades?.length ?? 0}
+          </span>
+        </div>
+      ),
+    },
+
+
 
     {
       name: 'Acciones',

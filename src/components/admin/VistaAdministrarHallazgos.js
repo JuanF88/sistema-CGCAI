@@ -407,6 +407,7 @@ const handleUploadExcel = async (e) => {
         <div className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-700">Reporte de Hallazgos</h2>
 
+
             <div className="flex justify-between items-center mb-4 gap-4">
                 <button
                     onClick={() => setIsModalOpen(true)}
