@@ -83,11 +83,11 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
     if (!archivo || !auditoriaParaValidar) return
 
     const nombreDep = auditoriaParaValidar.dependencias?.nombre
-      ?.normalize('NFD')
-      ?.replace(/[\u0300-\u036f]/g, '')
-      ?.replace(/\s+/g, '_')
-      ?.replace(/[^a-zA-Z0-9_-]/g, '') || 'desconocido';
-    const filePath = `validaciones/Auditoria_${auditoriaParaValidar.id}_${nombreDep}_${new Date().toISOString().split('T')[0]}.pdf`;
+      ?.normalize('NFD')?.replace(/[\u0300-\u036f]/g, '')
+      ?.replace(/\s+/g, '_')?.replace(/[^a-zA-Z0-9_-]/g, '') || 'desconocido'
+
+    const filePath = `validaciones/Auditoria_${auditoriaParaValidar.id}_${nombreDep}_${new Date().toISOString().split('T')[0]}.pdf`
+
     const { error: uploadError } = await supabase.storage
       .from('validaciones')
       .upload(filePath, archivo)
@@ -117,38 +117,81 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
     completadas: auditorias.filter(a => progresoAuditoria(a) === 100),
   }
 
-const SeccionAuditorias = ({ titulo, lista, className }) => {
-  return (
-    <div className={`${styles.seccion} ${className}`}>
-      <h3 className={styles.subtituloSeccion}>{titulo}</h3>
-      {lista.length === 0 ? (
-        <div className={styles.mensajeVacio}>
-          <p>🔍 No hay auditorías en esta sección.</p>
-        </div>
-      ) : (
-        <div className={styles.gridAuditorias}>
-          {lista.map((a) => {
-            const progreso = progresoAuditoria(a)
-            const nombreDep = a.dependencias?.nombre || 'Dependencia no encontrada'
+  const formatFecha = (isoDate) => {
+    if (!isoDate) return ''
+    const d = new Date(isoDate)
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const yyyy = d.getFullYear()
+    return `${dd}/${mm}/${yyyy}`
+  }
 
-            return (
-              <div key={a.id} className={`${styles.card} ${progreso === 100 ? styles.cardCompleta : ''}`}>
-                {a.dependencias?.plan_auditoria?.[0]?.enlace && (
-                  <a
-                    href={a.dependencias.plan_auditoria[0].enlace}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.botonPlanFlotante}
-                  >
-                    🗂️ Plan de auditoría encontrado
-                  </a>
-                )}
+  const estadoPill = (progreso) => {
+    if (progreso === 0) return { text: 'Pendiente', cls: styles.pillPendiente }
+    if (progreso === 50) return { text: 'En proceso', cls: styles.pillProceso }
+    if (progreso === 80) return { text: 'Por validar', cls: styles.pillPorValidar }
+    return { text: 'Validado', cls: styles.pillCompletado }
+  }
 
-                <div className={styles.cardContenido}>
-                  <p className={styles.nombreDep}>
-                    🏢 | {nombreDep} | 📅 {new Date(a.fecha_auditoria).getFullYear()} | 🧾 Auditoría #{a.id}
-                  </p>
+  const SeccionAuditorias = ({ titulo, lista, className }) => {
+    return (
+      <div className={`${styles.seccion} ${className}`}>
+        <h3 className={styles.subtituloSeccion}>{titulo}</h3>
 
+        {lista.length === 0 ? (
+          <div className={styles.mensajeVacio}>
+            <p>🔍 No hay auditorías en esta sección.</p>
+          </div>
+        ) : (
+          <div className={styles.gridAuditorias}>
+            {lista.map((a) => {
+              const progreso = progresoAuditoria(a)
+              const nombreDep = a.dependencias?.nombre || 'Dependencia no encontrada'
+              const hallFort = a.fortalezas?.length || 0
+              const hallOpm = a.oportunidades_mejora?.length || 0
+              const hallNC = a.no_conformidades?.length || 0
+              const year = a.fecha_auditoria ? new Date(a.fecha_auditoria).getFullYear() : null
+              const estado = estadoPill(progreso)
+
+              const planEnlace = a.dependencias?.plan_auditoria?.[0]?.enlace || ''
+
+              return (
+                <div key={a.id} className={`${styles.card} ${progreso === 100 ? styles.cardCompleta : ''}`}>
+                  {/* Header: nombre + estado + (plan) */}
+                  <div className={styles.cardHeader}>
+                    <div className={styles.cardTitleWrap}>
+                      <div className={styles.cardTitle}>
+                        <span className={styles.cardEmoji}>🏢</span> {nombreDep}
+                      </div>
+                      <span className={`${styles.pill} ${estado.cls}`}>{estado.text}</span>
+                    </div>
+
+                    {planEnlace && (
+                      <a
+                        href={planEnlace}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.btnPlanInline}
+                        title="Abrir plan de auditoría"
+                      >
+                        🗂️ Plan de auditoría
+                      </a>
+                    )}
+                  </div>
+
+                  {/* Meta chips */}
+                  <div className={styles.metaChips}>
+                    <span className={styles.chip}>🧾 ID #{a.id}</span>
+                    {progreso !== 0 && year && (
+                      <>
+                        <span className={styles.chip}>📅 Año {year}</span>
+                        <span className={styles.chip}>🗓️ {formatFecha(a.fecha_auditoria)}</span>
+                      </>
+                    )}
+
+                  </div>
+
+                  {/* Progreso */}
                   <div className={styles.barraProgreso}>
                     <div
                       className={
@@ -159,9 +202,10 @@ const SeccionAuditorias = ({ titulo, lista, className }) => {
                             : styles.progresoAmarillo
                       }
                       style={{ width: `${progreso}%` }}
-                    ></div>
+                    />
                   </div>
 
+                  {/* Estado textual */}
                   <p className={styles.estado}>
                     {progreso === 0 && '📝 Incompleta'}
                     {progreso === 50 && '🧩 Campos listos. Asignar hallazgos'}
@@ -169,30 +213,48 @@ const SeccionAuditorias = ({ titulo, lista, className }) => {
                     {progreso === 100 && '✅ Validado'}
                   </p>
 
+                  {/* Acciones */}
                   <div className={styles.botonesAccion}>
                     {progreso < 100 && (
-                      <button className={styles.botonEditar} onClick={() => setAuditoriaSeleccionada(a)}>
+                      <button
+                        className={styles.botonEditar}
+                        onClick={() => setAuditoriaSeleccionada(a)}
+                        title="Editar auditoría"
+                      >
                         ✏️ Editar
                       </button>
                     )}
 
                     {progreso >= 80 && (
-                      <button className={styles.botonDescarga} onClick={async (e) => {
-                        e.stopPropagation();
-                        const [fort, opor, noConfor] = await Promise.all([
-                          supabase.from('fortalezas').select(`*, iso:iso_id ( iso ), capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )`).eq('informe_id', a.id),
-                          supabase.from('oportunidades_mejora').select(`*, iso:iso_id ( iso ), capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )`).eq('informe_id', a.id),
-                          supabase.from('no_conformidades').select(`*, iso:iso_id ( iso ), capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )`).eq('informe_id', a.id),
-                        ])
-                        await generarInformeAuditoria(
-                          a,
-                          fort.data || [],
-                          opor.data || [],
-                          noConfor.data || [],
-                          usuario
-                        )
-                      }}>
-                        📄 Descargar Infome
+                      <button
+                        className={styles.botonDescarga}
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          const [fort, opor, noConfor] = await Promise.all([
+                            supabase
+                              .from('fortalezas')
+                              .select(`*, iso:iso_id ( iso ), capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )`)
+                              .eq('informe_id', a.id),
+                            supabase
+                              .from('oportunidades_mejora')
+                              .select(`*, iso:iso_id ( iso ), capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )`)
+                              .eq('informe_id', a.id),
+                            supabase
+                              .from('no_conformidades')
+                              .select(`*, iso:iso_id ( iso ), capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )`)
+                              .eq('informe_id', a.id),
+                          ])
+                          await generarInformeAuditoria(
+                            a,
+                            fort.data || [],
+                            opor.data || [],
+                            noConfor.data || [],
+                            usuario
+                          )
+                        }}
+                        title="Descargar informe"
+                      >
+                        📄 Descargar Informe
                       </button>
                     )}
 
@@ -204,21 +266,20 @@ const SeccionAuditorias = ({ titulo, lista, className }) => {
                           setAuditoriaParaValidar(a)
                           setModalVisible(true)
                         }}
+                        title="Validar informe"
                       >
                         ✅ Validar Informe
                       </button>
                     )}
                   </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   if (auditoriaSeleccionada) {
     return (
@@ -233,11 +294,12 @@ const SeccionAuditorias = ({ titulo, lista, className }) => {
   return (
     <div className={styles.contenedor}>
       <div className={styles.encabezadoAuditor}>
-        <h1 className={styles.nombreBienvenida}>Administrador de Auditorías</h1>
         <div className={styles.resumenContenedor}>
           <div className={`${styles.resumenTarjeta} ${styles.tarjetaAsignadas}`}>
             <p className={styles.resumenTitulo}>Pendientes</p>
-            <p className={styles.resumenNumero}>{auditorias.length - (agrupadas.porValidar.length + agrupadas.completadas.length + agrupadas.enProceso.length)}</p>
+            <p className={styles.resumenNumero}>
+              {auditorias.length - (agrupadas.porValidar.length + agrupadas.completadas.length + agrupadas.enProceso.length)}
+            </p>
           </div>
           <div className={`${styles.resumenTarjeta} ${styles.tarjetaProceso}`}>
             <p className={styles.resumenTitulo}>En Proceso</p>
@@ -255,11 +317,10 @@ const SeccionAuditorias = ({ titulo, lista, className }) => {
       </div>
 
       <div className={styles.dashboardLayout}>
-<SeccionAuditorias titulo="📋 Pendientes" lista={agrupadas.pendientes} className={styles.seccionPendientes} />
-<SeccionAuditorias titulo="🛠️ En Proceso" lista={agrupadas.enProceso} className={styles.seccionEnProceso} />
-<SeccionAuditorias titulo="📥 Por Validar" lista={agrupadas.porValidar} className={styles.seccionPorValidar} />
-<SeccionAuditorias titulo="✅ Completadas" lista={agrupadas.completadas} className={styles.seccionCompletadas} />
-
+        <SeccionAuditorias titulo="📋 Pendientes" lista={agrupadas.pendientes} className={styles.seccionPendientes} />
+        <SeccionAuditorias titulo="🛠️ En Proceso" lista={agrupadas.enProceso} className={styles.seccionEnProceso} />
+        <SeccionAuditorias titulo="📥 Por Validar" lista={agrupadas.porValidar} className={styles.seccionPorValidar} />
+        <SeccionAuditorias titulo="✅ Completadas" lista={agrupadas.completadas} className={styles.seccionCompletadas} />
       </div>
 
       {modalVisible && (
