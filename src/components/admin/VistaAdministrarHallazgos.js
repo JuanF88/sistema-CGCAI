@@ -401,7 +401,6 @@ const {
       }
 
       let procesadas = 0
-      let insertadas = 0
       const totalValidas = filasValidas.length
 
       for (const r of rows) {
