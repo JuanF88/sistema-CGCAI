@@ -93,6 +93,8 @@
   font-size: 0.95rem;
   transition: all 0.3s ease;
   background-color: #fdfdfd;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .input:focus {
@@ -131,4 +133,34 @@
   color: #f44336;
   font-size: 0.85rem;
   margin-top: -0.5rem;
+}
+
+.inputWrapper {
+  position: relative;
+  width: 100%;
+  display: block;              /* 👈 importante para igualar el ancho */
+}
+.eyeButton {
+  position: absolute;
+  right: 0.5rem;               /* ajusta si lo quieres más pegado/separado */
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0;                  /* 👈 quita cualquier padding que empuje */
+  line-height: 1;              /* 👈 evita “descent” raro */
+}
+
+.eyeButton:hover {
+  color: #111827;
+}
+.inputWrapper .input {
+  padding-right: 2.5rem;       /* 👈 deja hueco al ojito */
 }
