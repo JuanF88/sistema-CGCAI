@@ -34,6 +34,10 @@ export default function FormularioRegistro({ usuario, auditoria }) {
 
   const router = useRouter()
 
+
+  const [ayudaOpen, setAyudaOpen] = useState(false)
+  const [ayudaImagen, setAyudaImagen] = useState('')
+
   useEffect(() => {
     const cargarISO = async () => {
       const { data } = await supabase.from('iso').select('*')
@@ -453,6 +457,18 @@ export default function FormularioRegistro({ usuario, auditoria }) {
               ✖
             </button>
 
+            {/* Botón de ayuda */}
+            <button
+              type="button"
+              onClick={() => {
+                setAyudaImagen('ayudas/AyudaFortalezas.png') // cambia la ruta a tu imagen
+                setAyudaOpen(true)
+              }}
+              className={`${styles.botonAyuda} ml-10 border-blue-400 text-blue-600`}
+              title="Ver ayuda"
+            >
+              ?
+            </button>
 
             {/* ISO, Capítulo y Numeral en una sola fila */}
             <div className={styles.grupoFila}>
@@ -558,6 +574,20 @@ export default function FormularioRegistro({ usuario, auditoria }) {
               ✖
             </button>
 
+            {/* Botón de ayuda */}
+            <button
+              type="button"
+              onClick={() => {
+                setAyudaImagen('ayudas/AyudaOportunidad.png') // cambia la ruta a tu imagen
+                setAyudaOpen(true)
+              }}
+              className={`${styles.botonAyuda} ml-10 border-blue-400 text-blue-600`}
+              title="Ver ayuda"
+            >
+              ?
+            </button>
+
+
             {/* ISO, Capítulo y Numeral en una sola fila */}
             <div className={styles.grupoFila}>
               <div className={styles.campoAgrupado}>
@@ -652,6 +682,20 @@ export default function FormularioRegistro({ usuario, auditoria }) {
             >
               ✖
             </button>
+
+            {/* Botón de ayuda */}
+            <button
+              type="button"
+              onClick={() => {
+                setAyudaImagen('ayudas/AyudaNoConformidad.png') // cambia la ruta a tu imagen
+                setAyudaOpen(true)
+              }}
+              className={`${styles.botonAyuda} ml-10 border-blue-400 text-blue-600`}
+              title="Ver ayuda"
+            >
+              ?
+            </button>
+
 
             {/* ISO, Capítulo y Numeral en una sola fila */}
             <div className={styles.grupoFila}>
@@ -797,6 +841,32 @@ export default function FormularioRegistro({ usuario, auditoria }) {
         </button>
 
       </form>
+
+      {
+        ayudaOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-lg p-4 max-w-3xl relative">
+              {/* Botón cerrar */}
+              <button
+                onClick={() => setAyudaOpen(false)}
+                className="absolute top-2 right-2 text-red-600 font-bold text-xl"
+                title="Cerrar"
+              >
+                ✖
+              </button>
+
+              {/* Imagen de ayuda */}
+              <img
+                src={ayudaImagen}
+                alt="Ayuda para llenar no conformidad"
+                className="max-h-[80vh] object-contain"
+              />
+            </div>
+          </div>
+        )
+      }
+
     </div>
+
   )
 }

@@ -181,6 +181,7 @@
   background-color: #2159a1;
 }
 
+
 /* Sub Formulario de fortaleza */
 
 .fortalezaBg {
@@ -257,8 +258,8 @@
   background-color: white;
   border: 2px solid #e57373;
   color: #e53935;
-  width: 30px;
-  height: 30px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   font-weight: bold;
   font-size: 1rem;
@@ -272,6 +273,32 @@
 
 .botonEliminar:hover {
   background-color: #e53935;
+  color: white;
+  border-color: transparent;
+}
+
+.botonAyuda {
+  position: absolute;
+  top: 0.8rem;
+  right: 4.5rem; /* lo separa un poco de la X */
+  background-color: white;
+  border: 2px solid #64b5f6;
+  color: #1e88e5;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-weight: bold;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.botonAyuda:hover {
+  background-color: #1e88e5;
   color: white;
   border-color: transparent;
 }

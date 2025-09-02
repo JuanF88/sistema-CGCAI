@@ -4,12 +4,83 @@ import { useEffect, useState } from 'react'
 import { toast } from 'react-toastify'
 import { useRouter } from 'next/navigation'
 import DataTable from 'react-data-table-component'
+import { Eye, EyeOff } from 'lucide-react'
+import { Mail } from 'lucide-react'
 
 export default function VistaAdministrarUsuarios() {
   const [usuarios, setUsuarios] = useState([])
   const [mostrarModal, setMostrarModal] = useState(false)
   const [editando, setEditando] = useState(false)
+  const [mostrarPassword, setMostrarPassword] = useState(false)
 
+
+  // Enviar correo
+  const [credOpen, setCredOpen] = useState(false)
+  const [credUsuario, setCredUsuario] = useState(null) // el row seleccionado
+  const [credPassword, setCredPassword] = useState('') // por si NO viene del backend y quieres escribirla
+  const [credBody, setCredBody] = useState('')
+  const [credSubject, setCredSubject] = useState('')
+
+  const plantillaCredenciales = ({ nombre, apellido, email, password }) => {
+    return `Buen día ${nombre} ${apellido},
+
+    Te comparto tus credenciales de acceso:
+
+    Usuario: ${email}
+    Contraseña: ${password}
+
+    Puedes ingresar aquí: https://sistema-cgcai.vercel.app/
+
+    Saludos.`
+  }
+
+  const abrirCredenciales = (usuario) => {
+    const pwd = usuario.password || ''
+    setCredUsuario(usuario)
+    setCredPassword(pwd)
+
+    const subject = `Credenciales de acceso`
+    const body = plantillaCredenciales({
+      nombre: usuario.nombre || '',
+      apellido: usuario.apellido || '',
+      email: usuario.email || '',
+      password: pwd || '*** (edita antes de enviar)'
+    })
+
+    setCredSubject(subject)
+    setCredBody(body)
+    setCredOpen(true)
+  }
+
+  const cerrarCredenciales = () => {
+    setCredOpen(false)
+    setCredUsuario(null)
+    setCredPassword('')
+    setCredBody('')
+    setCredSubject('')
+  }
+
+  const copiarCredenciales = async () => {
+    try {
+      await navigator.clipboard.writeText(credBody)
+      toast.success('Texto copiado al portapapeles')
+    } catch {
+      toast.error('No se pudo copiar')
+    }
+  }
+
+
+  const abrirGmailCompose = () => {
+    if (!credUsuario?.email) {
+      toast.error('Falta el correo del usuario.')
+      return
+    }
+    const to = encodeURIComponent(credUsuario.email)
+    const su = encodeURIComponent(credSubject)
+    const bo = encodeURIComponent(credBody)
+    const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${su}&body=${bo}`
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
   // Eliminación
   const [eliminandoId, setEliminandoId] = useState(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -196,18 +267,28 @@ export default function VistaAdministrarUsuarios() {
           <button
             onClick={() => solicitarEliminacion(row)}
             disabled={eliminandoId === row.usuario_id}
-            className={`px-2 py-1 rounded text-white ${
-              eliminandoId === row.usuario_id
-                ? 'bg-red-300 cursor-not-allowed'
-                : 'bg-red-600 hover:bg-red-700'
-            }`}
+            className={`px-2 py-1 rounded text-white ${eliminandoId === row.usuario_id
+              ? 'bg-red-300 cursor-not-allowed'
+              : 'bg-red-600 hover:bg-red-700'
+              }`}
             title="Eliminar usuario"
           >
             {eliminandoId === row.usuario_id ? 'Eliminando...' : 'Eliminar'}
           </button>
+
+          {/* NUEVO: Enviar credenciales */}
+          <button
+            onClick={() => abrirCredenciales(row)}
+            className="bg-emerald-600 text-white px-2 py-1 rounded hover:bg-emerald-700 flex items-center gap-1"
+            title="Preparar correo con credenciales"
+          >
+            <Mail size={16} />
+            Credenciales
+          </button>
         </div>
       )
     }
+
   ]
 
   return (
@@ -270,14 +351,28 @@ export default function VistaAdministrarUsuarios() {
               className="w-full border p-2 rounded"
             />
 
-            <input
-              type="password"
-              name="password"
-              placeholder="Contraseña"
-              value={formulario.password}
-              onChange={handleChange}
-              className="w-full border p-2 rounded"
-            />
+            <div className="relative">
+              <input
+                type={mostrarPassword ? 'text' : 'password'}
+                name="password"
+                placeholder="Contraseña"
+                value={formulario.password}
+                onChange={handleChange}
+                className="w-full border p-2 pr-10 rounded"
+                autoComplete="new-password"
+              />
+
+              <button
+                type="button"
+                onClick={() => setMostrarPassword((v) => !v)}
+                className="absolute inset-y-0 right-2 flex items-center"
+                aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                title={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              >
+                {mostrarPassword ? <EyeOff size={20} className="text-gray-500" /> : <Eye size={20} className="text-gray-500" />}
+              </button>
+            </div>
+
 
             <select
               name="rol"
@@ -347,11 +442,10 @@ export default function VistaAdministrarUsuarios() {
               <button
                 onClick={confirmarEliminacion}
                 disabled={eliminandoId === usuarioAEliminar?.usuario_id}
-                className={`px-4 py-2 rounded text-white ${
-                  eliminandoId === usuarioAEliminar?.usuario_id
-                    ? 'bg-red-300 cursor-not-allowed'
-                    : 'bg-red-600 hover:bg-red-700'
-                }`}
+                className={`px-4 py-2 rounded text-white ${eliminandoId === usuarioAEliminar?.usuario_id
+                  ? 'bg-red-300 cursor-not-allowed'
+                  : 'bg-red-600 hover:bg-red-700'
+                  }`}
               >
                 {eliminandoId === usuarioAEliminar?.usuario_id ? 'Eliminando…' : 'Eliminar'}
               </button>
@@ -359,6 +453,95 @@ export default function VistaAdministrarUsuarios() {
           </div>
         </div>
       )}
+
+      {/* Modal credenciales */}
+      {credOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-xl space-y-4">
+            <h3 className="text-xl font-bold text-gray-800">
+              Enviar credenciales
+            </h3>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Para</label>
+                <input
+                  type="email"
+                  value={credUsuario?.email || ''}
+                  readOnly
+                  className="w-full border p-2 rounded bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Asunto</label>
+                <input
+                  type="text"
+                  value={credSubject}
+                  onChange={(e) => setCredSubject(e.target.value)}
+                  className="w-full border p-2 rounded"
+                />
+              </div>
+            </div>
+
+            {/* Si necesitas escribir/ajustar la contraseña a enviar */}
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Contraseña a incluir</label>
+              <input
+                type="text"
+                placeholder="Escribe la contraseña (o temporal)"
+                value={credPassword}
+                onChange={(e) => {
+                  const pwd = e.target.value
+                  setCredPassword(pwd)
+                  const nuevoBody = plantillaCredenciales({
+                    nombre: credUsuario?.nombre || '',
+                    apellido: credUsuario?.apellido || '',
+                    email: credUsuario?.email || '',
+                    password: pwd || '*** (edita antes de enviar)'
+                  })
+                  setCredBody(nuevoBody)
+                }}
+                className="w-full border p-2 rounded"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Nota: si tu API no devuelve la contraseña, puedes definir una temporal y obligar el cambio al primer ingreso.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Cuerpo</label>
+              <textarea
+                rows={8}
+                value={credBody}
+                onChange={(e) => setCredBody(e.target.value)}
+                className="w-full border p-2 rounded font-mono"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={cerrarCredenciales}
+                className="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={copiarCredenciales}
+                className="px-4 py-2 rounded bg-gray-800 text-white hover:bg-gray-900"
+              >
+                Copiar cuerpo
+              </button>
+              <button
+                onClick={abrirGmailCompose}
+                className="px-4 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+              >
+                Abrir en Gmail
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
