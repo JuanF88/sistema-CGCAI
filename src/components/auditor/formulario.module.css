@@ -210,6 +210,20 @@
   z-index: 1;
 }
 
+.descripcion {
+  left: 1rem;
+  margin-top: 20px;
+  color: #003399;
+  padding: 0.3rem 0.7rem;
+  font-weight: 200;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  z-index: 1;
+  background-color: white;
+  width: 1000px;
+}
+
+
 
 .grupoFila {
   display: flex;

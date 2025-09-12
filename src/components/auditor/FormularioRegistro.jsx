@@ -152,28 +152,47 @@ export default function FormularioRegistro({ usuario, auditoria }) {
     if (data) setListaNumerales(prev => ({ ...prev, [capituloId]: data }))
   }
 
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setForm((prev) => ({ ...prev, [name]: value }))
-  }
+// Campos que NO deben ir en mayúsculas
+const EXCLUDE_UPPERCASE = new Set(['auditores_acompanantes'])
 
-  const handleFortalezaChange = (index, field, value) => {
-    const nuevas = [...fortalezas]
-    nuevas[index][field] = value
-    setFortalezas(nuevas)
-  }
+const handleChange = (e) => {
+  const { name, value } = e.target
+  const shouldUppercase = typeof value === 'string' && !EXCLUDE_UPPERCASE.has(name)
 
-  const handleOportunidadChange = (index, field, value) => {
-    const nuevas = [...oportunidades]
-    nuevas[index][field] = value
-    setOportunidades(nuevas)
-  }
+  setForm(prev => ({
+    ...prev,
+    [name]: shouldUppercase ? value.toUpperCase() : value
+  }))
+}
 
-  const handleNoConformidadChange = (index, field, value) => {
-    const nuevas = [...noConformidades]
-    nuevas[index][field] = value
-    setNoConformidades(nuevas)
-  }
+
+
+const toUC = (v) => (typeof v === 'string' ? v.toUpperCase() : v)
+
+const handleFortalezaChange = (index, field, value) => {
+  setFortalezas(prev => {
+    const copy = [...prev]
+    copy[index] = { ...copy[index], [field]: toUC(value) }
+    return copy
+  })
+}
+
+const handleOportunidadChange = (index, field, value) => {
+  setOportunidades(prev => {
+    const copy = [...prev]
+    copy[index] = { ...copy[index], [field]: toUC(value) }
+    return copy
+  })
+}
+
+const handleNoConformidadChange = (index, field, value) => {
+  setNoConformidades(prev => {
+    const copy = [...prev]
+    copy[index] = { ...copy[index], [field]: toUC(value) }
+    return copy
+  })
+}
+
 
 
   const validarFormulario = () => {
@@ -446,7 +465,7 @@ export default function FormularioRegistro({ usuario, auditoria }) {
           >
             {/* Título de Fortaleza */}
             <div className={styles.subtituloFormulario}>💪 Fortaleza #{i + 1}</div>
-
+            <div className={styles.descripcion}>Describir las fortalezas (buenas prácticas identificadas), para ser replicadas en la institución (citar si las hay)</div>
             {/* Botón de eliminar */}
             <button
               type="button"
@@ -563,6 +582,7 @@ export default function FormularioRegistro({ usuario, auditoria }) {
           >
             {/* Título de Oportunidad */}
             <div className={styles.subtituloFormulario}>📈 Oportunidad #{i + 1}</div>
+            <div className={styles.descripcion}>Describir los requisitos susceptibles de mejora priorizados, que sean posibles de ejecutar, con respecto a los criterios de auditoría y la lista de chequeo (tenga en cuenta que el número no exceda de 4)</div>
 
             {/* Botón para eliminar */}
             <button
@@ -672,6 +692,7 @@ export default function FormularioRegistro({ usuario, auditoria }) {
           >
             {/* Título de No Conformidad */}
             <div className={styles.subtituloFormulario}>🚫 No Conformidad #{i + 1}</div>
+            <div className={styles.descripcion}>Incumplimiento de requisitos (No Conformidades) que demandan Acciones Correctivas</div>
 
             {/* Botón para eliminar */}
             <button

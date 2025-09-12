@@ -159,12 +159,14 @@ export default function VistaInformesAdmin() {
     if (completos < total) return 0
     return tieneHallazgos ? 100 : 50
   }
+
   const columnas = [
     {
-      name: 'ID',
-      selector: row => row.id,
-      sortable: true,
-      width: '70px'
+    name: 'ID',
+    selector: row => row.id,
+    sortable: true,
+    width: '64px',
+    cell: row => <div className="w-full text-center">{row.id}</div>, // ✅ centra sin props raras
     },
     {
       name: 'Año',
@@ -172,12 +174,16 @@ export default function VistaInformesAdmin() {
         const fecha = row.fecha_auditoria ? new Date(row.fecha_auditoria) : null
         return fecha ? fecha.getFullYear() : 'N/A'
       },
-      sortable: true
+          sortable: true,
+    width: '80px',
+      
     },
         {
       name: 'Fecha Audtoria',
       selector: row =>  row.fecha_auditoria|| 'N/A',
-      sortable: true
+          sortable: true,
+    cell: row => <div className="w-full text-center">{row.fecha_auditoria}</div>, // ✅ centra sin props raras
+
     },
     {
       name: 'Semestre',
@@ -187,7 +193,9 @@ export default function VistaInformesAdmin() {
         const mes = fecha.getMonth() + 1
         return mes >= 1 && mes <= 6 ? '1' : '2'
       },
-      sortable: true
+          sortable: true,
+    width: '120px',
+
     },
     {
       name: 'Dependencia',
@@ -273,13 +281,13 @@ export default function VistaInformesAdmin() {
     {
       name: 'Acciones',
       cell: row => (
-        <div className="flex gap-2">
+        <div className="flex gap-2 ">
           <button
             onClick={() => {
               setInformeDetalle(row)
               setMostrarDetalle(true)
             }}
-            className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-sm"
+            className="bg-blue-500 text-white px-1 py-1 rounded hover:bg-blue-600 text-s"
           >
             Ver más
           </button>
@@ -290,7 +298,7 @@ export default function VistaInformesAdmin() {
               setInformeAEliminar(row.id)
               setMostrarConfirmacion(true)
             }}
-            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-sm"
+            className="bg-red-500 text-white px-1 py-1 rounded hover:bg-red-600 text-s"
           >
             Eliminar
           </button>

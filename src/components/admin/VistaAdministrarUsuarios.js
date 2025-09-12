@@ -1,11 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react' // 👈 useMemo
 import { toast } from 'react-toastify'
 import { useRouter } from 'next/navigation'
 import DataTable from 'react-data-table-component'
-import { Eye, EyeOff } from 'lucide-react'
-import { Mail } from 'lucide-react'
+import { Eye, EyeOff, Mail } from 'lucide-react' // (puedes mantener como tenías)
 
 export default function VistaAdministrarUsuarios() {
   const [usuarios, setUsuarios] = useState([])
@@ -13,11 +12,13 @@ export default function VistaAdministrarUsuarios() {
   const [editando, setEditando] = useState(false)
   const [mostrarPassword, setMostrarPassword] = useState(false)
 
+  // 🔎 Buscador
+  const [busqueda, setBusqueda] = useState('')
 
   // Enviar correo
   const [credOpen, setCredOpen] = useState(false)
-  const [credUsuario, setCredUsuario] = useState(null) // el row seleccionado
-  const [credPassword, setCredPassword] = useState('') // por si NO viene del backend y quieres escribirla
+  const [credUsuario, setCredUsuario] = useState(null)
+  const [credPassword, setCredPassword] = useState('')
   const [credBody, setCredBody] = useState('')
   const [credSubject, setCredSubject] = useState('')
 
@@ -69,7 +70,6 @@ export default function VistaAdministrarUsuarios() {
     }
   }
 
-
   const abrirGmailCompose = () => {
     if (!credUsuario?.email) {
       toast.error('Falta el correo del usuario.')
@@ -81,6 +81,7 @@ export default function VistaAdministrarUsuarios() {
     const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${su}&body=${bo}`
     window.open(url, '_blank', 'noopener,noreferrer')
   }
+
   // Eliminación
   const [eliminandoId, setEliminandoId] = useState(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -129,7 +130,6 @@ export default function VistaAdministrarUsuarios() {
         throw new Error(err?.error || 'Error al eliminar')
       }
 
-      // Optimista: quita de la tabla
       setUsuarios(prev => prev.filter(u => u.usuario_id !== usuarioAEliminar.usuario_id))
       toast.success('Usuario eliminado')
       setConfirmOpen(false)
@@ -226,6 +226,29 @@ export default function VistaAdministrarUsuarios() {
     setEditando(false)
   }
 
+  // --- 🔎 BÚSQUEDA (case/acentos-insensitive) ---
+  const normalize = (s) =>
+    (s || '')
+      .toString()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+
+  const usuariosVista = useMemo(() => {
+    const q = normalize(busqueda)
+    if (!q) return usuarios
+    return usuarios.filter((u) => {
+      const nombreCompleto = `${u.nombre || ''} ${u.apellido || ''}`
+      return (
+        normalize(nombreCompleto).includes(q) ||
+        normalize(u.email).includes(q) ||
+        normalize(u.rol).includes(q) ||
+        normalize(u.estado).includes(q)
+      )
+    })
+  }, [usuarios, busqueda])
+  // --- fin búsqueda ---
+
   const columnas = [
     {
       name: 'ID',
@@ -256,7 +279,7 @@ export default function VistaAdministrarUsuarios() {
     {
       name: 'Acciones',
       cell: row => (
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           <button
             onClick={() => abrirEdicion(row)}
             className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
@@ -276,7 +299,7 @@ export default function VistaAdministrarUsuarios() {
             {eliminandoId === row.usuario_id ? 'Eliminando...' : 'Eliminar'}
           </button>
 
-          {/* NUEVO: Enviar credenciales */}
+          {/* Enviar credenciales */}
           <button
             onClick={() => abrirCredenciales(row)}
             className="bg-emerald-600 text-white px-2 py-1 rounded hover:bg-emerald-700 flex items-center gap-1"
@@ -288,16 +311,34 @@ export default function VistaAdministrarUsuarios() {
         </div>
       )
     }
-
   ]
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-700">Usuarios</h2>
 
+      {/* 🔎 Barra de búsqueda */}
+      <div className="flex items-center gap-3">
+        <input
+          type="text"
+          placeholder="Buscar por nombre, email, rol o estado..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          className="border p-2 rounded w-full max-w-md"
+        />
+        {busqueda && (
+          <button
+            onClick={() => setBusqueda('')}
+            className="px-3 py-2 rounded border border-gray-300 hover:bg-gray-50"
+          >
+            Limpiar
+          </button>
+        )}
+      </div>
+
       <DataTable
         columns={columnas}
-        data={usuarios}
+        data={usuariosVista}
         pagination
         highlightOnHover
         responsive
@@ -372,7 +413,6 @@ export default function VistaAdministrarUsuarios() {
                 {mostrarPassword ? <EyeOff size={20} className="text-gray-500" /> : <Eye size={20} className="text-gray-500" />}
               </button>
             </div>
-
 
             <select
               name="rol"
@@ -483,7 +523,6 @@ export default function VistaAdministrarUsuarios() {
               </div>
             </div>
 
-            {/* Si necesitas escribir/ajustar la contraseña a enviar */}
             <div>
               <label className="block text-sm text-gray-600 mb-1">Contraseña a incluir</label>
               <input

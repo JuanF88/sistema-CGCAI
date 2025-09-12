@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { LogOut, FileText, UserPlus, Home} from 'lucide-react'
 import { Lightbulb } from 'lucide-react'
+import { Building } from 'lucide-react'   
 import { BarChart } from 'lucide-react'
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Analytics } from "@vercel/analytics/next"
@@ -14,6 +15,7 @@ import styles from '@/components/CSS/AdminDashboard.module.css'
 import VistaBienvenida from '@/components/VistaBienvenida'
 import VistaInformesAdmin from '@/components/admin/VistaInformesAdmin'
 import VistaAdministrarUsuarios from '@/components/admin/VistaAdministrarUsuarios'
+import VistaAdministrarDependencias from '@/components/admin/VistaAdministrarDependencias'
 import VistaAdministrarHallazgos from '@/components/admin/VistaAdministrarHallazgos'
 import VistaEstadisticas from '@/components/admin/VistaEstadisticas'
 
@@ -81,6 +83,16 @@ export default function AdminDashboard() {
 
             <button
               onClick={() => {
+                setVista('adminDependencia')
+                window.history.pushState({}, '', '/admin?vista=adminDependencia')
+              }}
+              className={`${styles.navButton} ${vista === 'adminDependencia' ? styles.active : ''}`}
+            >
+              <Building size={18} /> <span>Administrar Dependencias</span>
+            </button>
+
+            <button
+              onClick={() => {
                 setVista('administrarHallazgos')
                 window.history.pushState({}, '', '/admin?vista=administrarHallazgos')
               }}
@@ -117,6 +129,7 @@ export default function AdminDashboard() {
   {vista === 'bienvenida' && usuario && <VistaBienvenida usuario={usuario} />}
   {vista === 'crearInforme' && <VistaInformesAdmin />}
   {vista === 'crearUsuario' && <VistaAdministrarUsuarios />}
+  {vista === 'adminDependencia' && <VistaAdministrarDependencias />}
   {vista === 'administrarHallazgos' && <VistaAdministrarHallazgos />}
   {vista === 'estadisticas' && <VistaEstadisticas />}
   {vista === 'gestionarUsuarios' && (

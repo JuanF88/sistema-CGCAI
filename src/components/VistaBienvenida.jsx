@@ -22,6 +22,9 @@ const noticias = [
 export default function VistaBienvenida({ usuario}) {
   const [auditorias, setAuditorias] = useState([])
 
+  const isAdmin = ((usuario?.rol || '').toLowerCase() === 'admin') ||
+                  ((usuario?.rol || '').toLowerCase() === 'administrador')
+
 
   const sliderSettings = {
     dots: true,
@@ -35,6 +38,8 @@ export default function VistaBienvenida({ usuario}) {
   }
 
     useEffect(() => {
+      if (isAdmin) return
+
       const cargarAsignadas = async () => {
         const { data, error } = await supabase
           .from('informes_auditoria')
@@ -67,7 +72,8 @@ export default function VistaBienvenida({ usuario}) {
       }
   
       cargarAsignadas()
-    }, [usuario])
+    }, [usuario, isAdmin])
+
   const contarCamposCompletos = (a) => {
     const campos = [
       'objetivo',
@@ -132,6 +138,7 @@ export default function VistaBienvenida({ usuario}) {
       <div className={styles.resumenContenedor}>
         <h2 className={styles.resumenTitulo}>Bienvenido de nuevo, <strong> {usuario.nombre} </strong></h2>
         
+        {!isAdmin && (
         <div className={styles.resumenTarjetas}>
           <div className={`${styles.resumenTarjeta} ${styles.tarjetaAsignadas}`}>
             <p className={styles.resumenLabel}>Pendientes</p>
@@ -150,7 +157,8 @@ export default function VistaBienvenida({ usuario}) {
             <p className={styles.resumenValor}>{agrupadas.completadas?.length || 0}</p>
           </div>
         </div>
-      </div>
+       )}
+    </div>
     </div>
   )
 }
