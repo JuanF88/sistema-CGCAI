@@ -1,13 +1,3 @@
-/* -------- Variables & base -------- */
-:root {
-  --radius-lg: 1rem;
-  --radius-md: 0.875rem;
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12);
-  --surface: #0b0c10;              /* contenedor */
-  --panel: #0f172a;                /* panel */
-  --text: #0b1220;                 /* texto base */
-}
 
 @property --a {
   syntax: "<angle>";
