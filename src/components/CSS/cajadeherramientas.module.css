@@ -1,59 +1,199 @@
+/* -------- Variables & base -------- */
+:root {
+  --radius-lg: 1rem;
+  --radius-md: 0.875rem;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --surface: #0b0c10;              /* contenedor */
+  --panel: #0f172a;                /* panel */
+  --text: #0b1220;                 /* texto base */
+}
+
+@property --a {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* -------- Contenedor -------- */
 .cajaHerramientas {
-  margin-top: 2rem;
-  margin-left: 2rem;
-  margin-right: 2rem;
-  padding: 3.5rem;
-  background-color: #f9fafb;
-  border: 2px dashed #d1d5db;
-  border-radius: 1rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  animation: fadeIn 0.5s ease-in-out;
+  margin: 2rem;
+  padding: 2.5rem;
+  background: linear-gradient(180deg, #ffffff, #f6f8fb);
+  border-radius: var(--radius-lg);
+  border: 1px solid #e5e7eb;
+  box-shadow: var(--shadow-sm);
+  animation: fadeIn 0.5s ease-in-out both;
 }
 
 .tituloHerramientas {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-  color: #111827;
+  font-size: 1.375rem;
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+  color: #0f172a;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
+  letter-spacing: -0.01em;
 }
 
+/* -------- Grid responsivo -------- */
 .gridHerramientas {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1.25rem;
 }
 
+/* -------- Tarjeta base -------- */
 .herramienta {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  --h: 210; /* hue base; se sobrescribe con nth-child abajo */
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  gap: 0.6rem;
+
   text-decoration: none;
-  padding: 1rem;
-  background-color: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.75rem;
-  transition: all 0.2s ease-in-out;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 1.25rem 1rem;
+
+  /* Fondo sutil + borde degradado */
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.9), rgba(250,253,255,0.9)) padding-box,
+    linear-gradient(135deg,
+      hsl(var(--h) 88% 60%) 0%,
+      hsl(calc(var(--h) + 25) 88% 58%) 35%,
+      hsl(calc(var(--h) + 55) 88% 56%) 100%
+    ) border-box;
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+  will-change: transform;
 }
 
-.herramienta:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border-color: #60a5fa;
-}
-
-.herramienta img {
+/* Ícono (SVG de lucide) */
+.herramienta :global(svg) {
   width: 40px;
   height: 40px;
-  margin-bottom: 0.5rem;
+  transition: transform 220ms ease, opacity 220ms ease, filter 220ms ease;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.08));
 }
 
+/* Texto */
 .herramienta span {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #1f2937;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0b1220;
   text-align: center;
+  letter-spacing: 0.01em;
 }
+
+/* -------- Efecto de barrido de color -------- */
+.herramienta::before {
+  content: "";
+  position: absolute;
+  inset: -2px;               /* grosor externo del anillo */
+  border-radius: inherit;
+  padding: 2px;              /* grosor del borde visible */
+  /* Degradado circular que va a girar */
+  background:
+    conic-gradient(
+      from var(--a),
+      hsl(210 90% 60%),
+      hsl(270 88% 58%),
+      hsl(145 88% 56%),
+      hsl(28 90% 60%),
+      hsl(340 88% 60%),
+      hsl(210 90% 60%)
+    );
+
+  /* Recorta el centro para que solo se vea el “borde” */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+
+  /* Estado base: sin animación visible */
+  animation: rotateRing 2s linear infinite;
+  animation-play-state: paused; /* solo gira en hover */
+  opacity: 0.95;
+  pointer-events: none;  /* no bloquea clics */
+}
+/* Sheen / brillo diagonal que se desplaza */
+.herramienta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: calc(0.875rem - 2px); /* radio interno, coincide con el borde */
+  background: linear-gradient(180deg, #ffffff, #f7faff);
+  z-index: -1;
+}
+/* Hover / focus */
+.herramienta:hover,
+.herramienta:focus-visible {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-md);
+}
+
+.herramienta:hover::before,
+.herramienta:focus-visible::before {
+  opacity: 1;
+}
+
+.herramienta:hover::after,
+.herramienta:focus-visible::after {
+  opacity: 1;
+  background-position: 120% 0; /* “desplazamiento” de color */
+}
+
+.herramienta:hover :global(svg),
+.herramienta:focus-visible :global(svg) {
+  transform: translateY(-2px) scale(1.04);
+}
+
+/* Accesibilidad: focus ring */
+.herramienta:focus-visible {
+  outline: none;
+  border-color: hsl(var(--h) 88% 60%);
+  box-shadow:
+    0 0 0 4px hsl(var(--h) 90% 60% / 0.18),
+    var(--shadow-md);
+}
+
+/* -------- Asigna paletas por tarjeta -------- */
+.gridHerramientas > a:nth-child(1) { --h: 210; } /* azul */
+.gridHerramientas > a:nth-child(2) { --h: 270; } /* violeta */
+.gridHerramientas > a:nth-child(3) { --h: 145; } /* verde */
+.gridHerramientas > a:nth-child(4) { --h: 28;  } /* naranja */
+.gridHerramientas > a:nth-child(5) { --h: 340; } /* fucsia */
+
+/* -------- Interacción con el mouse: mueve el brillo hacia el cursor -------- */
+@media (hover: hover) and (pointer: fine) {
+  .herramienta {
+    /* estas variables se actualizan desde JS opcionalmente si quieres seguimiento real del mouse */
+    --x: 0%;
+    --y: 0%;
+  }
+}
+
+/* -------- Animaciones y preferencias -------- */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  .cajaHerramientas { animation: none; }
+  .herramienta,
+  .herramienta :global(svg) {
+    transition: none;
+  }
+  .herramienta::after,
+  .herramienta::before {
+    transition: none;
+  }
+}
+

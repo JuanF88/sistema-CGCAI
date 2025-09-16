@@ -35,7 +35,7 @@ export default function AuditorDashboard() {
         <div className={styles.sidebarContent}>
 
           {/* Imagen superior */}
-          <img src="/profe.jpg" alt="Avatar" className={styles.avatar} />
+          <img src="/Silueta.png" alt="Avatar" className={styles.avatar} />
           {usuario && <p className={styles.username}>{usuario.nombre}</p>}
 
           <h2 className={styles.title}>Panel Auditor</h2>
