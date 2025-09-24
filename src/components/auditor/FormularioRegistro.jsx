@@ -403,7 +403,7 @@ const handleNoConformidadChange = (index, field, value) => {
 
 
         <div className={styles.tarjetaCampo}>
-          <label className={styles.etiqueta} htmlFor="objetivo">Objetivo</label>
+          <label className={styles.etiqueta} htmlFor="objetivo">Objetivo de la auditoría</label>
           <textarea
             id="objetivo"
             name="objetivo"
@@ -416,7 +416,7 @@ const handleNoConformidadChange = (index, field, value) => {
         </div>
 
         <div className={styles.tarjetaCampo}>
-          <label className={styles.etiqueta} htmlFor="criterios">Criterios</label>
+          <label className={styles.etiqueta} htmlFor="criterios">Criterios de la auditoría</label>
           <textarea
             id="criterios"
             name="criterios"
