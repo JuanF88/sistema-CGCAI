@@ -372,7 +372,7 @@ const handleNoConformidadChange = (index, field, value) => {
 
         <div className={styles.contenedorFechas}>
           <div className={styles.tarjetaCampo}>
-            <label className={styles.etiqueta} htmlFor="asistencia_tipo">Tipo de proceso</label>
+            <label className={styles.etiqueta} htmlFor="asistencia_tipo">Asistencia</label>
             <select
               id="asistencia_tipo"
               name="asistencia_tipo"
