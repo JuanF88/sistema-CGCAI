@@ -9,19 +9,20 @@
   position: fixed;
   top: 0;
   left: 0;
-  height: 100vh;
+  height: 100dvh;           /* mejor para móviles que 100vh */
   width: 20rem;
-  background-color: #002b9e; /* color de respaldo si la imagen no carga */
+  background-color: #002b9e;
   color: white;
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  flex-direction: column;   /* clave para que el footer quede abajo */
+  justify-content: flex-start; /* cambiamos space-between -> manejamos con flex:1 en content */
   padding: 1.5rem;
   z-index: 50;
   box-shadow: 2px 0 12px rgba(0, 0, 0, 0.2);
 
-  overflow: hidden; /* importante para contener el ::before */
+  overflow: hidden;          /* mantenemos para contener ::before */
 }
+
 
 .sidebar::before {
   content: '';
@@ -40,12 +41,28 @@
   pointer-events: none;
 }
 
-.sidebarContent,
+/* El contenido scrollea, no la barra completa */
+.sidebarContent {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;           /* ocupa todo el alto disponible */
+  overflow-y: auto;         /* <-- permite scroll vertical */
+  padding-right: 0.25rem;   /* un pequeño respiro para la scrollbar */
+  scrollbar-gutter: stable; /* evita saltos de layout en algunos navegadores */
+}
+
+
+/* Footer SIEMPRE visible (fuera del área scrolleable) */
 .sidebarFooter {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
 }
-
 .avatar {
   width: 200px;
   height: 200px;
@@ -141,4 +158,41 @@
   background-color: #f9fafb;
   min-height: 100vh;
   overflow-y: auto;
+}
+
+
+/* Ajustes de tamaños para pantallas medianas */
+@media (max-width: 1200px) {
+  .sidebar { width: 18rem; }
+  .mainContent { margin-left: 18rem; }
+  .avatar { width: 160px; height: 160px; }
+}
+
+/* Ajustes de tamaños para pantallas pequeñas */
+@media (max-width: 992px) {
+  .sidebar { width: 16rem; }
+  .mainContent { margin-left: 16rem; }
+  .avatar { width: 140px; height: 140px; }
+  .title { font-size: 1.25rem; margin-bottom: 1.25rem; }
+}
+
+/* En móvil: la barra cubre en overlay (sin empujar el contenido) */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    width: 16rem;
+  }
+
+  /* Si luego decides añadir una clase .open desde React para mostrarla: */
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .mainContent {
+    margin-left: 0;   /* el contenido ocupa todo el ancho */
+  }
+
+  .avatar { width: 110px; height: 110px; }
+  .navButton { padding: 0.6rem 0.85rem; font-size: 0.95rem; }
 }
