@@ -9,8 +9,7 @@
 
   background-image:
     linear-gradient(270deg, #002b9e, rgba(59, 116, 182, 0.9), #002b9e),
-    url('/FondoLogin.png'); /* 👉 asegúrate que esté en public/ */
-
+    url('/FondoLogin.png');
   background-size: 600% 600%, cover;
   background-position: center;
   background-repeat: no-repeat;
