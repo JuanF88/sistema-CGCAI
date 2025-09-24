@@ -329,9 +329,15 @@ const handleNoConformidadChange = (index, field, value) => {
             <div className={styles.tarjetaIzquierda}>
               🏢 {auditoria.dependencias?.nombre || 'Dependencia no encontrada'}
             </div>
-            <div className={styles.tarjetaDerecha}>
-              📅 {new Date(auditoria.fecha_auditoria).getFullYear()}
-            </div>
+
+            {/* Validación de la fecha */}
+            {(() => {
+              if (!auditoria.fecha_auditoria) return null;
+              const year = new Date(auditoria.fecha_auditoria).getFullYear();
+              return year !== 1969 ? (
+                <div className={styles.tarjetaDerecha}>📅 {year}</div>
+              ) : null;
+            })()}
           </div>
         </div>
       )}
@@ -365,6 +371,7 @@ const handleNoConformidadChange = (index, field, value) => {
               onChange={handleChange}
               className={styles.inputEstilo}
             />
+            <label>En atención a la resolución 290 de 2019 de la Universidad del Cauca.</label>
             {errores.fecha_seguimiento && <p className={styles.errorTexto}>{errores.fecha_seguimiento}</p>}
           </div>
         </div>
