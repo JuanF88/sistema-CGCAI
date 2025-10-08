@@ -4,6 +4,80 @@ import { useEffect, useState } from 'react'
 import { toast } from 'react-toastify'
 import { useRouter } from 'next/navigation'
 import DataTable from 'react-data-table-component'
+import { createClient } from '@supabase/supabase-js'
+
+// Cliente (usar variables públicas de tu proyecto)
+const supabase =
+  typeof window !== 'undefined'
+    ? createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      )
+    : null
+// Quita tildes y deja MAYUSCULAS_CON_GUIONES
+const toSlugUpper = (s = '') =>
+  s.normalize('NFD')
+   .replace(/[\u0300-\u036f]/g, '')
+   .replace(/[^A-Za-z0-9]+/g, '_')
+   .replace(/^_+|_+$/g, '')
+   .toUpperCase()
+
+// YYYY-MM-DD seguro (si ya viene como '2025-09-25' lo respeta)
+const toYMD = (input) => {
+  if (!input) return new Date().toISOString().slice(0,10)
+  const s = String(input)
+  return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0,10) : new Date(input).toISOString().slice(0,10)
+}
+
+// Path consistente DENTRO del bucket 'validaciones' (sin prefijo repetido)
+const buildValidationPath = (a) => {
+  const dep = toSlugUpper(a?.dependencias?.nombre || 'SIN_DEPENDENCIA')
+  const ymd = toYMD(a?.fecha_auditoria)
+  return `Auditoria_${a.id}_${dep}_${ymd}.pdf`
+}
+
+
+// Genera el nombre EXACTO del archivo
+const makeValidationFilename = (a) => {
+  const dep = toSlugUpper(a?.dependencias?.nombre || 'SIN_DEPENDENCIA')
+  const ymd = toYMD(a?.fecha_auditoria)
+  return `Auditoria_${a.id}_${dep}_${ymd}.pdf`
+}
+
+const getValidationUrl = async (a) => {
+  const path = buildValidationPath(a)
+
+  // 1) intenta URL firmada
+  const { data, error } = await supabase
+    .storage
+    .from('validaciones')
+    .createSignedUrl(path, 60)
+
+  if (data?.signedUrl && !error) return data.signedUrl
+
+  // 2) intenta pública (si el bucket/archivo es público)
+  const pub = supabase.storage.from('validaciones').getPublicUrl(path)
+  if (pub?.data?.publicUrl) return pub.data.publicUrl
+
+  // 3) (fallback) si ya subiste archivos viejos en 'validaciones/...'
+  const legacyPath = `validaciones/${path}`
+  const legacySigned = await supabase.storage.from('validaciones').createSignedUrl(legacyPath, 60)
+  if (legacySigned?.data?.signedUrl) return legacySigned.data.signedUrl
+
+  throw new Error(error?.message || 'No se encontró el archivo')
+}
+
+
+const handleDescargarValidacion = async (row, toast) => {
+  try {
+    const url = await getValidationUrl(row)
+    // Abre en otra pestaña (o cambia a descarga forzada si prefieres)
+    window.open(url, '_blank', 'noopener,noreferrer')
+  } catch (e) {
+    console.error(e)
+    toast?.error('No se pudo descargar el informe validado. Verifica que exista en el bucket "validaciones".')
+  }
+}
 
 export default function VistaInformesAdmin() {
   const [informes, setInformes] = useState([])
@@ -277,35 +351,48 @@ export default function VistaInformesAdmin() {
     },
 
 
+{
+  name: 'Acciones',
+  cell: row => {
+    const progreso = calcularAvance(row)
+    const puedeDescargar = progreso === 100 && row.validado === true
 
-    {
-      name: 'Acciones',
-      cell: row => (
-        <div className="flex gap-2 ">
+    return (
+      <div className="flex gap-2">
+        <button
+          onClick={() => {
+            setInformeDetalle(row)
+            setMostrarDetalle(true)
+          }}
+          className="bg-blue-500 text-white px-1 py-1 rounded hover:bg-blue-600 text-s"
+        >
+          Ver más
+        </button>
+
+        {puedeDescargar && (
           <button
-            onClick={() => {
-              setInformeDetalle(row)
-              setMostrarDetalle(true)
-            }}
-            className="bg-blue-500 text-white px-1 py-1 rounded hover:bg-blue-600 text-s"
+            onClick={() => handleDescargarValidacion(row, toast)}
+            className="bg-emerald-600 text-white px-1 py-1 rounded hover:bg-emerald-700 text-s"
+            title="Descargar informe validado"
           >
-            Ver más
+            Descargar
           </button>
+        )}
 
+        <button
+          onClick={() => {
+            setInformeAEliminar(row.id)
+            setMostrarConfirmacion(true)
+          }}
+          className="bg-red-500 text-white px-1 py-1 rounded hover:bg-red-600 text-s"
+        >
+          Eliminar
+        </button>
+      </div>
+    )
+  }
+}
 
-          <button
-            onClick={() => {
-              setInformeAEliminar(row.id)
-              setMostrarConfirmacion(true)
-            }}
-            className="bg-red-500 text-white px-1 py-1 rounded hover:bg-red-600 text-s"
-          >
-            Eliminar
-          </button>
-
-        </div>
-      )
-    }
 
   ]
 

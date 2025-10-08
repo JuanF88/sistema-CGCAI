@@ -11,6 +11,29 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
   const [modalVisible, setModalVisible] = useState(false)
   const [archivo, setArchivo] = useState(null)
   const [auditoriaParaValidar, setAuditoriaParaValidar] = useState(null)
+// === Helpers NOMBRE CONSISTENTE ===
+const toSlugUpper = (s = '') =>
+  s.normalize('NFD')
+   .replace(/[\u0300-\u036f]/g, '')
+   .replace(/[^A-Za-z0-9]+/g, '_')
+   .replace(/^_+|_+$/g, '')
+   .toUpperCase()
+
+const toYMD = (input) => {
+  if (!input) return new Date().toISOString().slice(0,10)
+  const s = String(input)
+  return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0,10) : new Date(input).toISOString().slice(0,10)
+}
+
+/**
+ * Devuelve SOLO el path dentro del bucket 'validaciones', sin prefijos extra.
+ * Ej.: Auditoria_270_CIENCIA_POLITICA_PREGRADO_2025-09-25.pdf
+ */
+const buildValidationPath = (auditoria) => {
+  const dep = toSlugUpper(auditoria?.dependencias?.nombre || 'SIN_DEPENDENCIA')
+  const ymd = toYMD(auditoria?.fecha_auditoria)
+  return `Auditoria_${auditoria.id}_${dep}_${ymd}.pdf`
+}
 
   useEffect(() => {
     setAuditoriaSeleccionada(null)
@@ -78,37 +101,37 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
     if (tieneHallazgos && a.validado) return 100
     return 50
   }
-
   const subirArchivoValidacion = async () => {
-    if (!archivo || !auditoriaParaValidar) return
+  if (!archivo || !auditoriaParaValidar) return
 
-    const nombreDep = auditoriaParaValidar.dependencias?.nombre
-      ?.normalize('NFD')?.replace(/[\u0300-\u036f]/g, '')
-      ?.replace(/\s+/g, '_')?.replace(/[^a-zA-Z0-9_-]/g, '') || 'desconocido'
+  const filePath = buildValidationPath(auditoriaParaValidar) // 👈 ahora sí existe
 
-    const filePath = `validaciones/Auditoria_${auditoriaParaValidar.id}_${nombreDep}_${new Date().toISOString().split('T')[0]}.pdf`
+  const { error: uploadError } = await supabase
+    .storage
+    .from('validaciones') // bucket
+    .upload(filePath, archivo, {
+      upsert: true,                    // opcional: permite re-subir
+      contentType: 'application/pdf'
+    })
 
-    const { error: uploadError } = await supabase.storage
-      .from('validaciones')
-      .upload(filePath, archivo)
-
-    if (uploadError) {
-      console.error('❌ Error subiendo archivo:', uploadError.message)
-      return
-    }
-
-    await supabase.from('validaciones_informe').insert([
-      { informe_id: auditoriaParaValidar.id, archivo_url: filePath }
-    ])
-
-    await supabase
-      .from('informes_auditoria')
-      .update({ validado: true })
-      .eq('id', auditoriaParaValidar.id)
-
-    setArchivo(null)
-    setModalVisible(false)
+  if (uploadError) {
+    console.error('❌ Error subiendo archivo:', uploadError.message)
+    return
   }
+
+  await supabase.from('validaciones_informe').insert([
+    { informe_id: auditoriaParaValidar.id, archivo_url: filePath }
+  ])
+
+  await supabase
+    .from('informes_auditoria')
+    .update({ validado: true })
+    .eq('id', auditoriaParaValidar.id)
+
+  setArchivo(null)
+  setModalVisible(false)
+}
+
 
   const agrupadas = {
     pendientes: auditorias.filter(a => progresoAuditoria(a) === 0),
