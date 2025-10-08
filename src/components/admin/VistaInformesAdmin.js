@@ -37,13 +37,6 @@ const buildValidationPath = (a) => {
 }
 
 
-// Genera el nombre EXACTO del archivo
-const makeValidationFilename = (a) => {
-  const dep = toSlugUpper(a?.dependencias?.nombre || 'SIN_DEPENDENCIA')
-  const ymd = toYMD(a?.fecha_auditoria)
-  return `Auditoria_${a.id}_${dep}_${ymd}.pdf`
-}
-
 const getValidationUrl = async (a) => {
   const path = buildValidationPath(a)
 
