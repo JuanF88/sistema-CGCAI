@@ -47,7 +47,6 @@ export default function AuditoriasVerificacionAdmin() {
   const [semFilter, setSemFilter] = useState('')
   const [estadoFilter, setEstadoFilter] = useState('')
   const [desde, setDesde] = useState('')
-  const [hasta, setHasta] = useState('')
 
   // modal detalle
   const [showDetail, setShowDetail] = useState(false)
