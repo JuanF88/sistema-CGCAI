@@ -258,7 +258,6 @@ export default function AuditoriasVerificacionAdmin() {
     if (anioFilter) { const y = fa ? fa.getFullYear() : null; if (String(y) !== String(anioFilter)) return false }
     if (semFilter) { const m = fa ? (fa.getMonth() + 1) : null; const sem = m ? (m <= 6 ? '1' : '2') : null; if (sem !== semFilter) return false }
     if (desde && fa && fa < parseYMD(desde)) return false
-    if (hasta && fa && fa > parseYMD(hasta)) return false
     switch (estadoFilter) {
       case 'plan_pendiente': if (flags.tienePlan) return false; break
       case 'plan_enviado': if (!flags.tienePlan) return false; break
@@ -268,7 +267,7 @@ export default function AuditoriasVerificacionAdmin() {
       default: break
     }
     return true
-  }), [auditorias, q, depFilter, audFilter, anioFilter, semFilter, estadoFilter, desde, hasta])
+  }), [auditorias, q, depFilter, audFilter, anioFilter, semFilter, estadoFilter, desde])
 
   // mantener selección coherente
   useEffect(() => {
