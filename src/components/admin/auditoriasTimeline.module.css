@@ -320,15 +320,6 @@
 .list::-webkit-scrollbar-thumb { background: #dbe3ec; border-radius: 8px; }
 .list::-webkit-scrollbar-track { background: transparent; }
 
-/* =========================
-   NUEVO: variables y animaciones
-   ========================= */
-:root {
-  --accent: #6366f1;   /* morado */
-  --accent-2: #22c55e; /* verde */
-  --overdue: #ef4444;  /* rojo */
-  --ok: #16a34a;       /* verde ok */
-}
 
 @keyframes pulse {
   0%   { box-shadow: 0 0 0 0 rgba(99,102,241,.55); }
@@ -465,14 +456,6 @@
 /* Botones con micro-animación al hacer hover */
 .btn:hover {
   transform: translateY(-1px) scale(1.01);
-}
-
-/* ===== Dots más grandes + titilando por estado ===== */
-:root {
-  --accent: #6366f1;   /* actual / a tiempo */
-  --overdue: #ef4444;  /* vencido */
-  --soon: #f59e0b;     /* próximo (<=3 días) */
-  --ok: #16a34a;       /* completado */
 }
 
 /* Centrar la línea vertical con el nuevo tamaño */
