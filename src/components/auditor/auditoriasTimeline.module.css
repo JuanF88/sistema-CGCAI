@@ -457,13 +457,6 @@
   transform: translateY(-1px) scale(1.01);
 }
 
-/* ===== Dots más grandes + titilando por estado ===== */
-:root {
-  --accent: #6366f1;   /* actual / a tiempo */
-  --overdue: #ef4444;  /* vencido */
-  --soon: #f59e0b;     /* próximo (<=3 días) */
-  --ok: #16a34a;       /* completado */
-}
 
 /* Centrar la línea vertical con el nuevo tamaño */
 .lineWrap { width: 34px; }        /* antes 28px */
