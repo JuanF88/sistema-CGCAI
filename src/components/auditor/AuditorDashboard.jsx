@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, FileText, Home, Wrench } from 'lucide-react'
+import { LogOut, FileText, Home, Wrench, ClipboardList } from 'lucide-react'
 import styles from '@/components/CSS/AuditorDashboard.module.css'
 import VistaActual from '@/components/auditor/VistaActual'
 import { SpeedInsights } from "@vercel/speed-insights/next"
@@ -19,6 +19,22 @@ export default function AuditorDashboard() {
     if (!userData) return router.push('/')
     setUsuario(JSON.parse(userData))
   }, [router])
+// Lee la vista inicial desde la URL
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search)
+  const v = params.get('vista')
+  if (v) setVista(v)
+}, [])
+
+// Mantén la UI sincronizada con el historial del navegador
+useEffect(() => {
+  const onPopState = () => {
+    const params = new URLSearchParams(window.location.search)
+    setVista(params.get('vista') || 'bienvenida')
+  }
+  window.addEventListener('popstate', onPopState)
+  return () => window.removeEventListener('popstate', onPopState)
+}, [])
 
   const cerrarSesion = () => {
     localStorage.removeItem('clienteLogueado')
@@ -50,6 +66,15 @@ export default function AuditorDashboard() {
             >
               <Home size={20} /> <span>Inicio</span>
             </button>
+            <button
+              onClick={() => {
+                setVista('timeline')
+                window.history.pushState({}, '', '/auditor?vista=timeline')
+              }}
+              className={`${styles.navButton} ${vista === 'timeline' ? styles.active : ''}`}
+            >
+              <ClipboardList size={20} /> <span>Auditoría Interna</span>
+            </button>
 
             <button
               onClick={() => {
@@ -59,7 +84,7 @@ export default function AuditorDashboard() {
               }}
               className={`${styles.navButton} ${vista === 'asignadas' ? styles.active : ''}`}
             >
-              <FileText size={20} /> <span>Auditorías</span>
+              <FileText size={20} /> <span>Informes de Auditoría</span>
             </button>
 
             <button
@@ -70,7 +95,7 @@ export default function AuditorDashboard() {
               }}
               className={`${styles.navButton} ${vista === 'caja' ? styles.active : ''}`}
             >
-<Wrench size={20} /> <span>Caja de Herramientas</span>
+            <Wrench size={20} /> <span>Caja de Herramientas</span>
             </button>
           </nav>
         </div>

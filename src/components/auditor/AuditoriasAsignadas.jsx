@@ -11,29 +11,29 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
   const [modalVisible, setModalVisible] = useState(false)
   const [archivo, setArchivo] = useState(null)
   const [auditoriaParaValidar, setAuditoriaParaValidar] = useState(null)
-// === Helpers NOMBRE CONSISTENTE ===
-const toSlugUpper = (s = '') =>
-  s.normalize('NFD')
-   .replace(/[\u0300-\u036f]/g, '')
-   .replace(/[^A-Za-z0-9]+/g, '_')
-   .replace(/^_+|_+$/g, '')
-   .toUpperCase()
+  // === Helpers NOMBRE CONSISTENTE ===
+  const toSlugUpper = (s = '') =>
+    s.normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Za-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .toUpperCase()
 
-const toYMD = (input) => {
-  if (!input) return new Date().toISOString().slice(0,10)
-  const s = String(input)
-  return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0,10) : new Date(input).toISOString().slice(0,10)
-}
+  const toYMD = (input) => {
+    if (!input) return new Date().toISOString().slice(0, 10)
+    const s = String(input)
+    return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : new Date(input).toISOString().slice(0, 10)
+  }
 
-/**
- * Devuelve SOLO el path dentro del bucket 'validaciones', sin prefijos extra.
- * Ej.: Auditoria_270_CIENCIA_POLITICA_PREGRADO_2025-09-25.pdf
- */
-const buildValidationPath = (auditoria) => {
-  const dep = toSlugUpper(auditoria?.dependencias?.nombre || 'SIN_DEPENDENCIA')
-  const ymd = toYMD(auditoria?.fecha_auditoria)
-  return `Auditoria_${auditoria.id}_${dep}_${ymd}.pdf`
-}
+  /**
+   * Devuelve SOLO el path dentro del bucket 'validaciones', sin prefijos extra.
+   * Ej.: Auditoria_270_CIENCIA_POLITICA_PREGRADO_2025-09-25.pdf
+   */
+  const buildValidationPath = (auditoria) => {
+    const dep = toSlugUpper(auditoria?.dependencias?.nombre || 'SIN_DEPENDENCIA')
+    const ymd = toYMD(auditoria?.fecha_auditoria)
+    return `Auditoria_${auditoria.id}_${dep}_${ymd}.pdf`
+  }
 
   useEffect(() => {
     setAuditoriaSeleccionada(null)
@@ -101,36 +101,87 @@ const buildValidationPath = (auditoria) => {
     if (tieneHallazgos && a.validado) return 100
     return 50
   }
-  const subirArchivoValidacion = async () => {
-  if (!archivo || !auditoriaParaValidar) return
+  async function descargarInformeValidadoPorId(informeId) {
+    try {
+      const prefixes = ['']; // agrega subcarpetas si las usas, ej: ['2025', 'dependencias/XYZ']
+      for (const prefix of prefixes) {
+        const { data: items, error: listErr } = await supabase
+          .storage
+          .from('validaciones')
+          .list(prefix, { limit: 100, sortBy: { column: 'name', order: 'asc' } })
 
-  const filePath = buildValidationPath(auditoriaParaValidar) // 👈 ahora sí existe
+        if (listErr) throw listErr
+        if (!items || items.length === 0) continue
 
-  const { error: uploadError } = await supabase
-    .storage
-    .from('validaciones') // bucket
-    .upload(filePath, archivo, {
-      upsert: true,                    // opcional: permite re-subir
-      contentType: 'application/pdf'
-    })
+        // Busca un archivo cuyo nombre contenga el id del informe
+        const hit = items.find(it => it.name && it.name.includes(String(informeId)))
+        if (!hit) continue
 
-  if (uploadError) {
-    console.error('❌ Error subiendo archivo:', uploadError.message)
-    return
+        const path = prefix ? `${prefix}/${hit.name}` : hit.name
+        const { data: signed, error: signErr } = await supabase
+          .storage
+          .from('validaciones')
+          .createSignedUrl(path, 60 * 60) // URL válida 1 hora
+
+        if (signErr || !signed?.signedUrl) {
+          throw signErr || new Error('No se pudo firmar la URL.')
+        }
+
+        // 🔗 Abrir en NUEVA PESTAÑA con <a> (sin window.open)
+        const url = signed.signedUrl
+        const a = document.createElement('a')
+        a.href = url
+        a.target = '_blank'
+        a.rel = 'noopener noreferrer'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+
+        return true
+      }
+
+      // No se encontró el archivo
+      toast.warn('Aún no hay un informe validado en el bucket para este informe.')
+      return false
+    } catch (err) {
+      console.error('Descarga validado error:', err)
+      toast.error('No se pudo descargar el informe validado.')
+      return false
+    }
   }
 
-  await supabase.from('validaciones_informe').insert([
-    { informe_id: auditoriaParaValidar.id, archivo_url: filePath }
-  ])
 
-  await supabase
-    .from('informes_auditoria')
-    .update({ validado: true })
-    .eq('id', auditoriaParaValidar.id)
 
-  setArchivo(null)
-  setModalVisible(false)
-}
+  const subirArchivoValidacion = async () => {
+    if (!archivo || !auditoriaParaValidar) return
+
+    const filePath = buildValidationPath(auditoriaParaValidar) // 👈 ahora sí existe
+
+    const { error: uploadError } = await supabase
+      .storage
+      .from('validaciones') // bucket
+      .upload(filePath, archivo, {
+        upsert: true,                    // opcional: permite re-subir
+        contentType: 'application/pdf'
+      })
+
+    if (uploadError) {
+      console.error('❌ Error subiendo archivo:', uploadError.message)
+      return
+    }
+
+    await supabase.from('validaciones_informe').insert([
+      { informe_id: auditoriaParaValidar.id, archivo_url: filePath }
+    ])
+
+    await supabase
+      .from('informes_auditoria')
+      .update({ validado: true })
+      .eq('id', auditoriaParaValidar.id)
+
+    setArchivo(null)
+    setModalVisible(false)
+  }
 
 
   const agrupadas = {
@@ -253,33 +304,18 @@ const buildValidationPath = (auditoria) => {
                         className={styles.botonDescarga}
                         onClick={async (e) => {
                           e.stopPropagation()
-                          const [fort, opor, noConfor] = await Promise.all([
-                            supabase
-                              .from('fortalezas')
-                              .select(`*, iso:iso_id ( iso ), capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )`)
-                              .eq('informe_id', a.id),
-                            supabase
-                              .from('oportunidades_mejora')
-                              .select(`*, iso:iso_id ( iso ), capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )`)
-                              .eq('informe_id', a.id),
-                            supabase
-                              .from('no_conformidades')
-                              .select(`*, iso:iso_id ( iso ), capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )`)
-                              .eq('informe_id', a.id),
-                          ])
-                          await generarInformeAuditoria(
-                            a,
-                            fort.data || [],
-                            opor.data || [],
-                            noConfor.data || [],
-                            usuario
-                          )
+                          e.preventDefault()
+                          const ok = await descargarInformeValidadoPorId(a.id)
+                          if (!ok) {
+                            // fallback opcional...
+                          }
                         }}
-                        title="Descargar informe"
+                        title="Descargar informe validado"
                       >
                         📄 Descargar Informe
                       </button>
                     )}
+
 
                     {progreso === 80 && (
                       <button

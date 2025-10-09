@@ -12,7 +12,7 @@ import { Analytics } from "@vercel/analytics/next"
 import styles from '@/components/CSS/AdminDashboard.module.css'
 
 
-import VistaBienvenida from '@/components/VistaBienvenida'
+import VistaTimeline from '@/components/admin/VistaTimeline'
 import VistaInformesAdmin from '@/components/admin/VistaInformesAdmin'
 import VistaAdministrarUsuarios from '@/components/admin/VistaAdministrarUsuarios'
 import VistaAdministrarDependencias from '@/components/admin/VistaAdministrarDependencias'
@@ -23,7 +23,7 @@ import VistaEstadisticas from '@/components/admin/VistaEstadisticas'
 export default function AdminDashboard() {
   const router = useRouter()
   const [usuario, setUsuario] = useState(null)
-  const [vista, setVista] = useState('bienvenida')
+  const [vista, setVista] = useState('VistaTimeline')
 
   useEffect(() => {
     const userData = localStorage.getItem('clienteLogueado')
@@ -51,10 +51,10 @@ export default function AdminDashboard() {
           <nav className={styles.nav}>
             <button
               onClick={() => {
-                setVista('bienvenida')
-                window.history.pushState({}, '', '/admin?vista=bienvenida')
+                setVista('VistaTimeline')
+                window.history.pushState({}, '', '/admin?vista=VistaTimeline')
               }}
-              className={`${styles.navButton} ${vista === 'bienvenida' ? styles.active : ''}`}
+              className={`${styles.navButton} ${vista === 'VistaTimeline' ? styles.active : ''}`}
             >
               <Home size={20} /> <span>Inicio</span>
             </button>
@@ -126,7 +126,7 @@ export default function AdminDashboard() {
 
       {/* Contenido principal */}
 <main className={styles.mainContent}>
-  {vista === 'bienvenida' && usuario && <VistaBienvenida usuario={usuario} />}
+  {vista === 'VistaTimeline' && usuario && <VistaTimeline usuario={usuario} />}
   {vista === 'crearInforme' && <VistaInformesAdmin />}
   {vista === 'crearUsuario' && <VistaAdministrarUsuarios />}
   {vista === 'adminDependencia' && <VistaAdministrarDependencias />}

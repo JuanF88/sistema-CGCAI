@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import VistaBienvenida from '@/components/VistaBienvenida'
 import AuditoriasAsignadas from '@/components/auditor/AuditoriasAsignadas'
 import CajadeHerramientas from '@/components/auditor/CajadeHerramientas'
+import AuditoriasTimeline from '@/components/auditor/AuditoriasTimeline'
 
 
 export default function VistaActual({ usuario, reset, setReset }) {
@@ -27,6 +28,9 @@ export default function VistaActual({ usuario, reset, setReset }) {
       )}
       {vista === 'caja' && (
         <CajadeHerramientas usuario={usuario} reset={reset} />
+      )}
+      {vista === 'timeline' && (
+        <AuditoriasTimeline usuario={usuario} reset={reset} />
       )}
     </>
   )

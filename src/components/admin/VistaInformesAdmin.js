@@ -10,23 +10,23 @@ import { createClient } from '@supabase/supabase-js'
 const supabase =
   typeof window !== 'undefined'
     ? createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      )
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    )
     : null
 // Quita tildes y deja MAYUSCULAS_CON_GUIONES
 const toSlugUpper = (s = '') =>
   s.normalize('NFD')
-   .replace(/[\u0300-\u036f]/g, '')
-   .replace(/[^A-Za-z0-9]+/g, '_')
-   .replace(/^_+|_+$/g, '')
-   .toUpperCase()
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toUpperCase()
 
 // YYYY-MM-DD seguro (si ya viene como '2025-09-25' lo respeta)
 const toYMD = (input) => {
-  if (!input) return new Date().toISOString().slice(0,10)
+  if (!input) return new Date().toISOString().slice(0, 10)
   const s = String(input)
-  return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0,10) : new Date(input).toISOString().slice(0,10)
+  return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : new Date(input).toISOString().slice(0, 10)
 }
 
 // Path consistente DENTRO del bucket 'validaciones' (sin prefijo repetido)
@@ -122,6 +122,7 @@ export default function VistaInformesAdmin() {
   const [nuevoInforme, setNuevoInforme] = useState({
     usuario_id: '',
     dependencia_id: '',
+    fecha_auditoria: '', // YYYY-MM-DD
   })
 
   useEffect(() => {
@@ -151,34 +152,53 @@ export default function VistaInformesAdmin() {
     setNuevoInforme((prev) => ({ ...prev, [name]: value }))
   }
   const crearInforme = async () => {
-    if (!nuevoInforme.usuario_id || !nuevoInforme.dependencia_id) {
-      toast.error('Por favor seleccione un auditor y una dependencia');
-      return;
-    }
-
-    const res = await fetch('/api/informes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(nuevoInforme),
-    })
-
-    if (res.ok) {
-      const creado = await res.json()
-      setInformes((prev) => [...prev, creado[0]])
-      setNuevoInforme({ usuario_id: '', dependencia_id: '' })
-      setMostrarModal(false)
-      toast.success('Auditoría asignada con éxito')
-      localStorage.setItem('vistaActual', 'crearInforme')
-      router.push('/admin?vista=crearInforme')
-    } else {
-      try {
-        const error = await res.json()
-        alert('Error al crear informe: ' + (error?.error || 'Error desconocido'))
-      } catch {
-        alert('Error al crear informe: No se pudo leer el mensaje de error')
-      }
-    }
+  // Validación mínima en el cliente
+  if (!nuevoInforme.usuario_id || !nuevoInforme.dependencia_id || !nuevoInforme.fecha_auditoria) {
+    toast.error('Por favor seleccione auditor, dependencia y fecha de auditoría');
+    return;
   }
+
+  // Construir payload PLANO (no anidado), con tipos correctos
+  const payload = {
+    usuario_id: Number(nuevoInforme.usuario_id),
+    dependencia_id: Number(nuevoInforme.dependencia_id),
+    fecha_auditoria: toYMD(nuevoInforme.fecha_auditoria),
+    asistencia_tipo: nuevoInforme.asistencia_tipo || 'Digital', // por si tu API lo usa
+    auditores_acompanantes: [],      // evita null
+    objetivo: '', criterios: '', conclusiones: '', recomendaciones: '',
+    fecha_seguimiento: null,
+    validado: false,
+  };
+
+  const res = await fetch('/api/informes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),   // 👈 plano
+  });
+
+  if (res.ok) {
+    const creado = await res.json();
+    const createdItem = (Array.isArray(creado) ? creado[0] : creado) || {};
+
+    // Si el API no devuelve la fecha, usamos la que enviamos
+    if (!createdItem.fecha_auditoria) {
+      createdItem.fecha_auditoria = payload.fecha_auditoria;
+    }
+
+    setInformes((prev) => [...prev, createdItem]);
+    setNuevoInforme({ usuario_id: '', dependencia_id: '', fecha_auditoria: '', asistencia_tipo: 'Digital' });
+    setMostrarModal(false);
+    toast.success('Auditoría asignada con éxito');
+    localStorage.setItem('vistaActual', 'crearInforme');
+    router.push('/admin?vista=crearInforme');
+  } else {
+    // Mejor manejo de error
+    let msg = 'Error desconocido';
+    try { const err = await res.json(); msg = err?.error || msg; } catch {}
+    alert('Error al crear informe: ' + msg);
+  }
+};
+
 
   const eliminarInforme = async (id) => {
     try {
@@ -229,11 +249,11 @@ export default function VistaInformesAdmin() {
 
   const columnas = [
     {
-    name: 'ID',
-    selector: row => row.id,
-    sortable: true,
-    width: '64px',
-    cell: row => <div className="w-full text-center">{row.id}</div>, // ✅ centra sin props raras
+      name: 'ID',
+      selector: row => row.id,
+      sortable: true,
+      width: '64px',
+      cell: row => <div className="w-full text-center">{row.id}</div>, // ✅ centra sin props raras
     },
     {
       name: 'Año',
@@ -241,15 +261,15 @@ export default function VistaInformesAdmin() {
         const fecha = row.fecha_auditoria ? new Date(row.fecha_auditoria) : null
         return fecha ? fecha.getFullYear() : 'N/A'
       },
-          sortable: true,
-    width: '80px',
-      
+      sortable: true,
+      width: '80px',
+
     },
-        {
+    {
       name: 'Fecha Audtoria',
-      selector: row =>  row.fecha_auditoria|| 'N/A',
-          sortable: true,
-    cell: row => <div className="w-full text-center">{row.fecha_auditoria}</div>, // ✅ centra sin props raras
+      selector: row => row.fecha_auditoria || 'N/A',
+      sortable: true,
+      cell: row => <div className="w-full text-center">{row.fecha_auditoria}</div>, // ✅ centra sin props raras
 
     },
     {
@@ -260,8 +280,8 @@ export default function VistaInformesAdmin() {
         const mes = fecha.getMonth() + 1
         return mes >= 1 && mes <= 6 ? '1' : '2'
       },
-          sortable: true,
-    width: '120px',
+      sortable: true,
+      width: '120px',
 
     },
     {
@@ -344,47 +364,47 @@ export default function VistaInformesAdmin() {
     },
 
 
-{
-  name: 'Acciones',
-  cell: row => {
-    const progreso = calcularAvance(row)
-    const puedeDescargar = progreso === 100 && row.validado === true
+    {
+      name: 'Acciones',
+      cell: row => {
+        const progreso = calcularAvance(row)
+        const puedeDescargar = progreso === 100 && row.validado === true
 
-    return (
-      <div className="flex gap-2">
-        <button
-          onClick={() => {
-            setInformeDetalle(row)
-            setMostrarDetalle(true)
-          }}
-          className="bg-blue-500 text-white px-1 py-1 rounded hover:bg-blue-600 text-s"
-        >
-          Ver más
-        </button>
+        return (
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setInformeDetalle(row)
+                setMostrarDetalle(true)
+              }}
+              className="bg-blue-500 text-white px-1 py-1 rounded hover:bg-blue-600 text-s"
+            >
+              Ver más
+            </button>
 
-        {puedeDescargar && (
-          <button
-            onClick={() => handleDescargarValidacion(row, toast)}
-            className="bg-emerald-600 text-white px-1 py-1 rounded hover:bg-emerald-700 text-s"
-            title="Descargar informe validado"
-          >
-            Descargar
-          </button>
-        )}
+            {puedeDescargar && (
+              <button
+                onClick={() => handleDescargarValidacion(row, toast)}
+                className="bg-emerald-600 text-white px-1 py-1 rounded hover:bg-emerald-700 text-s"
+                title="Descargar informe validado"
+              >
+                Descargar
+              </button>
+            )}
 
-        <button
-          onClick={() => {
-            setInformeAEliminar(row.id)
-            setMostrarConfirmacion(true)
-          }}
-          className="bg-red-500 text-white px-1 py-1 rounded hover:bg-red-600 text-s"
-        >
-          Eliminar
-        </button>
-      </div>
-    )
-  }
-}
+            <button
+              onClick={() => {
+                setInformeAEliminar(row.id)
+                setMostrarConfirmacion(true)
+              }}
+              className="bg-red-500 text-white px-1 py-1 rounded hover:bg-red-600 text-s"
+            >
+              Eliminar
+            </button>
+          </div>
+        )
+      }
+    }
 
 
   ]
@@ -522,6 +542,16 @@ export default function VistaInformesAdmin() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Fecha de Auditoría</label>
+              <input
+                type="date"
+                name="fecha_auditoria"
+                value={nuevoInforme.fecha_auditoria}
+                onChange={handleChange}
+                className="w-full border p-2 rounded"
+              />
             </div>
 
             <div className="flex justify-end gap-2">

@@ -57,37 +57,86 @@ export async function DELETE(req) {
 }
 
 export async function POST(req) {
-  const body = await req.json()
-  const { usuario_id, dependencia_id, validado = false } = body
+  try {
+    const raw = await req.json()
+    console.log('[POST /api/informes] body recibido:', raw)
 
-  if (!usuario_id || !dependencia_id) {
-    return Response.json({ error: 'Faltan campos requeridos' }, { status: 400 })
-  }
+    // Si viene anidado como { nuevoInforme: {...}, ... } lo aplanamos
+    const src = raw?.nuevoInforme && typeof raw.nuevoInforme === 'object'
+      ? { ...raw, ...raw.nuevoInforme }  // los campos dentro de nuevoInforme prevalecen
+      : raw
 
-  const { data, error } = await supabase
-    .from('informes_auditoria')
-    .insert([{ usuario_id, dependencia_id, validado }])
-    .select(`
-      id,
+    const usuario_id = Number.parseInt(src?.usuario_id, 10)
+    const dependencia_id = Number.parseInt(src?.dependencia_id, 10)
+
+    const toYMD = (v) => {
+      if (!v) return null
+      const s = String(v)
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10)
+      const d = new Date(s)
+      return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10)
+    }
+
+    const fecha_auditoria = toYMD(src?.fecha_auditoria)
+    const fecha_seguimiento = toYMD(src?.fecha_seguimiento)
+
+    if (!Number.isInteger(usuario_id)) {
+      return Response.json({ error: 'Falta usuario_id (numérico)' }, { status: 400 })
+    }
+    if (!Number.isInteger(dependencia_id)) {
+      return Response.json({ error: 'Falta dependencia_id (numérico)' }, { status: 400 })
+    }
+    if (!fecha_auditoria) {
+      return Response.json({ error: 'Falta fecha_auditoria (YYYY-MM-DD)' }, { status: 400 })
+    }
+
+    const payload = {
       usuario_id,
       dependencia_id,
-      validado,
-      usuarios:usuario_id (
-        nombre,
-        apellido
-      ),
-      dependencias:dependencia_id (
-        nombre
-      ),
-      fortalezas ( id ),
-      oportunidades_mejora ( id ),
-      no_conformidades ( id )
-    `)
+      validado: src?.validado === true,
+      fecha_auditoria,
+      asistencia_tipo: src?.asistencia_tipo ?? 'Digital',
+      auditores_acompanantes: Array.isArray(src?.auditores_acompanantes) ? src.auditores_acompanantes : [],
+      objetivo: src?.objetivo ?? null,
+      criterios: src?.criterios ?? null,
+      conclusiones: src?.conclusiones ?? null,
+      fecha_seguimiento,
+      recomendaciones: src?.recomendaciones ?? null,
+    }
 
-  if (error) {
-    console.error('❌ Error al crear informe:', error.message)
-    return Response.json({ error: error.message }, { status: 500 })
+    console.log('[POST /api/informes] payload a insertar:', payload)
+
+    const { data, error } = await supabase
+      .from('informes_auditoria')
+      .insert([payload])
+      .select(`
+        id,
+        objetivo,
+        criterios,
+        conclusiones,
+        fecha_auditoria,
+        asistencia_tipo,
+        fecha_seguimiento,
+        recomendaciones,
+        auditores_acompanantes,
+        usuario_id,
+        dependencia_id,
+        validado,
+        usuarios:usuario_id ( nombre, apellido ),
+        dependencias:dependencia_id ( nombre ),
+        fortalezas ( id ),
+        oportunidades_mejora ( id ),
+        no_conformidades ( id )
+      `)
+
+    if (error) {
+      console.error('❌ Error al crear informe:', error.message)
+      return Response.json({ error: error.message }, { status: 500 })
+    }
+
+    return Response.json(data, { status: 201 })
+  } catch (e) {
+    console.error('❌ POST /api/informes EX:', e)
+    return Response.json({ error: e.message || 'Error inesperado' }, { status: 500 })
   }
-
-  return Response.json(data, { status: 201 })
 }
