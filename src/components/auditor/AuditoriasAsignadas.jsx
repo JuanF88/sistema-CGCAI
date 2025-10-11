@@ -299,7 +299,7 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
                       </button>
                     )}
 
-                    {progreso >= 80 && (
+                    {progreso == 80 && (
                       <button
                         className={styles.botonDescarga}
                         onClick={async (e) => {
@@ -329,6 +329,23 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
                         title="Descargar informe"
                       >
                         📄 Descargar Informe
+                      </button>
+                    )}
+
+                    {progreso == 100 && (
+                      <button
+                        className={styles.botonDescarga}
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          e.preventDefault()
+                          const ok = await descargarInformeValidadoPorId(a.id)
+                          if (!ok) {
+                            // fallback opcional...
+                          }
+                        }}
+                        title="Descargar informe validado"
+                      >
+                        📄 Descargar Informe Validado
                       </button>
                     )}
 
