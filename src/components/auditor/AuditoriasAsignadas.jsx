@@ -304,13 +304,29 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
                         className={styles.botonDescarga}
                         onClick={async (e) => {
                           e.stopPropagation()
-                          e.preventDefault()
-                          const ok = await descargarInformeValidadoPorId(a.id)
-                          if (!ok) {
-                            // fallback opcional...
-                          }
+                          const [fort, opor, noConfor] = await Promise.all([
+                            supabase
+                              .from('fortalezas')
+                              .select(`*, iso:iso_id ( iso ), capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )`)
+                              .eq('informe_id', a.id),
+                            supabase
+                              .from('oportunidades_mejora')
+                              .select(`*, iso:iso_id ( iso ), capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )`)
+                              .eq('informe_id', a.id),
+                            supabase
+                              .from('no_conformidades')
+                              .select(`*, iso:iso_id ( iso ), capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )`)
+                              .eq('informe_id', a.id),
+                          ])
+                          await generarInformeAuditoria(
+                            a,
+                            fort.data || [],
+                            opor.data || [],
+                            noConfor.data || [],
+                            usuario
+                          )
                         }}
-                        title="Descargar informe validado"
+                        title="Descargar informe"
                       >
                         📄 Descargar Informe
                       </button>
