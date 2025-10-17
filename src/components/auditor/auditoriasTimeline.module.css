@@ -653,19 +653,6 @@
 }
 .botonCancelar:hover { background: #f8fafc; }
 
-/* ===== THEME VARS (usadas por pulso/gradientes) ===== */
-:root {
-  --accent: #9d9eff;   /* indigo-500 */
-  --accent-2: #3791e6; /* green-500 */
-  --accentSubir1:#2729a7;  
-  --accentSubir2:#4fd656;  
-  --accentIr1:#5557ec;  
-  --accentIr2:#e47ae7;  
-  --overdue: #f05959;  /* red-500 */
-  --soon: #f59e0b;     /* amber-500 */
-  --ok: #16a34a;       /* green-600 */
-}
-
 /* ===== Resumen superior: progreso + CTA ===== */
 .summaryBox {
   min-width: 280px;
