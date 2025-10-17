@@ -60,7 +60,7 @@ export default function AdminDashboard() {
             </button>
 
 
-            <button
+            {/* <button
               onClick={() => {
                 setVista('crearInforme')
                 window.history.pushState({}, '', '/admin?vista=crearInforme')
@@ -68,7 +68,7 @@ export default function AdminDashboard() {
               className={`${styles.navButton} ${vista === 'crearInforme' ? styles.active : ''}`}
             >
               <FileText size={18} /> <span>Administrar Auditorías</span>
-            </button>
+            </button> */}
 
 
             <button

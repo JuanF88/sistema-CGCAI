@@ -4,13 +4,21 @@ import { supabase } from '@/lib/supabaseClient'
 import FormularioRegistro from './FormularioRegistro'
 import styles from '@/components/CSS/AuditoriasAsignadas.module.css'
 import { generarInformeAuditoria } from '@/components/auditor/Utilidades/generarInformeAuditoria.jsx'
+import { useSearchParams, useRouter } from 'next/navigation' // 👈 NUEVO
 
 export default function AuditoriasAsignadas({ usuario, reset }) {
+  const router = useRouter() // 👈 NUEVO
+  const searchParams = useSearchParams() // 👈 NUEVO
+  const informeIdParam = searchParams.get('informeId') // string | null  👈 NUEVO
+  const directId = informeIdParam ? Number(informeIdParam) : null // 👈 NUEVO
+
   const [auditorias, setAuditorias] = useState([])
   const [auditoriaSeleccionada, setAuditoriaSeleccionada] = useState(null)
   const [modalVisible, setModalVisible] = useState(false)
   const [archivo, setArchivo] = useState(null)
   const [auditoriaParaValidar, setAuditoriaParaValidar] = useState(null)
+  const [loadingDirect, setLoadingDirect] = useState(!!directId) // 👈 NUEVO
+  const [notFoundDirect, setNotFoundDirect] = useState(false) // 👈 NUEVO
   // === Helpers NOMBRE CONSISTENTE ===
   const toSlugUpper = (s = '') =>
     s.normalize('NFD')
@@ -25,6 +33,15 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
     return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : new Date(input).toISOString().slice(0, 10)
   }
 
+  const handleVolver = () => {
+    setAuditoriaSeleccionada(null)
+    const params = new URLSearchParams(window.location.search)
+    params.delete('informeId')
+    if (!params.has('vista')) params.set('vista', 'asignadas')
+    router.replace(`/auditor?${params.toString()}`)
+  }
+
+
   /**
    * Devuelve SOLO el path dentro del bucket 'validaciones', sin prefijos extra.
    * Ej.: Auditoria_270_CIENCIA_POLITICA_PREGRADO_2025-09-25.pdf
@@ -34,6 +51,56 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
     const ymd = toYMD(auditoria?.fecha_auditoria)
     return `Auditoria_${auditoria.id}_${dep}_${ymd}.pdf`
   }
+  // SELECT reutilizable (igual al de la carga de lista)
+  const SELECT_FIELDS = `
+    id,
+    objetivo,
+    criterios,
+    conclusiones,
+    fecha_auditoria,
+    asistencia_tipo,
+    fecha_seguimiento,
+    recomendaciones,
+    auditores_acompanantes,
+    validado,
+    dependencia_id,
+    dependencias (
+      nombre,
+      plan_auditoria ( enlace )
+    ),
+    fortalezas ( id ),
+    oportunidades_mejora ( id ),
+    no_conformidades ( id )
+  `
+
+  // 🔴 Prefetch directo por ID para evitar "flash" de la lista
+  useEffect(() => {
+    let cancelled = false
+    const fetchDirect = async () => {
+      if (!directId) return
+      setLoadingDirect(true)
+      setNotFoundDirect(false)
+      try {
+        const { data, error } = await supabase
+          .from('informes_auditoria')
+          .select(SELECT_FIELDS)
+          .eq('usuario_id', usuario.usuario_id)
+          .eq('id', directId)
+          .single()
+
+        if (error || !data) {
+          if (!cancelled) setNotFoundDirect(true)
+          return
+        }
+        if (!cancelled) setAuditoriaSeleccionada(data)
+      } finally {
+        if (!cancelled) setLoadingDirect(false)
+      }
+    }
+    fetchDirect()
+    return () => { cancelled = true }
+  }, [directId, usuario?.usuario_id])
+
 
   useEffect(() => {
     setAuditoriaSeleccionada(null)
@@ -73,6 +140,13 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
 
     cargarAsignadas()
   }, [usuario, modalVisible])
+
+  useEffect(() => {
+    const qpId = Number(informeIdParam)
+    if (!qpId || auditorias.length === 0) return
+    const found = auditorias.find(a => a.id === qpId)
+    if (found) setAuditoriaSeleccionada(found)
+  }, [informeIdParam, auditorias])
 
   const contarCamposCompletos = (a) => {
     const campos = [
@@ -372,16 +446,41 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
       </div>
     )
   }
+  // 🚪 Gate de render cuando venimos con ?informeId=...
+  if (directId) {
+    if (loadingDirect) {
+      return (
+        <div className={styles.contenedor}>
+          <div style={{ padding: 16 }}>Cargando formulario…</div>
+        </div>
+      )
+    }
+    if (notFoundDirect) {
+      // Si el ID no pertenece al usuario o no existe, volvemos a la lista normal
+      // (o muestra un aviso si prefieres)
+    }
+    if (auditoriaSeleccionada) {
+      return (
+        <FormularioRegistro
+          usuario={usuario}
+          auditoria={auditoriaSeleccionada}
+          onVolver={handleVolver} 
+        />
+      )
+    }
+
+  }
 
   if (auditoriaSeleccionada) {
     return (
       <FormularioRegistro
         usuario={usuario}
         auditoria={auditoriaSeleccionada}
-        onVolver={() => setAuditoriaSeleccionada(null)}
+        onVolver={handleVolver}
       />
     )
   }
+
 
   return (
     <div className={styles.contenedor}>

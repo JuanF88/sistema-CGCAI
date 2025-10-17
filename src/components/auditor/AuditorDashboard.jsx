@@ -66,7 +66,7 @@ useEffect(() => {
             >
               <Home size={20} /> <span>Inicio</span>
             </button>
-            {/* <button
+            <button
               onClick={() => {
                 setVista('timeline')
                 window.history.pushState({}, '', '/auditor?vista=timeline')
@@ -74,9 +74,8 @@ useEffect(() => {
               className={`${styles.navButton} ${vista === 'timeline' ? styles.active : ''}`}
             >
               <ClipboardList size={20} /> <span>Auditoría Interna</span>
-            </button> */}
-
-            <button
+            </button>
+            {/* <button
               onClick={() => {
                 setVista('asignadas')
                 setResetAuditorias(prev => !prev)
@@ -85,7 +84,7 @@ useEffect(() => {
               className={`${styles.navButton} ${vista === 'asignadas' ? styles.active : ''}`}
             >
               <FileText size={20} /> <span>Informes de Auditoría</span>
-            </button>
+            </button> */}
 
             <button
               onClick={() => {

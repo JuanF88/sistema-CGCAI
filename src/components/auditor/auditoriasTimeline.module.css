@@ -289,22 +289,46 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+
 .btn {
   border: 1px solid #c7d2fe;
-  background: #eef2ff;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
   color: #3730a3;
   font-weight: 700;
   font-size: 13px;
   padding: 8px 12px;
   border-radius: 10px;
   cursor: pointer;
-  transition: transform 0.12s ease, background 0.2s, box-shadow 0.2s;
+  border-color: #a7c5ff;
+  color: #fff;
 }
-.btn:hover {
-  transform: translateY(-1px);
-  background: #e0e7ff;
-  box-shadow: 0 6px 14px rgba(59, 130, 246, 0.18);
+
+.btnSubir {
+  border: 2px dashed #cbd5e1;
+  background: #fcfdff;
+  color: #3730a3;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  border-color: #a7c5ff;
 }
+
+
+.btnIr{
+  border: 1px solid #c7d2fe;
+  background: linear-gradient(90deg, var(--accentIr1), var(--accentIr2));
+  color: #3730a3;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  border-color: #a7c5ff;
+  color: #fff;
+}
+
 .btnGhost {
   background: #ffffff;
   border-color: #e5e7eb;
@@ -359,12 +383,12 @@
 
 /* Brillos de tarjeta según estado */
 .glowCurrent {
-  border-color: #c7d2fe !important;
-  box-shadow: 0 0 0 3px rgba(99,102,241,.14), 0 14px 34px rgba(99,102,241,.16);
+  border-color: #b3c1f8 !important;
+  box-shadow: 0 0 0 6px rgba(99,102,241,.14), 0 14px 34px rgba(99,102,241,.16);
 }
 .glowOverdue {
   border-color: #fecaca !important;
-  box-shadow: 0 0 0 3px rgba(239,68,68,.14), 0 14px 34px rgba(239,68,68,.16);
+  box-shadow: 0 0 0 6px rgba(239,68,68,.14), 0 14px 34px rgba(239,68,68,.16);
 }
 .stepDone {
   opacity: .98;
@@ -378,15 +402,6 @@
 /* Sutileza al paso actual */
 .step.stepCurrent .stepBody {
   transform: translateY(-1px);
-}
-
-/* Hover más vivo en tarjetas */
-.stepBody {
-  transition: box-shadow .25s ease, transform .15s ease, border-color .2s ease;
-}
-.stepBody:hover {
-  border-color: #dde6f5;
-  box-shadow: 0 10px 28px rgba(15,23,42,.08);
 }
 
 /* =========================
@@ -457,7 +472,14 @@
   transform: translateY(-1px) scale(1.01);
 }
 
+.btnIr:hover {
+  transform: translateY(-1px) scale(1.01);
+}
 
+.planSlot:hover{
+  transform: translateY(-1px) scale(1.01);
+
+}
 /* Centrar la línea vertical con el nuevo tamaño */
 .lineWrap { width: 34px; }        /* antes 28px */
 .line { left: 17px; }             /* centrado con dot de 18px */
@@ -605,7 +627,7 @@
 }
 .botonSubir {
   border: 1px solid #c7d2fe;
-  background: linear-gradient(90deg, #6366f1, #22c55e);
+  background: linear-gradient(90deg, #6366f1, #33c0eb);
   color: #fff;
   font-weight: 800;
   font-size: 13px;
@@ -628,6 +650,117 @@
   padding: 8px 12px;
   border-radius: 10px;
   cursor: pointer;
-  transition: background .2s ease;
 }
 .botonCancelar:hover { background: #f8fafc; }
+
+/* ===== THEME VARS (usadas por pulso/gradientes) ===== */
+:root {
+  --accent: #9d9eff;   /* indigo-500 */
+  --accent-2: #3791e6; /* green-500 */
+  --accentSubir1:#2729a7;  
+  --accentSubir2:#4fd656;  
+  --accentIr1:#5557ec;  
+  --accentIr2:#e47ae7;  
+  --overdue: #f05959;  /* red-500 */
+  --soon: #f59e0b;     /* amber-500 */
+  --ok: #16a34a;       /* green-600 */
+}
+
+/* ===== Resumen superior: progreso + CTA ===== */
+.summaryBox {
+  min-width: 280px;
+  display: grid;
+  gap: 8px;
+  align-items: start;
+  justify-items: end;
+}
+.progressWrap {
+  width: 260px;
+  height: 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.progressBar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transition: width .3s ease;
+}
+.progressMeta {
+  display: flex;
+  gap: 10px;
+  font-size: 18px;
+  color: #475569;
+}
+.summaryActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* ===== Leyenda rápida ===== */
+.legend {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-size: 12px;
+  color: #64748b;
+  margin: 10px 0 6px 0;
+}
+.legendDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-right: 6px;
+  border: 2px solid currentColor;
+}
+.legendNow { color: var(--accent); background: #eef2ff; }
+.legendSoon { color: var(--soon); background: #ffedd5; }
+.legendOverdue { color: var(--overdue); background: #fee2e2; }
+.legendDone { color: var(--ok); background: #dcfce7; }
+
+
+/* Fila con slot fijo para el botón y la barra */
+.progressRow {
+  display: grid;
+  grid-template-columns: 180px 1fr; /* slot fijo + barra flexible */
+  align-items: center;
+  gap: 12px;
+}
+
+/* El contenedor del botón ocupa el slot fijo */
+.planSlot {
+  width: 100%;
+}
+
+/* Botón con altura mínima homogénea */
+.btnPlanInline {
+  min-height: 16px;
+  width: 100%;            /* llena el slot para que todas midan igual */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  margin-left: -50px;
+}
+
+/* Placeholder invisible que conserva el espacio del botón cuando no hay enlace */
+.btnPlaceholder {
+  visibility: hidden;     /* ocupa espacio pero no se ve */
+}
+
+/* Responsive: en móvil, que el botón pase arriba y la barra abajo */
+@media (max-width: 640px) {
+  .progressRow {
+    grid-template-columns: 1fr; /* apila */
+  }
+  .btnPlanInline,
+  .btnPlaceholder,
+  .planSlot {
+    width: 100%;
+  }
+}

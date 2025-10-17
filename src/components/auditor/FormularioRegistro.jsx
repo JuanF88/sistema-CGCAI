@@ -153,7 +153,12 @@ export default function FormularioRegistro({ usuario, auditoria }) {
   }
 
 // Campos que NO deben ir en mayúsculas
-const EXCLUDE_UPPERCASE = new Set(['auditores_acompanantes'])
+const EXCLUDE_UPPERCASE = new Set([
+ 'auditores_acompanantes',
+ 'asistencia_tipo',
+'fecha_auditoria',
+'fecha_seguimiento'
+])
 
 const handleChange = (e) => {
   const { name, value } = e.target
@@ -405,9 +410,6 @@ const handleNoConformidadChange = (index, field, value) => {
             {errores.auditores_acompanantes && <p className={styles.errorTexto}>{errores.auditores_acompanantes}</p>}
           </div>
         </div>
-
-
-
 
         <div className={styles.tarjetaCampo}>
           <label className={styles.etiqueta} htmlFor="objetivo">Objetivo de la auditoría</label>

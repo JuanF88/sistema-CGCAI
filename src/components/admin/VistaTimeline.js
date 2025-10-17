@@ -299,7 +299,7 @@ export default function AuditoriasVerificacionAdmin() {
         explicitDone: Boolean(selected.plan?.url || selected.plan?.enviado_at),
         subtitle: selected.plan?.enviado_at ? `Enviado el ${fmt(new Date(selected.plan.enviado_at))}` : 'Programar y enviar (5 días antes).',
         actions: selected.plan?.url ? [
-          { label: 'Ver plan', onClick: () => openInNewTab(selected.plan.url), ghost: true }
+          { label: 'Ver plan', onClick: () => openInNewTab(selected.plan.url)}
         ] : []
       },
       {
@@ -321,7 +321,7 @@ export default function AuditoriasVerificacionAdmin() {
         explicitDone: hasValidated,
         subtitle: 'Validación del informe (plazo +10 días).',
         actions: hasValidated ? [
-          { label: 'Descargar informe validado', onClick: () => openInNewTab(selected.validated.url) }
+          { label: 'Ver informe validado', onClick: () => openInNewTab(selected.validated.url) }
         ] : []
       },
       {

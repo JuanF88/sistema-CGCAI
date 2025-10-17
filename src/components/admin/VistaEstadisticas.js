@@ -1,85 +1,97 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, Legend
+  ResponsiveContainer, PieChart, Pie, Cell, Legend,
+  AreaChart, Area
 } from 'recharts'
 import { Check, ChevronDown } from 'lucide-react'
 import * as SelectPrimitive from '@radix-ui/react-select'
+import styles from './VistaEstadisticas.module.css'
 
-const COLORS = ['#dd6bd7ff', '#8c28ffff', '#700158ff']
+// Paleta coherente (brand + semáforos)
+const BRAND = '#4a47e2ff'        // purple-600
+const GREEN = '#55d187ff'        // fortalezas
+const AMBER = '#ece13fff'        // oportunidades
+const RED   = '#e41818ff'        // no conformidades
+const PIE_COLORS = [GREEN, AMBER, RED]
 
 const cn = (...classes) => classes.filter(Boolean).join(' ')
 
-// -------------------- UI --------------------
-const Card = ({ children }) => (
-  <div className="bg-white shadow-md rounded-2xl p-4 border border-gray-200">
-    {children}
-  </div>
-)
+// helpers (arriba del componente)
+const toNum = (v) => Number(v) || 0
+const norm = (s) => String(s ?? '').trim().toLowerCase()
 
-const CardContent = ({ children, className = '' }) => (
-  <div className={`p-2 ${className}`}>{children}</div>
-)
-
-const Label = ({ children, className = '' }) => (
-  <label className={cn('text-sm font-medium leading-none', className)}>{children}</label>
-)
-
-const Button = ({ children, className = '', variant = 'default', ...props }) => {
-  const baseStyle =
-    'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none'
-  const variants = {
-    default: 'bg-purple-600 text-white hover:bg-purple-700',
-    outline: 'border border-gray-300 text-gray-800 hover:bg-gray-100',
-  }
-  return (
-    <button className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>
-      {children}
-    </button>
-  )
+const normalizeTipo = (t) => {
+  const k = norm(t)
+  if (k.startsWith('fort')) return 'Fortaleza'
+  if (k.startsWith('oport')) return 'Oportunidad de Mejora'
+  if (k.startsWith('no con')) return 'No Conformidad'
+  return 'OTRO'
 }
 
+// -------------------- Mini-UI --------------------
+const Card = ({ children, className = '' }) => (
+  <div className={cn(styles.card, className)}>{children}</div>
+)
+const CardHeader = ({ title, subtitle, right }) => (
+  <div className={styles.cardHeader}>
+    <div>
+      <h3 className={styles.cardTitle}>{title}</h3>
+      {subtitle && <p className={styles.cardSubtitle}>{subtitle}</p>}
+    </div>
+    {right}
+  </div>
+)
+const CardContent = ({ children, className = '' }) => (
+  <div className={cn(styles.cardContent, className)}>{children}</div>
+)
+const KPI = ({ label, value, accent = 'default' }) => (
+  <div className={cn(styles.kpi, styles[`kpi_${accent}`])}>
+    <p className={styles.kpiLabel}>{label}</p>
+    <p className={styles.kpiValue}>{value}</p>
+  </div>
+)
+const Button = ({ children, className = '', variant = 'default', ...props }) => (
+  <button
+    className={cn(styles.btn, styles[`btn_${variant}`], className)}
+    {...props}
+  >{children}</button>
+)
+
+// -------------------- Radix Select wrappers --------------------
 const Select = SelectPrimitive.Root
 const SelectValue = SelectPrimitive.Value
-const SelectTrigger = SelectPrimitive.Trigger
+const SelectTrigger = ({ className = '', children, ...props }) => (
+  <SelectPrimitive.Trigger className={cn(styles.selectTrigger, className)} {...props}>
+    {children}
+  </SelectPrimitive.Trigger>
+)
 const SelectContent = ({ children, className = '', ...props }) => (
   <SelectPrimitive.Portal>
-    <SelectPrimitive.Content
-      sideOffset={4}
-      className={cn(
-        'z-[9999] min-w-[10rem] rounded-md border border-gray-300 bg-white shadow-md text-sm text-gray-900',
-        'focus:outline-none',
-        className
-      )}
-      {...props}
-    >
-      <SelectPrimitive.Viewport className="p-1">
+    <SelectPrimitive.Content sideOffset={4} className={cn(styles.selectContent, className)} {...props}>
+      <SelectPrimitive.Viewport className={styles.selectViewport}>
         {children}
       </SelectPrimitive.Viewport>
     </SelectPrimitive.Content>
   </SelectPrimitive.Portal>
 )
-
 const SelectItem = ({ children, value }) => (
-  <SelectPrimitive.Item
-    value={value}
-    className="cursor-pointer select-none px-3 py-2 rounded-sm hover:bg-purple-100 focus:bg-purple-100 focus:outline-none"
-  >
+  <SelectPrimitive.Item value={value} className={styles.selectItem}>
     <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
-    <SelectPrimitive.ItemIndicator className="absolute right-2">
+    <SelectPrimitive.ItemIndicator className={styles.selectIndicator}>
       <Check className="h-4 w-4 text-purple-600" />
     </SelectPrimitive.ItemIndicator>
   </SelectPrimitive.Item>
 )
 
-// -------------------- PAGE --------------------
+// -------------------- Página --------------------
 export default function VistaEstadisticas() {
   // Dataset unificado recomendado desde la API: [{ anio, dependencia, tipo, cantidad }]
   const [detalle, setDetalle] = useState([])
 
-  // También admitimos datasets “viejos” para backwards-compat
+  // Back-compat con datasets antiguos
   const [dataResumen, setDataResumen] = useState([]) // resumenPorDependencia
   const [porTipo, setPorTipo] = useState([])         // resumenPorTipo
 
@@ -88,307 +100,346 @@ export default function VistaEstadisticas() {
   const [filtroTipo, setFiltroTipo] = useState('todos')
   const [aniosDisponibles, setAniosDisponibles] = useState([])
   const [dependenciasDisponibles, setDependenciasDisponibles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const s = (v) => (v == null ? '' : String(v))
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true)
+      setError('')
       try {
         const res = await fetch('/api/estadisticas')
         if (!res.ok) throw new Error('Error en la API')
-
         const json = await res.json()
         const {
-          detalle: detalleApi = [],               // 👈 preferido
+          detalle: detalleApi = [],
           resumenPorDependencia = [],
           resumenPorTipo = [],
           anios = [],
           dependencias = []
         } = json
 
-        // Guardamos datasets crudos
         setDetalle(Array.isArray(detalleApi) ? detalleApi : [])
         setDataResumen(resumenPorDependencia ?? [])
         setPorTipo(resumenPorTipo ?? [])
-
-        // Catálogos
         setAniosDisponibles(anios ?? [])
         setDependenciasDisponibles(dependencias ?? [])
-
-        // Degradación si la API aún no envía `detalle`
-        if ((!detalleApi || !detalleApi.length) && (resumenPorDependencia.length || resumenPorTipo.length)) {
-          console.warn(
-            '[VistaEstadisticas] La API no envió `detalle`. ' +
-            'Los filtros por (año/dependencia/tipo) no afectarán ambas gráficas al 100%. ' +
-            'Recomendado: enviar `detalle: [{ anio, dependencia, tipo, cantidad }]`.'
-          )
-        }
-      } catch (error) {
-        console.error('Error cargando estadísticas:', error)
+      } catch (e) {
+        console.error(e)
+        setError('No se pudieron cargar las estadísticas.')
+      } finally {
+        setLoading(false)
       }
     }
-
     fetchData()
   }, [])
 
-  // -------------------- FILTRADO UNIFICADO --------------------
-  // Preferimos `detalle`. Si no existe, intentamos construir algo aproximado:
-  const detalleBase = (() => {
+  // -------------------- Filtrado unificado --------------------
+  const detalleBase = useMemo(() => {
     if (detalle.length) return detalle
 
-    // Fallback 1: si `resumenPorTipo` tiene anio/dep/tipo, úsalo
+    // Fallback: intenta derivar del porTipo si trae campos suficientes
     const tieneCampos = porTipo.some(i => 'tipo' in i && 'cantidad' in i && ('anio' in i || 'dependencia' in i))
     if (tieneCampos) return porTipo.map(i => ({
       anio: i.anio ?? null,
       dependencia: i.dependencia ?? null,
-      tipo: i.tipo ?? 'SIN_TIPO',
-      cantidad: i.cantidad ?? 0,
+      tipo: normalizeTipo(i.tipo),
+      cantidad: toNum(i.cantidad),
     }))
-
-    // Fallback 2: último recurso: compón con lo que hay (pierdes granularidad)
-    // - Si solo hay `resumenPorTipo`, no hay forma de aplicar año/dep de forma correcta.
-    // - Si solo hay `resumenPorDependencia`, no hay `tipo` para el pie.
-    // Creamos dataset vacío para no romper la UI.
     return []
-  })()
+  }, [detalle, porTipo])
 
-  // Aplica TODOS los filtros
-  const detalleFiltrado = detalleBase.filter(item => {
-    const okAnio = filtroAnio === 'todos' || s(item.anio) === s(filtroAnio)
-    const okDep = filtroDependencia === 'todas' || s(item.dependencia) === s(filtroDependencia)
-    const okTipo = filtroTipo === 'todos' || s(item.tipo) === s(filtroTipo)
-    return okAnio && okDep && okTipo
-  })
+  const detalleFiltrado = useMemo(() => {
+    return detalleBase.filter(item => {
+      const okAnio = filtroAnio === 'todos' || s(item.anio) === s(filtroAnio)
+      const okDep  = filtroDependencia === 'todas' || s(item.dependencia) === s(filtroDependencia)
+      const okTipo = filtroTipo === 'todos' || s(item.tipo) === s(filtroTipo)
+      return okAnio && okDep && okTipo
+    })
+  }, [detalleBase, filtroAnio, filtroDependencia, filtroTipo])
 
-  // Agrupar por dependencia para la BARRA
-  const dataBar = (() => {
-    // Si no hay `detalle`, degradamos a `dataResumen` con filtros parciales (año/dep)
+  // --------- BARRAS (por dependencia) ---------
+  const dataBar = useMemo(() => {
     if (!detalleBase.length) {
+      // Degradación: aplica solo filtros disponibles sobre el resumen
       return dataResumen.filter(item => {
         const okAnio = filtroAnio === 'todos' || s(item.anio) === s(filtroAnio)
-        const okDep = filtroDependencia === 'todas' || s(item.dependencia) === s(filtroDependencia)
+        const okDep  = filtroDependencia === 'todas' || s(item.dependencia) === s(filtroDependencia)
         return okAnio && okDep
       })
     }
-
     const map = new Map()
     for (const it of detalleFiltrado) {
-      const key = s(it.dependencia) || 'SIN_DEP'
-      const prev = map.get(key) || 0
-      map.set(key, prev + (it.cantidad || 0))
+ const key = s(it.dependencia) || 'SIN_DEP'
+ map.set(key, (map.get(key) || 0) + toNum(it.cantidad))
     }
     return Array.from(map, ([dependencia, cantidad]) => ({ dependencia, cantidad }))
-  })()
+  }, [detalleBase, detalleFiltrado, dataResumen, filtroAnio, filtroDependencia])
 
-  // Agrupar por tipo para el PIE
-  const porTipoGrafico = (() => {
+  // --------- PIE (por tipo) ---------
+  const porTipoGrafico = useMemo(() => {
     if (!detalleBase.length) {
-      // Degradación: usa `porTipo` filtrando solo por tipo (si `anio/dep` no existen, no hay como aplicar)
-      const base = porTipo.filter(i =>
-        filtroTipo === 'todos' ? true : s(i.tipo) === s(filtroTipo)
-      )
+      const base = porTipo.filter(i => (filtroTipo === 'todos' ? true : s(i.tipo) === s(filtroTipo)))
       const map = new Map()
       for (const it of base) {
         const key = s(it.tipo) || 'SIN_TIPO'
-        const prev = map.get(key) || 0
-        map.set(key, prev + (it.cantidad || 0))
+        map.set(key, (map.get(key) || 0) + (it.cantidad || 0))
       }
       return Array.from(map, ([tipo, cantidad]) => ({ tipo, cantidad }))
     }
-
     const map = new Map()
     for (const it of detalleFiltrado) {
-      const key = s(it.tipo) || 'SIN_TIPO'
-      const prev = map.get(key) || 0
-      map.set(key, prev + (it.cantidad || 0))
+ const key = normalizeTipo(it.tipo)
+ map.set(key, (map.get(key) || 0) + toNum(it.cantidad))
     }
     return Array.from(map, ([tipo, cantidad]) => ({ tipo, cantidad }))
-  })()
+  }, [detalleBase, detalleFiltrado, porTipo, filtroTipo])
 
-  // Totales (desde el mismo origen del pie, para coherencia)
+  // --------- TIMELINE (stacked áreas por año) ---------
+  // Ignoramos el filtro de tipo para mostrar SIEMPRE las 3 categorías simultáneamente.
+  const dataTimeline = useMemo(() => {
+    const base = detalleBase.filter(it => {
+      const okAnio = filtroAnio === 'todos' || s(it.anio) === s(filtroAnio)
+      const okDep  = filtroDependencia === 'todas' || s(it.dependencia) === s(filtroDependencia)
+      return okAnio && okDep
+    })
+    const map = new Map() // anio => { Fortaleza, Oportunidad de Mejora, No Conformidad }
+    for (const it of base) {
+      const year = s(it.anio) || 'SIN_AÑO'
+      if (!map.has(year)) map.set(year, { anio: year, Fortaleza: 0, 'Oportunidad de Mejora': 0, 'No Conformidad': 0 })
+      const row = map.get(year)
+ const t = normalizeTipo(it.tipo)
+ if (t === 'Fortaleza') row.Fortaleza += toNum(it.cantidad)
+ else if (t === 'Oportunidad de Mejora') row['Oportunidad de Mejora'] += toNum(it.cantidad)
+ else if (t === 'No Conformidad') row['No Conformidad'] += toNum(it.cantidad)
+    }
+    const arr = Array.from(map.values())
+    // Ordenar por año ascendente si es numérico
+    arr.sort((a, b) => Number(a.anio) - Number(b.anio))
+    return arr
+  }, [detalleBase, filtroAnio, filtroDependencia])
+
+  // --------- Totales y catálogos ---------
   const totalHallazgos = porTipoGrafico.reduce((sum, i) => sum + i.cantidad, 0)
   const findTotal = (k) => porTipoGrafico.find(i => i.tipo === k)?.cantidad ?? 0
   const totalFortalezas = findTotal('Fortaleza')
   const totalOportunidades = findTotal('Oportunidad de Mejora')
   const totalNoConformidades = findTotal('No Conformidad')
 
-  // Tipos disponibles (únicos)
   const tiposDisponibles = Array.from(new Set(
     (detalleBase.length ? detalleBase : porTipo).map(p => p.tipo).filter(Boolean)
   ))
 
+  // --------- Interacción: ocultar series en timeline ---------
+  const [hidden, setHidden] = useState({ Fortaleza: false, 'Oportunidad de Mejora': false, 'No Conformidad': false })
+  const toggleSeries = (key) => setHidden(prev => ({ ...prev, [key]: !prev[key] }))
+
+  // --------- Loading / Error ---------
+  if (loading) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.skeletonHeader} />
+        <div className={styles.skeletonGrid} />
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div className={styles.page}>
+        <Card>
+          <CardHeader title="Estadísticas de Hallazgos" subtitle="" />
+          <CardContent>
+            <p className={styles.error}>{error}</p>
+            <Button variant="outline" onClick={() => location.reload()}>Reintentar</Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-800">Estadísticas de Hallazgos</h2>
+    <div className={styles.page}>
+      {/* HEADER */}
+      <div className={styles.headerRow}>
+        <div>
+          <h2 className={styles.title}>Estadísticas de Hallazgos</h2>
+          <p className={styles.subtitle}>Panel interactivo por año, dependencia y tipo</p>
+        </div>
 
-      {/* RESUMEN GENERAL */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-purple-100 text-purple-800 p-4 rounded-xl shadow-sm">
-          <p className="text-xs uppercase font-semibold">Total Hallazgos</p>
-          <p className="text-2xl font-bold">{totalHallazgos}</p>
-        </div>
-        <div className="bg-green-100 text-green-800 p-4 rounded-xl shadow-sm">
-          <p className="text-xs uppercase font-semibold">Fortalezas</p>
-          <p className="text-2xl font-bold">{totalFortalezas}</p>
-        </div>
-        <div className="bg-yellow-100 text-yellow-800 p-4 rounded-xl shadow-sm">
-          <p className="text-xs uppercase font-semibold">Oportunidades de mejora</p>
-          <p className="text-2xl font-bold">{totalOportunidades}</p>
-        </div>
-        <div className="bg-red-100 text-red-800 p-4 rounded-xl shadow-sm">
-          <p className="text-xs uppercase font-semibold">No conformidades</p>
-          <p className="text-2xl font-bold">{totalNoConformidades}</p>
-        </div>
-        <div className="bg-blue-100 text-blue-800 p-4 rounded-xl shadow-sm">
-          <p className="text-xs uppercase font-semibold">Dependencias</p>
-          <p className="text-2xl font-bold">{dependenciasDisponibles.length}</p>
+        {/* Filtros principales */}
+        <div className={styles.filters}>
+          {/* Año */}
+          <div className={styles.filterItem}>
+            <label className={styles.filterLabel}>Año</label>
+            <Select value={filtroAnio} onValueChange={setFiltroAnio}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona un año" />
+                <ChevronDown className={styles.chevron} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                {aniosDisponibles.map(anio => (
+                  <SelectItem key={String(anio)} value={String(anio)}>{anio}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Dependencia */}
+          <div className={styles.filterItem}>
+            <label className={styles.filterLabel}>Dependencia</label>
+            <Select value={filtroDependencia} onValueChange={setFiltroDependencia}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona una dependencia" />
+                <ChevronDown className={styles.chevron} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas</SelectItem>
+                {dependenciasDisponibles.map(dep => (
+                  <SelectItem key={String(dep)} value={String(dep)}>{dep}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Tipo */}
+          <div className={styles.filterItem}>
+            <label className={styles.filterLabel}>Tipo de hallazgo</label>
+            <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona un tipo" />
+                <ChevronDown className={styles.chevron} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                {tiposDisponibles.map(tipo => (
+                  <SelectItem key={String(tipo)} value={String(tipo)}>{tipo}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {(filtroAnio !== 'todos' || filtroDependencia !== 'todas' || filtroTipo !== 'todos') && (
+            <Button
+              variant="outline"
+              onClick={() => { setFiltroAnio('todos'); setFiltroDependencia('todas'); setFiltroTipo('todos') }}
+            >Limpiar</Button>
+          )}
         </div>
       </div>
 
-      {/* FILTROS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-        {/* AÑO */}
-        <div className="space-y-1">
-          <Label>Año</Label>
-          <Select onValueChange={setFiltroAnio} value={filtroAnio}>
-            <SelectTrigger className="w-full bg-white border shadow-sm px-3 py-2 rounded-md">
-              <SelectValue placeholder="Selecciona un año" />
-              <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
-            </SelectTrigger>
-            <SelectContent className="w-[--radix-select-trigger-width]">
-              <SelectItem value="todos">Todos</SelectItem>
-              {aniosDisponibles.map(anio => (
-                <SelectItem key={String(anio)} value={String(anio)}>{anio}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* DEPENDENCIA */}
-        <div className="space-y-1">
-          <Label>Dependencia</Label>
-          <Select onValueChange={setFiltroDependencia} value={filtroDependencia}>
-            <SelectTrigger className="w-full bg-white border shadow-sm px-3 py-2 rounded-md">
-              <SelectValue placeholder="Selecciona una dependencia" />
-              <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
-            </SelectTrigger>
-            <SelectContent className="w-[--radix-select-trigger-width]">
-              <SelectItem value="todas">Todas</SelectItem>
-              {dependenciasDisponibles.map(dep => (
-                <SelectItem key={String(dep)} value={String(dep)}>{dep}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* TIPO */}
-        <div className="space-y-1">
-          <Label>Tipo de hallazgo</Label>
-          <Select onValueChange={setFiltroTipo} value={filtroTipo}>
-            <SelectTrigger className="w-full bg-white border shadow-sm px-3 py-2 rounded-md">
-              <SelectValue placeholder="Selecciona un tipo" />
-              <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
-            </SelectTrigger>
-            <SelectContent className="w-[--radix-select-trigger-width]">
-              <SelectItem value="todos">Todos</SelectItem>
-              {tiposDisponibles.map(tipo => (
-                <SelectItem key={String(tipo)} value={String(tipo)}>{tipo}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* LIMPIAR */}
-        {(filtroAnio !== 'todos' || filtroDependencia !== 'todas' || filtroTipo !== 'todos') && (
-          <Button
-            variant="outline"
-            className="w-full sm:w-fit mt-2"
-            onClick={() => {
-              setFiltroAnio('todos')
-              setFiltroDependencia('todas')
-              setFiltroTipo('todos')
-            }}
-          >
-            Limpiar filtros
-          </Button>
-        )}
+      {/* KPIs */}
+      <div className={styles.kpiRow}>
+        <KPI label="Total Hallazgos" value={totalHallazgos} accent="brand" />
+        <KPI label="Fortalezas" value={totalFortalezas} accent="green" />
+        <KPI label="Oportunidades de Mejora" value={totalOportunidades} accent="amber" />
+        <KPI label="No Conformidades" value={totalNoConformidades} accent="red" />
+        <KPI label="Dependencias" value={dependenciasDisponibles.length}/>
       </div>
 
-      {/* GRÁFICAS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Gráficas */}
+      <div className={styles.gridCharts}>
         {/* Barras por dependencia */}
         <Card>
-          <CardContent className="h-80 pt-6">
-            <h3 className="font-semibold text-lg text-center mb-2">Hallazgos por dependencia</h3>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dataBar}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="dependencia" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="cantidad" fill="#6a0c81ff" />
-              </BarChart>
-            </ResponsiveContainer>
+          <CardHeader
+            title="Hallazgos por dependencia"
+            subtitle={filtroAnio === 'todos' ? 'Todos los años' : `Año ${filtroAnio}`}
+          />
+          <CardContent className={styles.chartBox}>
+            {dataBar.length ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dataBar} margin={{ top: 6, right: 12, bottom: 6, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="dependencia" tick={{ fontSize: 0 }} interval={0} angle={-25} textAnchor="end" height={8} />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip wrapperStyle={{ outline: 'none' }} />
+                  <Bar dataKey="cantidad" fill={BRAND} radius={[6,6,0,0]} isAnimationActive />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className={styles.empty}>No hay datos para esta combinación de filtros.</div>
+            )}
           </CardContent>
         </Card>
 
         {/* Pie por tipo */}
         <Card>
-          <CardContent className="h-80 pt-6">
-            <h3 className="font-semibold text-lg text-center mb-2">Distribución por tipo</h3>
-
-            <div className="flex justify-end mb-2 text-sm text-gray-500">
-              Total hallazgos: <span className="font-semibold ml-1">{totalHallazgos}</span>
-            </div>
-
-            {porTipoGrafico.length > 0 ? (
+          <CardHeader
+            title="Distribución por tipo"
+            subtitle={`Total: ${totalHallazgos}`}
+          />
+          <CardContent className={styles.chartBox}>
+            {porTipoGrafico.length ? (
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart
-                  margin={{ top: 10, right: 100, bottom: 80, left: 8 }}  // 👈 deja espacio para la leyenda
-                >
-                  <Pie
-                    data={porTipoGrafico}
-                    dataKey="cantidad"
-                    nameKey="tipo"
-                    cx="45%"          // 👈 corre el pie un poco a la izquierda
-                    cy="50%"
-                    outerRadius={100}  // 👈 un poco más chico para que no se solape
-                  >
-                    {porTipoGrafico.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <PieChart margin={{ top: 12, right: 12, bottom: 12, left: 12 }}>
+                  <Pie data={porTipoGrafico} dataKey="cantidad" nameKey="tipo" cx="50%" cy="50%" outerRadius={96}>
+                    {porTipoGrafico.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
-
-                  {/* Tooltip: tipo + valor + % */}
                   <Tooltip
                     formatter={(value, _name, { payload }) => {
-                      const tipo = payload?.tipo ?? payload?.name ?? 'Tipo'
-                      const pct =
-                        payload?.percent != null ? ` (${(payload.percent * 100).toFixed(0)}%)` : ''
-                      return [`${value}${pct}`, tipo]
+                      const pct = payload?.percent != null ? ` (${(payload.percent * 100).toFixed(0)}%)` : ''
+                      return [`${value}${pct}`, payload?.tipo || 'Tipo']
                     }}
                     wrapperStyle={{ outline: 'none' }}
                   />
-
-                  {/* 👇 Leyenda DENTRO del chart, a la derecha */}
-                  <Legend
-                    layout="vertical"
-                    verticalAlign="middle"
-                    align="right"
-                    iconType="circle"
-                    wrapperStyle={{ right: 12 }}   // ajusta si quieres más/menos margen
-                  />
+                  <Legend verticalAlign="bottom" height={24} iconType="circle" />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-center text-gray-500 mt-6">
-                No hay datos para esta combinación de filtros.
-              </p>
+              <div className={styles.empty}>No hay datos para esta combinación de filtros.</div>
             )}
           </CardContent>
         </Card>
-
       </div>
+
+      {/* Timeline stacked por año */}
+      <Card>
+        <CardHeader
+          title="Evolución anual por tipo"
+          subtitle={filtroDependencia === 'todas' ? 'Todas las dependencias' : `Dependencia: ${filtroDependencia}`}
+          right={(
+            <div className={styles.legendToggles}>
+              {[
+                { k: 'Fortaleza', c: GREEN },
+                { k: 'Oportunidad de Mejora', c: AMBER },
+                { k: 'No Conformidad', c: RED },
+              ].map(({ k, c }) => (
+                <button key={k} className={cn(styles.legendBtn, hidden[k] && styles.legendBtn_off)} onClick={() => toggleSeries(k)}>
+                  <span className={styles.legendDot} style={{ backgroundColor: c }} />
+                  {k}
+                </button>
+              ))}
+            </div>
+          )}
+        />
+        <CardContent className={styles.chartBoxTall}>
+          {dataTimeline.length ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={dataTimeline} margin={{ top: 8, right: 18, bottom: 8, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="anio" tick={{ fontSize: 12 }} />
+                <YAxis allowDecimals={false} />
+                <Tooltip wrapperStyle={{ outline: 'none' }} />
+                {!hidden['Fortaleza'] && (
+                  <Area type="monotone" dataKey="Fortaleza" stroke={GREEN} fill={GREEN} fillOpacity={0.18} strokeWidth={2} />
+                )}
+                {!hidden['Oportunidad de Mejora'] && (
+                  <Area type="monotone" dataKey="Oportunidad de Mejora" stroke={AMBER} fill={AMBER} fillOpacity={0.18} strokeWidth={2} />
+                )}
+                {!hidden['No Conformidad'] && (
+                  <Area type="monotone" dataKey="No Conformidad" stroke={RED} fill={RED} fillOpacity={0.18} strokeWidth={2} />
+                )}
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className={styles.empty}>No hay datos para construir la línea de tiempo.</div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
