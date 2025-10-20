@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
 
 .dashboardContainer {
   display: flex;
@@ -10,7 +9,7 @@
   top: 0;
   left: 0;
   height: 100vh;
-  width: 18rem;
+  width: 20rem;
   background-color: #002b9e; /* color de respaldo si la imagen no carga */
   color: white;
   display: flex;

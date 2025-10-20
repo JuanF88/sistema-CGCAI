@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import styles from '@/components/admin/auditoriasTimeline.module.css'
+import styles from '@/components/admin/CSS/auditoriasTimeline.module.css'
 import { generarInformeAuditoria } from '@/components/auditor/Utilidades/generarInformeAuditoria.jsx'
 import { generarPlanMejora2 } from '@/components/auditor/Utilidades/generarPlanMejora2.xpp'
 import { toast } from 'react-toastify'

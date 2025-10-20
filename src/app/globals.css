@@ -1,7 +1,6 @@
 /* globals.css */
 
-/* Si estás en Tailwind v4 puedes usar solo la primera línea.
-   Si estás en v3, deja las tres @tailwind. */
+/* Tailwind v4 */
 @import "tailwindcss";
 @tailwind base;
 @tailwind components;
@@ -9,8 +8,9 @@
 
 /* ===== Baseline consistente ===== */
 html {
-  font-size: 16px;              /* rem consistente */
+  font-size: 16px !important;        /* fija el rem a 16px */
   -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -19,43 +19,30 @@ html {
 :root {
   --background: #ffffff00;
   --foreground: #171717;
-  /* La familia real viene del next/font (variable --font-poppins) */
-  --font-poppins: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-poppins: var(--font-poppins, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif);
+  --sidebar-w: 320px;                /* 👈 NUEVO: ancho fijo para la sidebar */
 }
 
-/* Tailwind theme inline (si lo usas) */
+/* Tailwind theme inline */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-poppins); /* usa Poppins como sans por defecto */
+  --font-sans: var(--font-poppins);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root { --foreground: #ffffff; }
-
-  input,
-  textarea,
-  select {
-    background-color: #1a1a1a;
-    color: #ffffff;
-  }
+  input, textarea, select { background-color: #1a1a1a; color: #ffffff; }
 }
 
-/* Utilities de animación (tu configuración) */
+/* Animaciones */
 @layer utilities {
   .animate-slide-in-left { animation: slideInLeft 0.5s ease-out; }
   .animate-fade-in { animation: fadeIn 0.4s ease-out; }
 
-  @keyframes slideInLeft {
-    0% { opacity: 0; transform: translateX(-20px); }
-    100% { opacity: 1; transform: translateX(0); }
-  }
-
-  @keyframes fadeIn {
-    0% { opacity: 0; transform: scale(0.95); }
-    100% { opacity: 1; transform: scale(1); }
-  }
+  @keyframes slideInLeft { 0%{opacity:0;transform:translateX(-20px);} 100%{opacity:1;transform:translateX(0);} }
+  @keyframes fadeIn { 0%{opacity:0;transform:scale(0.95);} 100%{opacity:1;transform:scale(1);} }
 }
 
 @layer utilities {
@@ -65,18 +52,16 @@ html {
   .boton-cerrar { @apply absolute top-2 right-2 text-red-500 hover:text-red-700 text-lg; }
 }
 
-/* Usa la fuente de next/font en el body */
+/* Fuente aplicada globalmente (usa la var que inyecta next/font) */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-poppins); /* << antes aquí tenías Arial */
+  font-family: var(--font-poppins);
   line-height: 1.5;
 }
 
-/* Inputs claros por defecto (lo mantengo como pusiste) */
-input,
-textarea,
-select {
+/* Inputs claros por defecto */
+input, textarea, select {
   color: #171717;
   background-color: #ffffff;
 }

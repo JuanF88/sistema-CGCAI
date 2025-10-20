@@ -18,7 +18,6 @@ import VistaAdministrarDependencias from '@/components/admin/VistaAdministrarDep
 import VistaAdministrarHallazgos from '@/components/admin/VistaAdministrarHallazgos'
 import VistaEstadisticas from '@/components/admin/VistaEstadisticas'
 
-
 export default function AdminDashboard() {
   const router = useRouter()
   const [usuario, setUsuario] = useState(null)
