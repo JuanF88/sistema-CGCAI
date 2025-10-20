@@ -9,8 +9,7 @@ import { BarChart } from 'lucide-react'
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Analytics } from "@vercel/analytics/next"
 
-import styles from '@/components/CSS/AdminDashboard.module.css'
-
+import styles from '@/components/admin/CSS/AdminDashboard.module.css'
 
 import VistaTimeline from '@/components/admin/VistaTimeline'
 import VistaInformesAdmin from '@/components/admin/VistaInformesAdmin'
