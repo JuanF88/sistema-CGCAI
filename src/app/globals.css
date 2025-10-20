@@ -1,5 +1,3 @@
-/* globals.css */
-
 /* Tailwind v4 */
 @import "tailwindcss";
 @tailwind base;
@@ -8,26 +6,26 @@
 
 /* ===== Baseline consistente ===== */
 html {
-  font-size: 16px !important;        /* fija el rem a 16px */
+  font-size: 16px !important;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
 
-/* Colores y fuente base */
+/* Colores y fuente base (⚠️ NO sobrescribir --font-poppins) */
 :root {
   --background: #ffffff00;
   --foreground: #171717;
-  --font-poppins: var(--font-poppins, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif);
-  --sidebar-w: 320px;                /* 👈 NUEVO: ancho fijo para la sidebar */
+  --font-sans-fallback: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --sidebar-w: 320px;
 }
 
 /* Tailwind theme inline */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-poppins);
+  --font-sans: var(--font-poppins); /* la define next/font en <html> */
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
@@ -52,11 +50,11 @@ html {
   .boton-cerrar { @apply absolute top-2 right-2 text-red-500 hover:text-red-700 text-lg; }
 }
 
-/* Fuente aplicada globalmente (usa la var que inyecta next/font) */
+/* Usa la var que inyecta next/font, con fallback si faltara */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-poppins);
+  font-family: var(--font-poppins, var(--font-sans-fallback));
   line-height: 1.5;
 }
 
@@ -64,4 +62,10 @@ body {
 input, textarea, select {
   color: #171717;
   background-color: #ffffff;
+}
+
+/* Opcional: evita “bold sintético” que cambia métricas en algunos navegadores */
+html, body {
+  font-synthesis-weight: none;
+  font-synthesis-style: none;
 }
