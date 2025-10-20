@@ -1,94 +1,82 @@
+/* globals.css */
+
+/* Si estás en Tailwind v4 puedes usar solo la primera línea.
+   Si estás en v3, deja las tres @tailwind. */
 @import "tailwindcss";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ===== Baseline consistente ===== */
+html {
+  font-size: 16px;              /* rem consistente */
+  -webkit-text-size-adjust: 100%;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* Colores y fuente base */
 :root {
   --background: #ffffff00;
   --foreground: #171717;
-  font-family: 'Poppins', sans-serif;
+  /* La familia real viene del next/font (variable --font-poppins) */
+  --font-poppins: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
+/* Tailwind theme inline (si lo usas) */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-poppins); /* usa Poppins como sans por defecto */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --foreground: #ffffff;
-  }
+  :root { --foreground: #ffffff; }
 
   input,
   textarea,
   select {
-    background-color: #1a1a1a; /* fondo oscuro si deseas en modo oscuro */
+    background-color: #1a1a1a;
     color: #ffffff;
   }
 }
 
+/* Utilities de animación (tu configuración) */
 @layer utilities {
-  .animate-slide-in-left {
-    animation: slideInLeft 0.5s ease-out;
-  }
-
-  .animate-fade-in {
-    animation: fadeIn 0.4s ease-out;
-  }
+  .animate-slide-in-left { animation: slideInLeft 0.5s ease-out; }
+  .animate-fade-in { animation: fadeIn 0.4s ease-out; }
 
   @keyframes slideInLeft {
-    0% {
-      opacity: 0;
-      transform: translateX(-20px);
-    }
-    100% {
-      opacity: 1;
-      transform: translateX(0);
-    }
+    0% { opacity: 0; transform: translateX(-20px); }
+    100% { opacity: 1; transform: translateX(0); }
   }
 
   @keyframes fadeIn {
-    0% {
-      opacity: 0;
-      transform: scale(0.95);
-    }
-    100% {
-      opacity: 1;
-      transform: scale(1);
-    }
+    0% { opacity: 0; transform: scale(0.95); }
+    100% { opacity: 1; transform: scale(1); }
   }
 }
 
 @layer utilities {
-  .input-estilo {
-    @apply w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition;
-  }
-
-  .boton-hallazgo {
-    @apply text-white px-4 py-2 rounded-lg transition font-semibold;
-  }
-
-  .bloque-hallazgo {
-    @apply p-6 border rounded-2xl shadow-sm space-y-3 relative;
-  }
-
-  .boton-cerrar {
-    @apply absolute top-2 right-2 text-red-500 hover:text-red-700 text-lg;
-  }
+  .input-estilo { @apply w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-400 transition; }
+  .boton-hallazgo { @apply text-white px-4 py-2 rounded-lg transition font-semibold; }
+  .bloque-hallazgo { @apply p-6 border rounded-2xl shadow-sm space-y-3 relative; }
+  .boton-cerrar { @apply absolute top-2 right-2 text-red-500 hover:text-red-700 text-lg; }
 }
 
+/* Usa la fuente de next/font en el body */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-poppins); /* << antes aquí tenías Arial */
+  line-height: 1.5;
 }
 
-/* Corrección específica para todos los inputs/selects */
+/* Inputs claros por defecto (lo mantengo como pusiste) */
 input,
 textarea,
 select {
-  color: #171717; /* texto negro por defecto */
-  background-color: white; /* fondo blanco claro */
+  color: #171717;
+  background-color: #ffffff;
 }
