@@ -44,10 +44,8 @@ export default function AdminDashboard() {
       <aside className={styles.sidebar}>
         <div className={styles.sidebarContent}>
 
-          <img src="avatares/admin.png" alt="Avatar" className={styles.avatar} />
+          <img src="avatares/Silueta.png" alt="Avatar" className={styles.avatar} />
           {usuario && <p className={styles.username}>{usuario.nombre}</p>}
-
-
           <nav className={styles.nav}>
             <button
               onClick={() => {
