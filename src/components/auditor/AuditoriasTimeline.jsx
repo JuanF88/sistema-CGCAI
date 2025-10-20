@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import styles from './auditoriasTimeline.module.css'
 import { generarInformeAuditoria } from '@/components/auditor/Utilidades/generarInformeAuditoria.jsx'
-import { generarPlanMejora } from '@/components/auditor/Utilidades/generarPlanMejora'
 import { generarPlanMejora2 } from '@/components/auditor/Utilidades/generarPlanMejora2.xpp'
 
 function parseYMD(ymd) {
