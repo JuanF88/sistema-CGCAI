@@ -1,6 +1,5 @@
 // @/components/auditor/Utilidades/generarPlanMejora.xpp.js
 import { saveAs } from 'file-saver'
-
 // ===== Utilidades (reusadas/adaptadas) =====
 const toSlugUpper = (s = '') =>
   s.normalize('NFD')
