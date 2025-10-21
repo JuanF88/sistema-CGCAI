@@ -52,7 +52,8 @@ export default function AdminDashboard() {
               }}
               className={`${styles.navButton} ${vista === 'VistaTimeline' ? styles.active : ''}`}
             >
-              <Home size={20} /> <span>Inicio</span>
+              <Home className={styles.navIconSmall} size={18} />
+              <span className={styles.navTextSmall}>Inicio</span>
             </button>
 
 
@@ -74,7 +75,8 @@ export default function AdminDashboard() {
               }}
               className={`${styles.navButton} ${vista === 'crearUsuario' ? styles.active : ''}`}
             >
-              <UserPlus size={18} /> <span>Administrar Usuarios</span>
+
+              <UserPlus  className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Administrar Usuarios</span>
             </button>
 
             <button
@@ -84,7 +86,7 @@ export default function AdminDashboard() {
               }}
               className={`${styles.navButton} ${vista === 'adminDependencia' ? styles.active : ''}`}
             >
-              <Building size={18} /> <span>Administrar Dependencias</span>
+              <Building className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Administrar Dependencia</span>
             </button>
 
             <button
@@ -94,7 +96,7 @@ export default function AdminDashboard() {
               }}
               className={`${styles.navButton} ${vista === 'administrarHallazgos' ? styles.active : ''}`}
             >
-              <Lightbulb size={18} /> <span>Reporte de Hallazgos</span>
+              <Lightbulb className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}> Reporte de Hallazgos</span>
             </button>
 
             <button
@@ -104,7 +106,7 @@ export default function AdminDashboard() {
               }}
               className={`${styles.navButton} ${vista === 'estadisticas' ? styles.active : ''}`}
             >
-              <BarChart size={18} /> <span>Estadísticas</span>
+              <BarChart className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Estadísticas</span>
             </button>
 
 

@@ -9,7 +9,7 @@
   top: 0;
   left: 0;
   height: 100vh;
-  width: 20rem;
+  width: 18rem;
   background-color: #002b9e; /* color de respaldo si la imagen no carga */
   color: white;
   display: flex;
@@ -135,10 +135,24 @@
 }
 
 .mainContent {
-  margin-left: 20rem; /* coincidir con sidebar */
+  margin-left: 18rem; /* coincidir con sidebar */
   padding: 30px;
   flex: 1;
   background-color: #f9fafb;
   min-height: 100vh;
   overflow-y: auto;
+}
+
+/* tamaño más pequeño solo para algunos labels/íconos */
+.navTextSmall {
+  font-size: 0.9rem;   /* antes probablemente 1rem */
+  line-height: 1.1;
+}
+.navIconSmall {
+  width: 15px;
+  height: 15px;        /* ícono un poco más chico */
+}
+/* (opcional) botón un pelín más compacto */
+.navButtonSmall {
+  padding: 0.6rem 0.9rem;
 }

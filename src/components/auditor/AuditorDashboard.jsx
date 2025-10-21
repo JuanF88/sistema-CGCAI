@@ -118,7 +118,8 @@ export default function AuditorDashboard() {
               }}
               className={`${styles.navButton} ${vista === 'bienvenida' ? styles.active : ''}`}
             >
-              <Home size={20} /> <span>Inicio</span>
+               <Home className={styles.navIconSmall} size={18} />
+              <span className={styles.navTextSmall}>Inicio</span>
             </button>
 
             <button
@@ -128,7 +129,7 @@ export default function AuditorDashboard() {
               }}
               className={`${styles.navButton} ${vista === 'timeline' ? styles.active : ''}`}
             >
-              <ClipboardList size={20} /> <span>Auditoría Interna</span>
+              <ClipboardList className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Auditoría Interna</span>
             </button>
 
             {/* <button
@@ -150,7 +151,7 @@ export default function AuditorDashboard() {
               }}
               className={`${styles.navButton} ${vista === 'caja' ? styles.active : ''}`}
             >
-              <Wrench size={20} /> <span>Caja de Herramientas</span>
+              <Wrench className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Caja de Herramientas</span>
             </button>
           </nav>
         </div>

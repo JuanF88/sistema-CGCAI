@@ -40,11 +40,13 @@
   padding: 2rem;
   border-radius: 1rem;
   max-width: 500px;
-  width: 100%;
+  width: 450px;
+  height: 355px;
   text-align: center;
   box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
   animation: fade-in 0.7s ease-in-out;
   margin-top: 100px;
+
 }
 
 @keyframes fade-in {
@@ -54,16 +56,18 @@
 
 .logoContainer {
   position: absolute;
-  top: -220px; /* mitad de la altura de la imagen, ajústalo si cambias el tamaño */
+  top: -200px; /* mitad de la altura de la imagen, ajústalo si cambias el tamaño */
   left: 50%;
   transform: translateX(-50%);
   border-radius: 50%;
   padding: 0.5rem;
+  width: 130px;
+  height: 130px;
 }
 
 
 .titulo {
-  font-size: 2.5rem;
+  font-size: 2.2rem;
   font-weight: 700;
   color: #002b9e;
   text-shadow: 1px 1px 2px #00000052;
@@ -104,9 +108,9 @@
   display: inline-block; /* 👈 hace que el botón solo ocupe lo necesario */
   background: linear-gradient(90deg, #0043b7, #002b9e);
   color: white;
-  padding: 0.75rem 1.5rem; /* 👈 controlas espacio vertical y horizontal */
+  padding: 0.65rem 1.5rem; /* 👈 controlas espacio vertical y horizontal */
   font-weight: 700;
-  font-size: 1.2rem;
+  font-size: 1rem;
   border: none;
   border-radius: 1rem;
   cursor: pointer;
