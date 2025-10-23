@@ -654,6 +654,7 @@ export default function AuditoriasTimeline({ usuario }) {
                                 <div className={styles.itemBottom}>
                                     <span className={styles.itemDate}>📅 {label}</span>
                                     {a.validated?.url && <span className={styles.badgeMini}>Validado</span>}
+                                    {a.allDone?.url && <span className={styles.badgeMini}>Completado</span>}
                                 </div>
                             </li>
                         )

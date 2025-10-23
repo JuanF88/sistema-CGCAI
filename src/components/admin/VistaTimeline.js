@@ -90,6 +90,62 @@ export default function AuditoriasVerificacionAdmin() {
   const [validateFile, setValidateFile] = useState(null)
   const [uploadingValidation, setUploadingValidation] = useState(false)
 
+  const [editingDate, setEditingDate] = useState(false)
+  const [dateDraft, setDateDraft] = useState('')     // 'YYYY-MM-DD'
+  const [savingDate, setSavingDate] = useState(false)
+  const selected = useMemo(() => auditorias.find(a => a.id === selectedId) || null, [auditorias, selectedId])
+  const isAuditValidated = (a) => Boolean(a?.validated?.url) || a?.validado === true
+
+const beginEditFecha = useCallback(() => {
+  const sel = auditorias.find(a => a.id === selectedId)
+  if (!sel) return
+  if (isAuditValidated(sel)) {
+    toast.info('Esta auditoría ya está validada; no puedes cambiar la fecha.')
+    return
+  }
+  setDateDraft(toYMD(sel.fecha_auditoria))
+  setEditingDate(true)
+}, [auditorias, selectedId])
+
+const cancelEditFecha = useCallback(() => {
+  setEditingDate(false)
+  setDateDraft('')
+}, [])
+
+const saveFechaAuditoria = useCallback(async () => {
+  const sel = auditorias.find(a => a.id === selectedId)
+  if (!sel || !dateDraft) return
+  if (isAuditValidated(sel)) {
+    toast.warning('No se puede actualizar la fecha de una auditoría validada.')
+    setEditingDate(false)
+    return
+  }
+
+  const ymd = toYMD(dateDraft)
+  setSavingDate(true)
+  try {
+    const { error: upErr } = await supabase
+      .from('informes_auditoria')
+      .update({ fecha_auditoria: ymd })
+      .eq('id', sel.id)
+    if (upErr) throw upErr
+
+    setAuditorias(prev => prev.map(a => a.id === sel.id ? { ...a, fecha_auditoria: ymd } : a))
+    toast.success('Fecha de auditoría actualizada.')
+    setEditingDate(false)
+  } catch (e) {
+    console.error('Actualizar fecha error:', e)
+    toast.error('No se pudo actualizar la fecha.')
+  } finally {
+    setSavingDate(false)
+  }
+}, [auditorias, selectedId, dateDraft])
+
+const handleDateKeyDown = useCallback((e) => {
+  if (e.key === 'Enter') { e.preventDefault(); saveFechaAuditoria() }
+  if (e.key === 'Escape') { e.preventDefault(); cancelEditFecha() }
+}, [saveFechaAuditoria, cancelEditFecha])
+
   // helpers UI
   const openingRef = useRef(false)
   const openInNewTab = useCallback((url) => {
@@ -466,7 +522,6 @@ export default function AuditoriasVerificacionAdmin() {
     if (selectedId && !filtradas.some(a => a.id === selectedId)) setSelectedId(filtradas[0]?.id ?? null)
   }, [filtradas, selectedId])
 
-  const selected = useMemo(() => auditorias.find(a => a.id === selectedId) || null, [auditorias, selectedId])
 
   /* timeline (con acciones por etapa) */
   const timeline = useMemo(() => {
@@ -688,11 +743,8 @@ export default function AuditoriasVerificacionAdmin() {
                 </div>
                 <div className={styles.itemBottom}>
                   <span className={styles.itemDate}>📅 {label}</span>
-                  {a.usuarios && <span className={styles.badgeMini}>👤 {(a.usuarios?.nombre || '')} {(a.usuarios?.apellido || '')}</span>}
+                  {a.usuarios && <span className={styles.badgeMini}>{(a.usuarios?.nombre || '')}</span>}
                   {a.plan?.url && <span className={styles.badgeMini}>Plan</span>}
-                  {a.asistencia?.url && <span className={styles.badgeMini}>Asistencia</span>}
-                  {a.evaluacion?.url && <span className={styles.badgeMini}>Evaluación</span>}
-                  {a.acta?.url && <span className={styles.badgeMini}>Acta</span>}
                   {a.validated?.url && <span className={styles.badgeMini}>Validado</span>}
                 </div>
               </li>
@@ -719,10 +771,55 @@ export default function AuditoriasVerificacionAdmin() {
                   Auditoría #{selected.id}{' '}
                   <span className={styles.depName}>— {selected.dependencias?.nombre || 'Dependencia'}</span>
                 </h2>
-                <div className={styles.meta}>
-                  {selected.usuarios && <>Auditor: <strong>{(selected.usuarios?.nombre || '')} {(selected.usuarios?.apellido || '')}</strong> · </>}
-                  {selected.fecha_auditoria && <>Fecha: <strong>{fmt(parseYMD(selected.fecha_auditoria))}</strong></>}
-                </div>
+<div className={styles.meta}>
+  {selected.usuarios && <>Auditor: <strong>{(selected.usuarios?.nombre || '')} {(selected.usuarios?.apellido || '')}</strong> · </>}
+
+  {/* Fecha editable inline */}
+  <span>Fecha: </span>
+  {editingDate ? (
+    <>
+      <input
+        type="date"
+        className={styles.inputBase}
+        value={dateDraft}
+        onChange={e => setDateDraft(e.target.value)}
+        onKeyDown={handleDateKeyDown} 
+        disabled={savingDate}
+        style={{ marginRight: 8 }}
+      />
+      <button
+        className={styles.btn}
+        onClick={saveFechaAuditoria}
+        disabled={savingDate || !dateDraft}
+        title="Guardar fecha"
+      >
+        {savingDate ? 'Guardando…' : 'Guardar'}
+      </button>
+      <button
+        className={`${styles.btn} ${styles.btnGhost}`}
+        onClick={cancelEditFecha}
+        disabled={savingDate}
+        title="Cancelar"
+        style={{ marginLeft: 6 }}
+      >
+        Cancelar
+      </button>
+    </>
+  ) : (
+    <>
+      <strong>{fmt(parseYMD(selected.fecha_auditoria))}</strong>{' '}
+      <button
+        className={`${styles.btn} ${styles.btnGhost}`}
+        onClick={beginEditFecha}
+        title="Editar fecha"
+        style={{ marginLeft: 6 }}
+      >
+        ✎
+      </button>
+    </>
+  )}
+</div>
+
                 {selected.asistencia_tipo && <div className={styles.meta}>Asistencia: <strong>{selected.asistencia_tipo}</strong></div>}
               </div>
 
