@@ -25,14 +25,7 @@ function fmt(date) {
     }).format(date)
   } catch { return date?.toLocaleDateString?.() ?? '' }
 }
-function statusLabel(due, delivered, today) {
-  if (delivered) return 'Entregado'
-  if (!due) return 'Sin fecha'
-  const d = daysBetween(today, due)
-  if (d < 0) return `Vencido ${Math.abs(d)} d`
-  if (d === 0) return 'Hoy'
-  return `Faltan ${d} d`
-}
+
 
 /* ===== helpers filename para detectar archivos en Storage ===== */
 const toSlugUpper = (s = '') =>
@@ -403,7 +396,7 @@ function buildTooltip(title, ag) {
 }
 
 /* ===== Modal detalle ===== */
-function DetailModal({ depId, onClose, items }) {
+function DetailModal({ onClose, items }) {
   const today = startOfDay(new Date())
 
   const cols = [

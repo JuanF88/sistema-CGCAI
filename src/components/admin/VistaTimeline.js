@@ -64,7 +64,7 @@ export default function AuditoriasVerificacionAdmin() {
 
   // modal detalle
   const [showDetail, setShowDetail] = useState(false)
-  const [informes, setInformes] = useState([])
+  const [setInformes] = useState([])
 
   // ✅ NUEVOS estados: modal/archivo/subida Acta de Compromiso
   const [actaCompModalOpen, setActaCompModalOpen] = useState(false)
