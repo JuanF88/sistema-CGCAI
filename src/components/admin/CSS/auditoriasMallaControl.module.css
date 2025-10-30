@@ -1,0 +1,324 @@
+/* ===== Layout general (solo malla) ===== */
+.wrapper {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  min-height: 70vh;
+}
+
+/* ===== Content ===== */
+.content { min-height: 70vh; }
+
+/* Toolbar superior */
+.toolbar {
+  position: sticky; top: 6px; z-index: 5;
+  background: #ffffff;
+  border: 1px solid #edf0f3;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  padding: 12px;
+  margin-bottom: 20px;
+}
+.toolbarTop {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 8px; padding-bottom: 6px;
+  border-bottom: 1px dashed #e6eaf0;
+}
+.toolbarTitle { margin: 0; font-weight: 600; font-size: 16px; color: #0f172a; }
+.toolbarActions { display: flex; align-items: center; gap: 8px; }
+
+.inputGroup { display: grid; gap: 4px; }
+.inputLabel { font-size: 12px; color: #6b7280; margin-left: 25px;}
+.inputBase {
+  border: 1px solid #e5e7eb; background: #fff; border-radius: 10px;
+  padding: 8px 8px; font-size: 14px; outline: none;
+  transition: box-shadow .15s ease, border-color .15s ease; min-height: 40px;
+}
+.inputBase:focus {
+  border-color: #a7c5ff;
+  box-shadow: 0 0 0 3px rgba(99,102,241,.15);
+}
+/* ===== Layout general (solo malla) ===== */
+.wrapper { display: grid; grid-template-columns: 1fr; gap: 1.25rem; min-height: 70vh; }
+.content { min-height: 70vh; }
+
+/* Toolbar superior */
+.toolbar {
+  position: sticky; top: 6px; z-index: 5;
+  background: #ffffff; border: 1px solid #edf0f3; border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06); padding: 12px; margin-bottom: 10px;
+}
+.toolbarTop { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed #e6eaf0; }
+.toolbarTitle { margin: 0; font-weight: 800; font-size: 16px; color: #0f172a; }
+.toolbarActions { display: flex; align-items: center; gap: 8px; }
+.inputGroup { display: grid; gap: 4px; }
+.inputLabel { font-size: 12px; color: #6b7280; }
+.inputBase { border: 1px solid #e5e7eb; background: #fff; border-radius: 10px; padding: 8px 8px; font-size: 14px; outline: none; transition: box-shadow .15s ease, border-color .15s ease; min-height: 40px; }
+.inputBase:focus { border-color: #a7c5ff; box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
+.refreshBtn { border: 1px solid #dbe1e6; background: #fafbfc; padding: 6px 10px; border-radius: 10px; cursor: pointer; transition: transform 0.12s ease, background 0.2s; }
+.refreshBtn:hover { transform: translateY(-1px); background: #f3f6f9; }
+
+/* KPIs */
+.kpisBar { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+.kpiChip { background: #f8fafc; border: 1px solid #e5e7eb; color: #0f172a; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 800; }
+
+/* Leyenda heat */
+.legend { display: flex; align-items: center; gap: 8px; color: #6b7280; font-size: 12px; margin: 6px 0; }
+.legendBox { width: 18px; height: 12px; border-radius: 4px; border: 1px solid #e5e7eb; display: inline-block; }
+
+/* Escala de calor */
+.heat0 { background: #f8fafc; }
+.heat1 { background: #eff6ff; }
+.heat2 { background: #dbeafe; }
+.heat3 { background: #bfdbfe; }
+.heat4 { background: #bbf7d0; }
+.heat5 { background: #dcfce7; }
+
+/* ===== Grid principal (heatmap) ===== */
+.gridCard {
+  background: #ffffff; border: 1px solid #edf0f3; border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(20, 20, 20, 0.05); overflow: hidden;
+}
+.gridHeader, .gridRow {
+  display: grid;
+  grid-template-columns: 2fr 1fr repeat(7, 1fr);
+}
+.gridHeader { background: #fbfdff; border-bottom: 1px dashed #e6eaf0; position: sticky; top: 0; z-index: 1; }
+.gridHead, .gridHeadSticky {
+  padding: 10px 12px; font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: .6px; border-right: 1px solid #edf0f3;
+}
+.gridHeadSticky { position: sticky; left: 0; z-index: 2; background: #fbfdff; }
+
+.gridBody { max-height: 64vh; overflow: auto; }
+.gridRow:nth-child(even) { background: #fcfdff; }
+
+.depCell, .progressCell, .cell {
+  padding: 10px 12px; border-right: 1px solid #edf0f3; border-bottom: 1px solid #edf0f3;
+  display: flex; align-items: center; justify-content: center; min-height: 46px;
+}
+.depCell { justify-content: flex-start; font-weight: 800; color: #111827; position: sticky; left: 0; background: #ffffff; z-index: 1; }
+.depCellClickable { cursor: pointer; }
+.depCellClickable:hover { background: #f8fafc; }
+
+.cell { color: #0a0d12; font-weight: 800; letter-spacing: .2px; }
+.cellText {
+  background: rgba(255,255,255,.6); border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 4px 8px; color: #0f172a;
+}
+
+/* % Avance */
+.progressCell { gap: 8px; flex-direction: column; }
+.progressTrack { width: 100%; height: 10px; background: #f1f5f9; border: 1px solid #e5e7eb; border-radius: 999px; overflow: hidden; }
+.progressFill { height: 100%; width: 0%; background: linear-gradient(90deg, #6366f1, #22c55e); border-right: 1px solid rgba(0,0,0,.05); transition: width .35s ease; }
+.progressLabel { font-size: 12px; font-weight: 900; color: #0f172a; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 999px; padding: 2px 8px; }
+
+/* Estados */
+.skeletonList, .emptyBox, .errorBox { font-size: 14px; color: #576171; padding: 12px; }
+.errorBox { color: #b00020; background: #fff6f6; border: 1px solid #ffdada; border-radius: 10px; }
+
+/* Responsive grid */
+@media (max-width: 1200px) { .gridHeader, .gridRow { grid-template-columns: 1.6fr 1fr repeat(7, 0.9fr); } }
+@media (max-width: 720px)  { .gridHeader, .gridRow { grid-template-columns: 1.4fr 1fr repeat(7, 0.8fr); } }
+
+/* ===== Modal de detalle ===== */
+.modalOverlay {
+  position: fixed; inset: 0; background: rgba(15, 23, 42, 0.35); backdrop-filter: blur(2px);
+  display: flex; align-items: center; justify-content: center; z-index: 60;
+}
+.modalCard {
+  background: #ffffff; border: 1px solid #edf0f3; border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.2);
+  padding: 16px 16px 12px 16px; width: min(1100px, 94vw); max-height: 88vh; overflow: auto; position: relative;
+}
+.modalTitle { margin: 0 0 10px 0; font-size: 18px; font-weight: 800; color: #0f172a; padding-bottom: 8px; border-bottom: 1px dashed #e6eaf0; }
+.modalClose { position: absolute; top: 10px; right: 12px; border: 1px solid #e5e7eb; background: #fff; border-radius: 10px; padding: 4px 8px; cursor: pointer; }
+
+/* Tabla de auditorías dentro del modal */
+.auditTable {
+  display: grid;
+  grid-template-columns:
+    0.6fr   /* ID */
+    1fr     /* Fecha */
+    repeat(7, 1.6fr); /* etapas */
+  gap: 6px;
+  align-items: center;
+}
+.auditTh, .auditTd {
+  padding: 8px 10px; border: 1px solid #edf0f3; border-radius: 10px; background: #fff;
+  font-size: 13px; color: #1f2937;
+}
+.auditTh { font-weight: 900; color: #475569; background: #fbfdff; }
+.auditColId { text-align: center; }
+.auditColFecha { }
+.auditColStage { text-align: center; }
+
+/* Chips de estado por etapa */
+.chip {
+  display: inline-block; font-size: 12px; font-weight: 800; padding: 4px 8px;
+  border-radius: 999px; border: 1px solid transparent; white-space: nowrap;
+}
+.chipOk { color: #065f46; background: #d1fae5; border-color: #a7f3d0; }
+.chipToday { color: #1e3a8a; background: #dbeafe; border-color: #bfdbfe; }
+.chipSoon { color: #7c2d12; background: #ffedd5; border-color: #fed7aa; }
+.chipOverdue { color: #7f1d1d; background: #fee2e2; border-color: #fecaca; }
+.chipPending { color: #475569; background: #f1f5f9; border-color: #e2e8f0; }
+
+/* Botón recargar */
+.refreshBtn {
+    margin-top: 20px;
+  border: 1px solid #dbe1e6;
+  background: #fafbfc;
+  padding: 6px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.2s;
+}
+.refreshBtn:hover { transform: translateY(-1px); background: #f3f6f9; }
+
+/* KPIs */
+.kpisBar {
+  margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px;
+}
+.kpiChip {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* Leyenda heat */
+.legend {
+  display: flex; align-items: center; gap: 8px;
+  color: #6b7280; font-size: 12px; margin: 6px 0;
+}
+.legendBox {
+  width: 18px; height: 12px; border-radius: 4px;
+  border: 1px solid #e5e7eb; display: inline-block;
+}
+
+/* Escala de calor (azules→verdes suaves como tu UI) */
+.heat0 { background: #f8fafc; }  /* 0% */
+.heat1 { background: #eff6ff; }  /* >0% */
+.heat2 { background: #dbeafe; }  /* ≥25% */
+.heat3 { background: #bfdbfe; }  /* ≥50% */
+.heat4 { background: #bbf7d0; }  /* ≥70% */
+.heat5 { background: #dcfce7; }  /* ≥90% */
+
+/* ===== Grid principal (heatmap) ===== */
+.gridCard {
+  background: #ffffff;
+  border: 1px solid #edf0f3;
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(20, 20, 20, 0.05);
+  overflow: hidden;
+}
+
+.gridHeader,
+.gridRow {
+  display: grid;
+  grid-template-columns:
+    2fr   /* dependencia */
+    1fr   /* AVANCE % (reemplaza Total) */
+    repeat(7, 1fr); /* etapas */
+}
+
+.gridHeader {
+  background: #fbfdff;
+  border-bottom: 1px dashed #e6eaf0;
+  position: sticky; top: 0; z-index: 1;
+}
+.gridHead,
+.gridHeadSticky {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  border-right: 1px solid #edf0f3;
+}
+.gridHeadSticky {
+  position: sticky; left: 0; z-index: 2; background: #fbfdff;
+}
+
+.gridBody { max-height: 64vh; overflow: auto; }
+.gridRow:nth-child(even) { background: #fcfdff; }
+
+.depCell,
+.progressCell,
+.cell {
+  padding: 10px 12px;
+  border-right: 1px solid #edf0f3;
+  border-bottom: 1px solid #edf0f3;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 46px;
+}
+.depCell { justify-content: flex-start; font-weight: 500; color: #111827; position: sticky; left: 0; background: #ffffff; z-index: 1; }
+.cell { color: #0a0d12; font-weight: 200; letter-spacing: .2px; }
+
+.cellText {
+  background: rgba(255,255,255,.6);
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 4px 8px;
+  color: #0f172a;
+}
+
+/* ===== Columna AVANCE % ===== */
+.progressCell {
+  gap: 8px;
+  flex-direction: column;
+}
+.progressTrack {
+  width: 100%;
+  height: 10px;
+  background: #f1f5f9;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #6366f1, #22c55e);
+  border-right: 1px solid rgba(0,0,0,.05);
+  transition: width .35s ease;
+}
+.progressLabel {
+  font-size: 12px;
+  font-weight: 900;
+  color: #0f172a;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* Estados de carga / vacío / error */
+.skeletonList,
+.emptyBox,
+.errorBox {
+  font-size: 14px;
+  color: #576171;
+  padding: 12px;
+}
+.errorBox {
+  color: #b00020;
+  background: #fff6f6;
+  border: 1px solid #ffdada;
+  border-radius: 10px;
+}
+
+/* Responsive grid */
+@media (max-width: 1200px) {
+  .gridHeader, .gridRow {
+    grid-template-columns: 1.6fr 1fr repeat(7, 0.9fr);
+  }
+}
+@media (max-width: 720px) {
+  .gridHeader, .gridRow {
+    grid-template-columns: 1.4fr 1fr repeat(7, 0.8fr);
+  }
+}
