@@ -81,18 +81,18 @@ export async function generarPlanMejora2(
 
     // ===== Map de capítulos y helper =====
 const CAPITULO_TITULOS = {
-  1: 'Proyecto Educativo del Programa e Identidad Institucional',
-  2: 'Estudiantes',
-  3: 'Profesores',
-  4: 'Egresados',
-  5: 'Aspectos Académicos y Resultados de Aprendizaje',
-  6: 'Permanencia y Graduación',
-  7: 'Interacción Con el Entorno Nacional e Internacional',
-  8: 'Aportes de la Investigación, la Innovación el Desarrollo Tecnológico y la creación, asociados al Programa Académico',
-  9: 'Bienestar de la Comunidad Académica del Programa',
-  10: 'Medios Educativos y Ambientes de Aprendizaje',
-  11: 'Organización, Administración y Financiación del Programa Académico',
-  12: 'Recursos Físicos y Tecnológicos',
+  1: 'NO APLICA',
+  2: 'NO APLICA',
+  3: 'NO APLICA',
+  4: 'FACTOR 1, FACTOR 2, FACTOR 3, FACTOR 4 Y FACTOR 7',
+  5: 'FACTOR 12',
+  6: 'FACTOR 2',
+  7: 'FACTOR 3, FACTOR 10, FACTOR 11',
+  8: 'FACTOR 2, FACTOR 3, FACTOR 4, FACTOR 5, FACTOR 6, FACTOR 7, FACTOR 8, FACTOR 8 Y FACTOR 11',
+  9: 'FACTOR 2, FACTOR 3, FACTOR 5, FACTOR 7, FACTOR 12, FACTOR 8 Y FACTOR 11',
+  10: 'FACTOR 9 Y FACTOR 12',
+  11: 'NO APLICA',
+  12: 'NO APLICA',
 }
 
 /**

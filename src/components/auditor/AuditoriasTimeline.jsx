@@ -66,6 +66,14 @@ const buildPlanPath = (auditoria) => {
     return `PlanAuditoria_${auditoria.id}_${dep}_${ymd}.pdf`
 }
 
+// ✅ NUEVO: constructor de ruta para Acta de Compromiso
+const buildActaCompromisoPath = (auditoria) => {
+    const dep = toSlugUpper(auditoria?.dependencias?.nombre || 'SIN_DEP')
+    const ymd = toYMD(auditoria?.fecha_auditoria)
+    return `ActaCompromiso_${auditoria.id}_${dep}_${ymd}.pdf`
+}
+
+
 // ✅ NUEVO: constructores de rutas para los 3 documentos previos
 const buildAsistenciaPath = (auditoria) => {
     const dep = toSlugUpper(auditoria?.dependencias?.nombre || 'SIN_DEP')
@@ -92,6 +100,12 @@ export default function AuditoriasTimeline({ usuario }) {
     const [asistenciaModalOpen, setAsistenciaModalOpen] = useState(false)
     const [asistenciaFile, setAsistenciaFile] = useState(null)
     const [uploadingAsistencia, setUploadingAsistencia] = useState(false)
+
+    // ✅ NUEVO: modal/archivo/subida para Acta de Compromiso
+    const [actaCompModalOpen, setActaCompModalOpen] = useState(false)
+    const [actaCompFile, setActaCompFile] = useState(null)
+    const [uploadingActaComp, setUploadingActaComp] = useState(false)
+
 
     const [evaluacionModalOpen, setEvaluacionModalOpen] = useState(false)
     const [evaluacionFile, setEvaluacionFile] = useState(null)
@@ -228,15 +242,15 @@ export default function AuditoriasTimeline({ usuario }) {
                 nc,
                 null, // usuario (opcional)
                 {
-                templateUrl: '/plantillas/PlanMejora.xlsx',
-                writeMeta: true,
-                metaCells: { dependencia: 'D8', fechaGeneracion: 'F49' },
-                metaDateFormat: 'dd/mm/yyyy',
-                startRow: 12,
-                rowsPerItem: 2,
-                pairsCount: 14,
-                cols: { fuente: 'A', tipo: 'B', factor: 'C', descripcion: 'D' },
-                wrapTextColumns: ['D'],
+                    templateUrl: '/plantillas/PlanMejora.xlsx',
+                    writeMeta: true,
+                    metaCells: { dependencia: 'D8', fechaGeneracion: 'F49' },
+                    metaDateFormat: 'dd/mm/yyyy',
+                    startRow: 12,
+                    rowsPerItem: 2,
+                    pairsCount: 14,
+                    cols: { fuente: 'A', tipo: 'B', factor: 'C', descripcion: 'D' },
+                    wrapTextColumns: ['D'],
                 }
             )
 
@@ -346,6 +360,38 @@ export default function AuditoriasTimeline({ usuario }) {
         }
     }
 
+    // ✅ NUEVO: subir Acta de Compromiso
+    const uploadActaCompromiso = async () => {
+        if (!selected || !actaCompFile) return
+        setUploadingActaComp(true)
+        try {
+            const filePath = buildActaCompromisoPath(selected)
+            const { error: upErr } = await supabase
+                .storage
+                .from('actascompromiso')
+                .upload(filePath, actaCompFile, { upsert: true, contentType: 'application/pdf' })
+            if (upErr) throw upErr
+
+            const { data: signed } = await supabase
+                .storage
+                .from('actascompromiso')
+                .createSignedUrl(filePath, 60 * 60)
+
+            setAuditorias(prev => prev.map(a =>
+                a.id === selected.id
+                    ? { ...a, acta_compromiso: { path: filePath, url: signed?.signedUrl || null, uploaded_at: new Date().toISOString() } }
+                    : a
+            ))
+            setActaCompModalOpen(false)
+            setActaCompFile(null)
+        } catch (e) {
+            console.error('Error subiendo acta de compromiso:', e)
+            alert('No se pudo subir el acta de compromiso.')
+        } finally {
+            setUploadingActaComp(false)
+        }
+    }
+
     const loadData = useCallback(async () => {
         if (!usuario?.usuario_id) {
             setError('Sesión no disponible. Vuelve a iniciar sesión.')
@@ -430,13 +476,14 @@ export default function AuditoriasTimeline({ usuario }) {
                         } catch { return null }
                     }
 
-                    const [asistencia, evaluacion, acta] = await Promise.all([
-                        fetchDoc('asistencias'),
-                        fetchDoc('evaluaciones'),
-                        fetchDoc('actas')
+                    const [asistencia, evaluacion, acta, acta_compromiso] = await Promise.all([
+                    fetchDoc('asistencias'),
+                    fetchDoc('evaluaciones'),
+                    fetchDoc('actas'),
+                    fetchDoc('actascompromiso')
                     ])
 
-                    return { ...a, plan, validated, asistencia, evaluacion, acta }
+                    return { ...a, plan, validated, asistencia, evaluacion, acta, acta_compromiso }
                 })
             )
 
@@ -505,6 +552,21 @@ export default function AuditoriasTimeline({ usuario }) {
                     ? [{ label: 'Ver plan enviado', href: selected.plan.url, btnClass: styles.btn }]
                     : [{ label: 'Subir plan de auditoría', onClick: () => setPlanModalOpen(true), btnClass: styles.btnSubir }]
             },
+            {
+                key: 'acta_compromiso',
+                title: 'Acta de compromiso',
+                // la fijamos entre informe(+10) y PM(+20): ~+15 días post auditoría
+                when: addDays(fa, 15),
+                days: diffInDays(hoy, addDays(fa, 15)),
+                explicitDone: Boolean(selected.acta_compromiso?.url),
+                subtitle: selected.acta_compromiso?.url
+                    ? 'Cargada.'
+                    : 'Subir PDF del acta de compromiso.',
+                actions: selected.acta_compromiso?.url
+                    ? [{ label: 'Ver acta de compromiso', href: selected.acta_compromiso.url, btnClass: styles.btn }]
+                    : [{ label: 'Subir acta de compromiso', onClick: () => setActaCompModalOpen(true), btnClass: styles.btnSubir }]
+            },
+
             // ✅ NUEVOS 3 PASOS ANTES DE LLENAR INFORME
             {
                 key: 'asistencia',
@@ -558,10 +620,11 @@ export default function AuditoriasTimeline({ usuario }) {
                         !isFilled || !hasHallazgos
                             ? [{ label: isFilled ? 'Editar informe' : 'Llenar informe', onClick: () => router.push(`/auditor?vista=asignadas&informeId=${selected.id}`), btnClass: styles.btn }]
                             : [
+                                { label: 'Editar informe', onClick: () => router.push(`/auditor?vista=asignadas&informeId=${selected.id}`), btnClass: styles.btn },
                                 { label: '📄 Descargar Informe', onClick: () => handleDownloadInforme(selected), btnClass: styles.btn },
                                 { label: '✅ Validar Informe', onClick: () => setValidateModalOpen(true), btnClass: styles.btnSubir }
-                              ]
-                      )
+                            ]
+                    )
             },
             {
                 key: 'pm',
@@ -570,7 +633,7 @@ export default function AuditoriasTimeline({ usuario }) {
                 days: diffInDays(hoy, pmLimit),
                 explicitDone: false,
                 subtitle: 'Plan de Mejoramiento (10 días después de entregar el informe).',
-                actions: hasValidated ? [{ label: '📥 Descargar Formato PM', onClick: () => handleDownloadPM(selected), btnClass: styles.btn } ] : []
+                actions: hasValidated ? [{ label: '📥 Descargar Formato PM', onClick: () => handleDownloadPM(selected), btnClass: styles.btn }] : []
             }
         ]
 
@@ -869,7 +932,7 @@ export default function AuditoriasTimeline({ usuario }) {
                                             <>
                                                 <div className={styles.iconoSubida}>📎</div>
                                                 <p className={styles.instrucciones}>
-                                                    Arrastra el PDF aquí o haz clic para seleccionar<br />
+                                                    Haz clic para seleccionar el pdf<br />
                                                     <span className={styles.subtexto}>Solo PDF (máx. 2&nbsp;MB)</span>
                                                 </p>
                                             </>
@@ -939,7 +1002,7 @@ export default function AuditoriasTimeline({ usuario }) {
                                             <>
                                                 <div className={styles.iconoSubida}>📎</div>
                                                 <p className={styles.instrucciones}>
-                                                    Arrastra el PDF aquí o haz clic para seleccionar<br />
+                                                    Haz clic para seleccionar el pdf<br />
                                                     <span className={styles.subtexto}>Solo PDF (máx. 1&nbsp;MB)</span>
                                                 </p>
                                             </>
@@ -967,6 +1030,64 @@ export default function AuditoriasTimeline({ usuario }) {
                             </div>
                         )}
 
+                        {/* ✅ NUEVO MODAL: Acta de Compromiso */}
+                        {actaCompModalOpen && (
+                            <div
+                                className={styles.modalOverlay}
+                                onClick={(e) => { if (e.target === e.currentTarget) { setActaCompModalOpen(false); setActaCompFile(null) } }}
+                            >
+                                <div className={styles.modalContenido}>
+                                    <button
+                                        className={styles.modalCerrar}
+                                        onClick={() => { setActaCompModalOpen(false); setActaCompFile(null) }}
+                                        title="Cerrar"
+                                        aria-label="Cerrar"
+                                    >
+                                        ✖
+                                    </button>
+
+                                    <h3 className={styles.modalTitulo}>Subir acta de compromiso (PDF)</h3>
+
+                                    <label htmlFor="actaCompFile" className={styles.dropArea}>
+                                        <input
+                                            id="actaCompFile"
+                                            type="file"
+                                            accept="application/pdf"
+                                            className={styles.inputArchivo}
+                                            onChange={(e) => setActaCompFile(e.target.files?.[0] || null)}
+                                        />
+                                        {!actaCompFile ? (
+                                            <>
+                                                <div className={styles.iconoSubida}>📎</div>
+                                                <p className={styles.instrucciones}>
+                                                    Haz clic para seleccionar el pdf<br />
+                                                    <span className={styles.subtexto}>Solo PDF (máx. 2&nbsp;MB)</span>
+                                                </p>
+                                            </>
+                                        ) : (
+                                            <p className={styles.nombreArchivo}>✅ {actaCompFile.name}</p>
+                                        )}
+                                    </label>
+
+                                    <div className={styles.modalBotones}>
+                                        <button
+                                            onClick={uploadActaCompromiso}
+                                            disabled={!actaCompFile || uploadingActaComp}
+                                            className={styles.botonSubir}
+                                        >
+                                            {uploadingActaComp ? 'Subiendo…' : 'Subir'}
+                                        </button>
+                                        <button
+                                            onClick={() => { setActaCompModalOpen(false); setActaCompFile(null) }}
+                                            className={styles.botonCancelar}
+                                        >
+                                            Cancelar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* ✅ NUEVOS MODALES: Asistencia / Evaluación / Acta */}
                         {asistenciaModalOpen && (
                             <div className={styles.modalOverlay} onClick={(e) => { if (e.target === e.currentTarget) { setAsistenciaModalOpen(false); setAsistenciaFile(null) } }}>
@@ -978,7 +1099,7 @@ export default function AuditoriasTimeline({ usuario }) {
                                         {!asistenciaFile ? (
                                             <>
                                                 <div className={styles.iconoSubida}>📎</div>
-                                                <p className={styles.instrucciones}>Arrastra el PDF aquí o haz clic para seleccionar<br /><span className={styles.subtexto}>Solo PDF (máx. 2&nbsp;MB)</span></p>
+                                                <p className={styles.instrucciones}>Haz clic para seleccionar el pdf<br /><span className={styles.subtexto}>Solo PDF (máx. 2&nbsp;MB)</span></p>
                                             </>
                                         ) : (<p className={styles.nombreArchivo}>✅ {asistenciaFile.name}</p>)}
                                     </label>
@@ -1000,7 +1121,7 @@ export default function AuditoriasTimeline({ usuario }) {
                                         {!evaluacionFile ? (
                                             <>
                                                 <div className={styles.iconoSubida}>📎</div>
-                                                <p className={styles.instrucciones}>Arrastra el PDF aquí o haz clic para seleccionar<br /><span className={styles.subtexto}>Solo PDF (máx. 2&nbsp;MB)</span></p>
+                                                <p className={styles.instrucciones}>Haz clic para seleccionar el pdf<br /><span className={styles.subtexto}>Solo PDF (máx. 2&nbsp;MB)</span></p>
                                             </>
                                         ) : (<p className={styles.nombreArchivo}>✅ {evaluacionFile.name}</p>)}
                                     </label>
@@ -1022,7 +1143,7 @@ export default function AuditoriasTimeline({ usuario }) {
                                         {!actaFile ? (
                                             <>
                                                 <div className={styles.iconoSubida}>📎</div>
-                                                <p className={styles.instrucciones}>Arrastra el PDF aquí o haz clic para seleccionar<br /><span className={styles.subtexto}>Solo PDF (máx. 2&nbsp;MB)</span></p>
+                                                <p className={styles.instrucciones}>Haz clic para seleccionar el pdf<br /><span className={styles.subtexto}>Solo PDF (máx. 2&nbsp;MB)</span></p>
                                             </>
                                         ) : (<p className={styles.nombreArchivo}>✅ {actaFile.name}</p>)}
                                     </label>

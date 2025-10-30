@@ -21,7 +21,7 @@ import VistaEstadisticas from '@/components/admin/VistaEstadisticas'
 export default function AdminDashboard() {
   const router = useRouter()
   const [usuario, setUsuario] = useState(null)
-  const [vista, setVista] = useState('VistaTimeline')
+  const [vista, setVista] = useState('crearInforme')
 
   useEffect(() => {
     const userData = localStorage.getItem('clienteLogueado')
@@ -45,6 +45,17 @@ export default function AdminDashboard() {
           <img src="avatares/Silueta.png" alt="Avatar" className={styles.avatar} />
           {usuario && <p className={styles.username}>{usuario.nombre}</p>}
           <nav className={styles.nav}>
+
+            {<button
+              onClick={() => {
+                setVista('crearInforme')
+                window.history.pushState({}, '', '/admin?vista=crearInforme')
+              }}
+              className={`${styles.navButton} ${vista === 'crearInforme' ? styles.active : ''}`}
+            >
+              <FileText size={18} /> <span>Inicio </span>
+            </button>}
+            
             <button
               onClick={() => {
                 setVista('VistaTimeline')
@@ -53,20 +64,8 @@ export default function AdminDashboard() {
               className={`${styles.navButton} ${vista === 'VistaTimeline' ? styles.active : ''}`}
             >
               <Home className={styles.navIconSmall} size={18} />
-              <span className={styles.navTextSmall}>Inicio</span>
+              <span className={styles.navTextSmall}>Administrar Auditorías</span>
             </button>
-
-
-            {/* <button
-              onClick={() => {
-                setVista('crearInforme')
-                window.history.pushState({}, '', '/admin?vista=crearInforme')
-              }}
-              className={`${styles.navButton} ${vista === 'crearInforme' ? styles.active : ''}`}
-            >
-              <FileText size={18} /> <span>Administrar Auditorías</span>
-            </button> */}
-
 
             <button
               onClick={() => {

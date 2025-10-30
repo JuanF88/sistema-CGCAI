@@ -36,6 +36,9 @@ const buildValidationPath = (a) => `Auditoria_${a.id}_${toSlugUpper(a?.dependenc
 const buildAsistenciaPath = (a) => `Asistencia_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
 const buildEvaluacionPath = (a) => `Evaluacion_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
 const buildActaPath = (a) => `Acta_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
+// ✅ NUEVO: ruta para Acta de Compromiso
+const buildActaCompromisoPath = (a) => `ActaCompromiso_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
+
 
 export default function AuditoriasVerificacionAdmin() {
   const [loading, setLoading] = useState(true)
@@ -56,10 +59,39 @@ export default function AuditoriasVerificacionAdmin() {
   const [onlyAsistencia, setOnlyAsistencia] = useState(false)
   const [onlyEvaluacion, setOnlyEvaluacion] = useState(false)
   const [onlyActa, setOnlyActa] = useState(false)
+// ✅ NUEVO check rápido
+  const [onlyActaComp, setOnlyActaComp] = useState(false)
 
   // modal detalle
   const [showDetail, setShowDetail] = useState(false)
+  const [informes, setInformes] = useState([])
 
+  // ✅ NUEVOS estados: modal/archivo/subida Acta de Compromiso
+  const [actaCompModalOpen, setActaCompModalOpen] = useState(false)
+  const [actaCompFile, setActaCompFile] = useState(null)
+  const [uploadingActaComp, setUploadingActaComp] = useState(false)
+
+  const eliminarInforme = async (id) => {
+    try {
+      const res = await fetch('/api/informes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+
+      if (res.ok) {
+        setInformes(prev => prev.filter(inf => inf.id !== id))
+        toast.success('Informe eliminado correctamente')
+      } else {
+        const error = await res.json()
+        toast.error('Error al eliminar: ' + (error?.error || 'desconocido'))
+      }
+    } catch (err) {
+      console.error('Error al eliminar:', err)
+      toast.error('Error inesperado al eliminar informe')
+    }
+    await loadData()
+  }
   // ====== MODAL crear auditoría ======
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -332,6 +364,40 @@ const handleDateKeyDown = useCallback((e) => {
     }
   }
 
+    // ✅ NUEVO: Subir Acta de Compromiso
+  const subirActaCompromiso = async (a) => {
+    if (!a || !actaCompFile) return
+    setUploadingActaComp(true)
+    try {
+      const filePath = buildActaCompromisoPath(a)
+      const { error: upErr } = await supabase
+        .storage
+        .from('actascompromiso')
+        .upload(filePath, actaCompFile, { upsert: true, contentType: 'application/pdf' })
+      if (upErr) throw upErr
+
+      const { data: signed } = await supabase
+        .storage
+        .from('actascompromiso')
+        .createSignedUrl(filePath, 3600)
+
+      setAuditorias(prev => prev.map(x =>
+        x.id === a.id
+          ? { ...x, acta_compromiso: { path: filePath, url: signed?.signedUrl || null, uploaded_at: new Date().toISOString() } }
+          : x
+      ))
+
+      setActaCompModalOpen(false)
+      setActaCompFile(null)
+      toast.success('Acta de compromiso cargada.')
+    } catch (e) {
+      console.error('Acta de compromiso error:', e)
+      toast.error('No se pudo subir el acta de compromiso.')
+    } finally {
+      setUploadingActaComp(false)
+    }
+  }
+
   // ====== Cargar data principal ======
   const loadData = useCallback(async () => {
     setLoading(true); setError(null)
@@ -370,13 +436,7 @@ const handleDateKeyDown = useCallback((e) => {
             } catch {}
           }
 
-          // VALIDADO firmado
-          let validated = null
-          try {
-            const v = buildValidationPath(a)
-            const { data: signedVal } = await supabase.storage.from('validaciones').createSignedUrl(v, 3600)
-            if (signedVal?.signedUrl) validated = { file: v, url: signedVal.signedUrl }
-          } catch {}
+
 
           // NUEVOS: asistencia / evaluación / acta (firmados si existen)
           const trySign = async (bucket, path) => {
@@ -388,12 +448,14 @@ const handleDateKeyDown = useCallback((e) => {
           const asistencia = await trySign('asistencias', buildAsistenciaPath(a))
           const evaluacion = await trySign('evaluaciones', buildEvaluacionPath(a))
           const acta = await trySign('actas', buildActaPath(a))
-
+          const acta_compromiso = await trySign('actascompromiso', buildActaCompromisoPath(a))
+          // VALIDADO: intenta firmar por ruta exacta
+          const validated = await trySign('validaciones', buildValidationPath(a))
           // Conteos de hallazgos
           const fCount = a.fortalezas?.length || 0
           const omCount = a.oportunidades_mejora?.length || 0
           const ncCount = a.no_conformidades?.length || 0
-          return { ...a, plan, validated, asistencia, evaluacion, acta, fCount, omCount, ncCount }
+          return { ...a, plan, validated,acta_compromiso, asistencia, evaluacion, acta, fCount, omCount, ncCount }
         })
       )
 
@@ -473,6 +535,7 @@ const handleDateKeyDown = useCallback((e) => {
       asistenciaOK: Boolean(a.asistencia?.url),
       evaluacionOK: Boolean(a.evaluacion?.url),
       actaOK: Boolean(a.acta?.url),
+      actaCompOK: Boolean(a.acta_compromiso?.url),
       listoValidar,
     }
   }
@@ -501,6 +564,7 @@ const handleDateKeyDown = useCallback((e) => {
       case 'informe_completo': if (!flags.informeCompleto) return false; break
       case 'validado': if (!flags.validado) return false; break
       case 'no_validado': if (flags.validado) return false; break
+      case 'acta_compromiso_cargada': if (!flags.actaCompOK) return false; break
       case 'asistencia_cargada': if (!flags.asistenciaOK) return false; break
       case 'evaluacion_cargada': if (!flags.evaluacionOK) return false; break
       case 'acta_cargada': if (!flags.actaOK) return false; break
@@ -509,12 +573,13 @@ const handleDateKeyDown = useCallback((e) => {
     }
 
     // checks rápidos (AND)
+    if (onlyActaComp && !flags.actaCompOK) return false
     if (onlyAsistencia && !flags.asistenciaOK) return false
     if (onlyEvaluacion && !flags.evaluacionOK) return false
     if (onlyActa && !flags.actaOK) return false
 
     return true
-  }), [auditorias, q, depFilter, audFilter, anioFilter, semFilter, estadoFilter, desde, onlyAsistencia, onlyEvaluacion, onlyActa])
+  }), [auditorias, q, depFilter, audFilter, anioFilter, semFilter, estadoFilter, desde, onlyAsistencia, onlyEvaluacion, onlyActa, onlyActaComp])
 
   // mantener selección coherente
   useEffect(() => {
@@ -535,7 +600,8 @@ const handleDateKeyDown = useCallback((e) => {
     const isFilled = Boolean(selected.objetivo?.trim()) && Boolean(selected.criterios?.trim()) && Boolean(selected.conclusiones?.trim()) && Boolean(selected.recomendaciones?.trim())
     const hallCount = (selected.fortalezas?.length || 0) + (selected.oportunidades_mejora?.length || 0) + (selected.no_conformidades?.length || 0)
     const hasHallazgos = hallCount > 0
-    const hasValidated = Boolean(selected.validated?.url) || selected.validado === true
+const validatedHref = selected.validated?.url ?? null
+const hasValidated = Boolean(validatedHref) || selected.validado === true
 
     return [
       {
@@ -548,6 +614,17 @@ const handleDateKeyDown = useCallback((e) => {
         actions: selected.plan?.url
           ? [{ label: 'Ver plan', onClick: () => openInNewTab(selected.plan.url) }]
           : [{ label: 'Subir plan', onClick: () => setPlanModalOpen(true) }]
+      },
+            {
+        key: 'acta_compromiso',
+        title: 'Acta de compromiso',
+        when: addDays(fa, 15), // ajusta si quieres otro límite
+        days: diffInDays(hoy, addDays(fa, 15)),
+        explicitDone: Boolean(selected.acta_compromiso?.url),
+        subtitle: selected.acta_compromiso?.url ? 'Cargada.' : 'Subir PDF del acta de compromiso.',
+        actions: selected.acta_compromiso?.url
+          ? [{ label: 'Ver acta compromiso', onClick: () => openInNewTab(selected.acta_compromiso.url) }]
+          : [{ label: 'Subir acta compromiso', onClick: () => setActaCompModalOpen(true) }]
       },
       {
         key: 'asistencia',
@@ -593,14 +670,29 @@ const handleDateKeyDown = useCallback((e) => {
           : (!hasHallazgos
               ? 'Campos listos. Asignar hallazgos.'
               : (hasValidated ? 'Informe validado.' : 'Campos e hallazgos listos: descarga y valida.')),
-        actions: hasValidated
-          ? [{ label: 'Ver validado', onClick: () => openInNewTab(selected.validated.url) }]
-          : (!isFilled || !hasHallazgos
-              ? [{ label: isFilled ? 'Editar/Llenar (auditor)' : 'Llenar (auditor)', onClick: () => toast.info('Edición desde vista del auditor'), ghost: true }]
-              : [
-                  { label: '📄 Descargar informe', onClick: () => handleDescargarInforme(selected) },
-                  { label: '✅ Subir validado', onClick: () => setValidateModalOpen(true) }
-                ])
+              actions: hasValidated
+  ? (validatedHref
+      ? [{
+          label: 'Ver informe validado',
+          onClick: () => openInNewTab(validatedHref)
+        }]
+      : [{
+          label: 'Abrir validado',
+          onClick: async () => {
+            const path = buildValidationPath(selected)
+            const { data } = await supabase.storage.from('validaciones').createSignedUrl(path, 3600)
+            if (data?.signedUrl) openInNewTab(data.signedUrl)
+            else toast.error('No se encontró el PDF validado en almacenamiento.')
+          }
+        }]
+    )
+  : (!isFilled || !hasHallazgos
+      ? [{ label: isFilled ? 'Editar/Llenar (auditor)' : 'Llenar (auditor)', onClick: () => toast.info('Edición desde vista del auditor'), ghost: true }]
+      : [
+          { label: '📄 Descargar informe', onClick: () => handleDescargarInforme(selected) },
+          { label: '✅ Subir validado', onClick: () => setValidateModalOpen(true) }
+        ])
+
       },
       {
         key: 'pm',
@@ -699,6 +791,7 @@ const handleDateKeyDown = useCallback((e) => {
             <option value="informe_completo">Informe completo</option>
             <option value="validado">Validado</option>
             <option value="no_validado">No validado</option>
+            <option value="acta_compromiso_cargada">Acta compromiso cargada</option>
             <option value="asistencia_cargada">Asistencia cargada</option>
             <option value="evaluacion_cargada">Evaluación cargada</option>
             <option value="acta_cargada">Acta cargada</option>
@@ -709,6 +802,10 @@ const handleDateKeyDown = useCallback((e) => {
 
         {/* Checks rápidos */}
         <div className={styles.kpisBar}>
+        <label className={styles.kpiChip}>
+          <input type="checkbox" checked={onlyActaComp} onChange={e => setOnlyActaComp(e.target.checked)} /> Acta compromiso
+        </label>
+
           <label className={styles.kpiChip}>
             <input type="checkbox" checked={onlyAsistencia} onChange={e => setOnlyAsistencia(e.target.checked)} /> Asistencia
           </label>
@@ -895,6 +992,7 @@ const handleDateKeyDown = useCallback((e) => {
               <div className={styles.detailCol}><strong>Criterios:</strong><br />{selected.criterios || '—'}</div>
               <div className={styles.detailCol}><strong>Conclusiones:</strong><br />{selected.conclusiones || '—'}</div>
               <div className={styles.detailCol}><strong>Recomendaciones:</strong><br />{selected.recomendaciones || '—'}</div>
+              <div><strong>Acta de compromiso:</strong> {selected.acta_compromiso?.url ? <a href={selected.acta_compromiso.url} onClick={(e) => { e.preventDefault(); openInNewTab(selected.acta_compromiso.url) }} className={styles.linkLike}>Ver</a>: '—'}</div>
               <div><strong>Plan:</strong> {selected.plan?.url ? <a href={selected.plan.url} onClick={(e) => { e.preventDefault(); openInNewTab(selected.plan.url) }} className={styles.linkLike}>Abrir</a> : 'Sin plan'}</div>
               <div><strong>Informe validado:</strong> {selected.validated?.url ? <a href={selected.validated.url} onClick={(e) => { e.preventDefault(); openInNewTab(selected.validated.url) }} className={styles.linkLike}>Descargar</a> : 'No disponible'}</div>
               <div><strong>Asistencia:</strong> {selected.asistencia?.url ? <a href={selected.asistencia.url} onClick={(e) => { e.preventDefault(); openInNewTab(selected.asistencia.url) }} className={styles.linkLike}>Ver</a> : '—'}</div>
@@ -977,7 +1075,7 @@ const handleDateKeyDown = useCallback((e) => {
               {!planFile ? (
                 <>
                   <div className={styles.iconoSubida}>📎</div>
-                  <p className={styles.instrucciones}>Arrastra el PDF aquí o haz clic para seleccionar<br /><span className={styles.subtexto}>Solo PDF (máx. 2 MB)</span></p>
+                  <p className={styles.instrucciones}>Haz clic para seleccionar el pdf<br /><span className={styles.subtexto}>Solo PDF (máx. 2 MB)</span></p>
                 </>
               ) : (
                 <p className={styles.nombreArchivo}>✅ {planFile.name}</p>
@@ -989,6 +1087,73 @@ const handleDateKeyDown = useCallback((e) => {
                 {uploadingPlan ? 'Subiendo…' : (selected?.plan ? 'Reemplazar plan' : 'Subir plan')}
               </button>
               <button className={styles.botonCancelar} onClick={() => { setPlanModalOpen(false); setPlanFile(null) }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* ✅ NUEVO: Acta de compromiso */}
+      {actaCompModalOpen && selected && (
+        <div
+          className={styles.modalOverlay}
+          onClick={(e) => { if (e.target === e.currentTarget) { setActaCompModalOpen(false); setActaCompFile(null) } }}
+        >
+          <div className={styles.modalContenido}>
+            <button className={styles.modalCerrar} onClick={() => { setActaCompModalOpen(false); setActaCompFile(null) }}>✖</button>
+            <h3 className={styles.modalTitulo}>Acta de compromiso — Subir PDF</h3>
+
+            {selected?.acta_compromiso?.url && (
+              <a
+                href={selected.acta_compromiso.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.btnVerActual}
+                onClick={(e)=>{e.preventDefault(); openInNewTab(selected.acta_compromiso.url)}}
+              >
+                👀 Ver acta de compromiso actual
+              </a>
+            )}
+
+            <label className={styles.dropArea}>
+              <input
+                type="file"
+                accept="application/pdf"
+                className={styles.inputArchivo}
+                onChange={(e) => {
+                  const f = e.target.files?.[0] || null
+                  if (f && f.size > 2 * 1024 * 1024) {
+                    toast.warn('Máximo 2MB')
+                    e.target.value = null
+                    return
+                  }
+                  setActaCompFile(f)
+                }}
+              />
+              {!actaCompFile ? (
+                <>
+                  <div className={styles.iconoSubida}>📎</div>
+                  <p className={styles.instrucciones}>
+                    Haz clic para seleccionar el pdf<br />
+                    <span className={styles.subtexto}>Solo PDF (máx. 2 MB)</span>
+                  </p>
+                </>
+              ) : (
+                <p className={styles.nombreArchivo}>✅ {actaCompFile.name}</p>
+              )}
+            </label>
+
+            <div className={styles.modalBotones}>
+              <button
+                className={styles.botonSubir}
+                onClick={() => subirActaCompromiso(selected)}
+                disabled={!actaCompFile || uploadingActaComp}
+              >
+                {uploadingActaComp ? 'Subiendo…' : 'Subir'}
+              </button>
+              <button className={styles.botonCancelar} onClick={() => { setActaCompModalOpen(false); setActaCompFile(null) }}>
+                Cancelar
+              </button>
             </div>
           </div>
         </div>
@@ -1025,7 +1190,7 @@ const handleDateKeyDown = useCallback((e) => {
               {!asistenciaFile ? (
                 <>
                   <div className={styles.iconoSubida}>📎</div>
-                  <p className={styles.instrucciones}>Arrastra el PDF aquí o haz clic para seleccionar<br /><span className={styles.subtexto}>Solo PDF (máx. 2 MB)</span></p>
+                  <p className={styles.instrucciones}>Haz clic para seleccionar el pdf<br /><span className={styles.subtexto}>Solo PDF (máx. 2 MB)</span></p>
                 </>
               ) : (
                 <p className={styles.nombreArchivo}>✅ {asistenciaFile.name}</p>
@@ -1073,7 +1238,7 @@ const handleDateKeyDown = useCallback((e) => {
               {!evaluacionFile ? (
                 <>
                   <div className={styles.iconoSubida}>📎</div>
-                  <p className={styles.instrucciones}>Arrastra el PDF aquí o haz clic para seleccionar<br /><span className={styles.subtexto}>Solo PDF (máx. 2 MB)</span></p>
+                  <p className={styles.instrucciones}>Haz clic para seleccionar el pdf<br /><span className={styles.subtexto}>Solo PDF (máx. 2 MB)</span></p>
                 </>
               ) : (
                 <p className={styles.nombreArchivo}>✅ {evaluacionFile.name}</p>
@@ -1089,6 +1254,7 @@ const handleDateKeyDown = useCallback((e) => {
           </div>
         </div>
       )}
+
 
       {/* Acta */}
       {actaModalOpen && selected && (
@@ -1121,7 +1287,7 @@ const handleDateKeyDown = useCallback((e) => {
               {!actaFile ? (
                 <>
                   <div className={styles.iconoSubida}>📎</div>
-                  <p className={styles.instrucciones}>Arrastra el PDF aquí o haz clic para seleccionar<br /><span className={styles.subtexto}>Solo PDF (máx. 2 MB)</span></p>
+                  <p className={styles.instrucciones}>Haz clic para seleccionar el pdf<br /><span className={styles.subtexto}>Solo PDF (máx. 2 MB)</span></p>
                 </>
               ) : (
                 <p className={styles.nombreArchivo}>✅ {actaFile.name}</p>
@@ -1163,7 +1329,7 @@ const handleDateKeyDown = useCallback((e) => {
               {!validateFile ? (
                 <>
                   <div className={styles.iconoSubida}>📎</div>
-                  <p className={styles.instrucciones}>Arrastra el PDF aquí o haz clic para seleccionar<br /><span className={styles.subtexto}>Solo PDF (máx. 1 MB)</span></p>
+                  <p className={styles.instrucciones}>Haz clic para seleccionar el pdf<br /><span className={styles.subtexto}>Solo PDF (máx. 1 MB)</span></p>
                 </>
               ) : (
                 <p className={styles.nombreArchivo}>✅ {validateFile.name}</p>

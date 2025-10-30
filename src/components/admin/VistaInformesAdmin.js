@@ -1,638 +1,476 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { toast } from 'react-toastify'
-import { useRouter } from 'next/navigation'
-import DataTable from 'react-data-table-component'
-import { createClient } from '@supabase/supabase-js'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { supabase } from '@/lib/supabaseClient'
+import styles from '@/components/admin/CSS/auditoriasMallaControl.module.css'
 
-// Cliente (usar variables públicas de tu proyecto)
-const supabase =
-  typeof window !== 'undefined'
-    ? createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    )
-    : null
-// Quita tildes y deja MAYUSCULAS_CON_GUIONES
+/* ===== utilidades fecha ===== */
+function parseYMD(ymd) {
+  if (!ymd) return null
+  const [y, m, d] = String(ymd).slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return null
+  return new Date(y, m - 1, d)
+}
+function addDays(date, n) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  d.setDate(d.getDate() + n)
+  return d
+}
+function startOfDay(date) { return new Date(date.getFullYear(), date.getMonth(), date.getDate()) }
+function daysBetween(a, b) { return Math.round((startOfDay(b) - startOfDay(a)) / 86400000) }
+function fmt(date) {
+  try {
+    return new Intl.DateTimeFormat('es-CO', {
+      timeZone: 'America/Bogota', year: 'numeric', month: 'short', day: '2-digit'
+    }).format(date)
+  } catch { return date?.toLocaleDateString?.() ?? '' }
+}
+function statusLabel(due, delivered, today) {
+  if (delivered) return 'Entregado'
+  if (!due) return 'Sin fecha'
+  const d = daysBetween(today, due)
+  if (d < 0) return `Vencido ${Math.abs(d)} d`
+  if (d === 0) return 'Hoy'
+  return `Faltan ${d} d`
+}
+
+/* ===== helpers filename para detectar archivos en Storage ===== */
 const toSlugUpper = (s = '') =>
-  s.normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^A-Za-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .toUpperCase()
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase()
 
-// YYYY-MM-DD seguro (si ya viene como '2025-09-25' lo respeta)
 const toYMD = (input) => {
   if (!input) return new Date().toISOString().slice(0, 10)
   const s = String(input)
   return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : new Date(input).toISOString().slice(0, 10)
 }
 
-// Path consistente DENTRO del bucket 'validaciones' (sin prefijo repetido)
-const buildValidationPath = (a) => {
-  const dep = toSlugUpper(a?.dependencias?.nombre || 'SIN_DEPENDENCIA')
-  const ymd = toYMD(a?.fecha_auditoria)
-  return `Auditoria_${a.id}_${dep}_${ymd}.pdf`
-}
+const buildPlanPath            = (a) => `PlanAuditoria_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
+const buildValidationPath      = (a) => `Auditoria_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEPENDENCIA')}_${toYMD(a?.fecha_auditoria)}.pdf`
+const buildAsistenciaPath      = (a) => `Asistencia_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
+const buildEvaluacionPath      = (a) => `Evaluacion_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
+const buildActaPath            = (a) => `Acta_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
+const buildActaCompromisoPath  = (a) => `ActaCompromiso_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
 
-
-const getValidationUrl = async (a) => {
-  const path = buildValidationPath(a)
-
-  // 1) intenta URL firmada
-  const { data, error } = await supabase
-    .storage
-    .from('validaciones')
-    .createSignedUrl(path, 60)
-
-  if (data?.signedUrl && !error) return data.signedUrl
-
-  // 2) intenta pública (si el bucket/archivo es público)
-  const pub = supabase.storage.from('validaciones').getPublicUrl(path)
-  if (pub?.data?.publicUrl) return pub.data.publicUrl
-
-  // 3) (fallback) si ya subiste archivos viejos en 'validaciones/...'
-  const legacyPath = `validaciones/${path}`
-  const legacySigned = await supabase.storage.from('validaciones').createSignedUrl(legacyPath, 60)
-  if (legacySigned?.data?.signedUrl) return legacySigned.data.signedUrl
-
-  throw new Error(error?.message || 'No se encontró el archivo')
-}
-
-
-const handleDescargarValidacion = async (row, toast) => {
+/* ===== obtener timestamps desde Storage (created_at/updated_at) ===== */
+async function getFileTimestamps(supabase, bucket, fullPath) {
   try {
-    const url = await getValidationUrl(row)
-    // Abre en otra pestaña (o cambia a descarga forzada si prefieres)
-    window.open(url, '_blank', 'noopener,noreferrer')
-  } catch (e) {
-    console.error(e)
-    toast?.error('No se pudo descargar el informe validado. Verifica que exista en el bucket "validaciones".')
+    const dir = fullPath.includes('/') ? fullPath.slice(0, fullPath.lastIndexOf('/')) : ''
+    const name = fullPath.includes('/') ? fullPath.slice(fullPath.lastIndexOf('/') + 1) : fullPath
+    const { data: list } = await supabase.storage.from(bucket).list(dir || '', { limit: 1000 })
+    const obj = (list || []).find(x => x.name === name)
+    return obj ? { created_at: obj.created_at, updated_at: obj.updated_at } : null
+  } catch {
+    return null
   }
 }
 
-export default function VistaInformesAdmin() {
-  const [informes, setInformes] = useState([])
-  const [auditores, setAuditores] = useState([])
-  const [dependencias, setDependencias] = useState([])
-  const [mostrarModal, setMostrarModal] = useState(false)
-  const router = useRouter()
-  const [busqueda, setBusqueda] = useState('')
-  const [filtroDependencia, setFiltroDependencia] = useState('')
-  const [filtroAuditor, setFiltroAuditor] = useState('')
-  const [filtroAnio, setFiltroAnio] = useState('')
-  const [filtroSemestre, setFiltroSemestre] = useState('')
+export default function AuditoriasMallaControl() {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [auditorias, setAuditorias] = useState([])
+  const [selectedYear, setSelectedYear] = useState('') // '' = todos
 
-  const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false)
-  const [informeAEliminar, setInformeAEliminar] = useState(null)
+  // modal detalle por dependencia
+  const [detailDepId, setDetailDepId] = useState(null)
 
-  const [mostrarDetalle, setMostrarDetalle] = useState(false)
-  const [informeDetalle, setInformeDetalle] = useState(null)
-
-  const informesFiltrados = informes.filter((informe) => {
-    const coincideBusqueda =
-      busqueda === '' ||
-      (informe.usuarios &&
-        (`${informe.usuarios.nombre} ${informe.usuarios.apellido}`.toLowerCase().includes(busqueda.toLowerCase()))) ||
-      (informe.dependencias?.nombre?.toLowerCase().includes(busqueda.toLowerCase())) ||
-      (informe.id?.toString().includes(busqueda))
-
-    const coincideDependencia =
-      filtroDependencia === '' || informe.dependencia_id === parseInt(filtroDependencia)
-
-    const coincideAuditor =
-      filtroAuditor === '' || informe.usuario_id === parseInt(filtroAuditor)
-
-    const coincideAnio =
-      filtroAnio === '' ||
-      (informe.fecha_auditoria &&
-        new Date(informe.fecha_auditoria).getFullYear().toString() === filtroAnio)
-
-    const coincideSemestre =
-      filtroSemestre === '' ||
-      (informe.fecha_auditoria &&
-        ((new Date(informe.fecha_auditoria).getMonth() + 1 <= 6 && filtroSemestre === '1') ||
-          (new Date(informe.fecha_auditoria).getMonth() + 1 > 6 && filtroSemestre === '2')))
-
-    return coincideBusqueda && coincideDependencia && coincideAuditor && coincideAnio && coincideSemestre
-  })
-
-
-  const [nuevoInforme, setNuevoInforme] = useState({
-    usuario_id: '',
-    dependencia_id: '',
-    fecha_auditoria: '', // YYYY-MM-DD
-  })
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const resInformes = await fetch('/api/informes')
-        const dataInformes = await resInformes.json()
-
-        const resAuditores = await fetch('/api/usuarios?rol=auditor')
-        const dataAuditores = await resAuditores.json()
-
-        const resDeps = await fetch('/api/dependencias')
-        const dataDeps = await resDeps.json()
-
-        setInformes(dataInformes)
-        setAuditores(dataAuditores)
-        setDependencias(dataDeps)
-      } catch (error) {
-        console.error('Error al cargar datos:', error)
-      }
-    }
-    fetchData()
-  }, [router])
-
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setNuevoInforme((prev) => ({ ...prev, [name]: value }))
-  }
-  const crearInforme = async () => {
-  // Validación mínima en el cliente
-  if (!nuevoInforme.usuario_id || !nuevoInforme.dependencia_id || !nuevoInforme.fecha_auditoria) {
-    toast.error('Por favor seleccione auditor, dependencia y fecha de auditoría');
-    return;
-  }
-
-  // Construir payload PLANO (no anidado), con tipos correctos
-  const payload = {
-    usuario_id: Number(nuevoInforme.usuario_id),
-    dependencia_id: Number(nuevoInforme.dependencia_id),
-    fecha_auditoria: toYMD(nuevoInforme.fecha_auditoria),
-    asistencia_tipo: nuevoInforme.asistencia_tipo || 'Digital', // por si tu API lo usa
-    auditores_acompanantes: [],      // evita null
-    objetivo: '', criterios: '', conclusiones: '', recomendaciones: '',
-    fecha_seguimiento: null,
-    validado: false,
-  };
-
-  const res = await fetch('/api/informes', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),   // 👈 plano
-  });
-
-  if (res.ok) {
-    const creado = await res.json();
-    const createdItem = (Array.isArray(creado) ? creado[0] : creado) || {};
-
-    // Si el API no devuelve la fecha, usamos la que enviamos
-    if (!createdItem.fecha_auditoria) {
-      createdItem.fecha_auditoria = payload.fecha_auditoria;
-    }
-
-    setInformes((prev) => [...prev, createdItem]);
-    setNuevoInforme({ usuario_id: '', dependencia_id: '', fecha_auditoria: '', asistencia_tipo: 'Digital' });
-    setMostrarModal(false);
-    toast.success('Auditoría asignada con éxito');
-    localStorage.setItem('vistaActual', 'crearInforme');
-    router.push('/admin?vista=crearInforme');
-  } else {
-    // Mejor manejo de error
-    let msg = 'Error desconocido';
-    try { const err = await res.json(); msg = err?.error || msg; } catch {}
-    alert('Error al crear informe: ' + msg);
-  }
-};
-
-
-  const eliminarInforme = async (id) => {
+  const loadData = useCallback(async () => {
+    setLoading(true); setError(null)
     try {
-      const res = await fetch('/api/informes', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      })
+      const { data, error } = await supabase
+        .from('informes_auditoria')
+        .select(`
+          id, fecha_auditoria, dependencia_id, validado,
+          objetivo, criterios, conclusiones, recomendaciones,
+          dependencias:dependencias ( nombre ),
+          usuarios:usuario_id ( nombre, apellido ),
+          fortalezas ( id ),
+          oportunidades_mejora ( id ),
+          no_conformidades ( id ),
+          plan_informe:planes_auditoria_informe ( archivo_path, enviado_at )
+        `)
+        .order('fecha_auditoria', { ascending: true })
 
-      if (res.ok) {
-        setInformes(prev => prev.filter(inf => inf.id !== id))
-        toast.success('Informe eliminado correctamente')
-      } else {
-        const error = await res.json()
-        toast.error('Error al eliminar: ' + (error?.error || 'desconocido'))
+      if (error) throw error
+      const rows = data || []
+
+      const trySign = async (bucket, path) => {
+        try {
+          const { data: s } = await supabase.storage.from(bucket).createSignedUrl(path, 60)
+          return Boolean(s?.signedUrl)
+        } catch { return false }
       }
-    } catch (err) {
-      console.error('Error al eliminar:', err)
-      toast.error('Error inesperado al eliminar informe')
-    }
-  }
 
-  const contarCamposCompletos = (a) => {
-    const campos = [
-      'objetivo',
-      'criterios',
-      'conclusiones',
-      'fecha_auditoria',
-      'asistencia_tipo',
-      'fecha_seguimiento',
-      'recomendaciones',
-      'auditores_acompanantes'
-    ]
-    return campos.reduce((acc, campo) => (a[campo] ? acc + 1 : acc), 0)
-  }
+      const merged = await Promise.all(rows.map(async (a) => {
+        const fa = parseYMD(a.fecha_auditoria)
+        const due = fa ? {
+          plan:        addDays(fa, -5),
+          asistencia:  fa,
+          evaluacion:  fa,
+          acta:        fa,
+          actaComp:    addDays(fa, 15),
+          informeOk:   addDays(fa, 10),
+          validado:    addDays(fa, 10),
+        } : {}
 
-  const calcularAvance = (a) => {
-    const total = 8
-    const completos = contarCamposCompletos(a)
-    const tieneHallazgos =
-      (a.fortalezas?.length || 0) > 0 ||
-      (a.oportunidades_mejora?.length || 0) > 0 ||
-      (a.no_conformidades?.length || 0) > 0
+        const [hasPlan, hasAsis, hasEval, hasActa, hasActaComp, hasValid] = await Promise.all([
+          trySign('planes',         buildPlanPath(a)),
+          trySign('asistencias',    buildAsistenciaPath(a)),
+          trySign('evaluaciones',   buildEvaluacionPath(a)),
+          trySign('actas',          buildActaPath(a)),
+          trySign('actascompromiso',buildActaCompromisoPath(a)),
+          trySign('validaciones',   buildValidationPath(a)),
+        ])
 
-    if (completos < total) return 0
-    return tieneHallazgos ? 100 : 50
-  }
+        // Campos e hallazgos completos = "informeOk"
+        const isFilled = Boolean(a.objetivo?.trim()) && Boolean(a.criterios?.trim()) &&
+                         Boolean(a.conclusiones?.trim()) && Boolean(a.recomendaciones?.trim())
+        const hallCount = (a.fortalezas?.length || 0) + (a.oportunidades_mejora?.length || 0) + (a.no_conformidades?.length || 0)
+        const informeOk = isFilled && hallCount > 0
+        const validadoOk = hasValid || a.validado === true
 
-  const columnas = [
-    {
-      name: 'ID',
-      selector: row => row.id,
-      sortable: true,
-      width: '64px',
-      cell: row => <div className="w-full text-center">{row.id}</div>, // ✅ centra sin props raras
-    },
-    {
-      name: 'Año',
-      selector: row => {
-        const fecha = row.fecha_auditoria ? new Date(row.fecha_auditoria) : null
-        return fecha ? fecha.getFullYear() : 'N/A'
-      },
-      sortable: true,
-      width: '80px',
+        // Fechas de entrega (cuando existan)
+        const planSentAt = a?.plan_informe?.[0]?.enviado_at
+          || (hasPlan ? (await getFileTimestamps(supabase, 'planes', buildPlanPath(a)))?.created_at : null)
+        const asistenciaAt = hasAsis ? (await getFileTimestamps(supabase, 'asistencias', buildAsistenciaPath(a)))?.created_at : null
+        const evaluacionAt = hasEval ? (await getFileTimestamps(supabase, 'evaluaciones', buildEvaluacionPath(a)))?.created_at : null
+        const actaAt       = hasActa ? (await getFileTimestamps(supabase, 'actas', buildActaPath(a)))?.created_at : null
+        const actaCompAt   = hasActaComp ? (await getFileTimestamps(supabase, 'actascompromiso', buildActaCompromisoPath(a)))?.created_at : null
+        const validadoAt   = validadoOk ? (await getFileTimestamps(supabase, 'validaciones', buildValidationPath(a)))?.created_at : null
 
-    },
-    {
-      name: 'Fecha Audtoria',
-      selector: row => row.fecha_auditoria || 'N/A',
-      sortable: true,
-      cell: row => <div className="w-full text-center">{row.fecha_auditoria}</div>, // ✅ centra sin props raras
+        const _stages = {
+          plan:       { delivered: hasPlan,       due: due.plan,       deliveredAt: planSentAt ? new Date(planSentAt) : null },
+          asistencia: { delivered: hasAsis,       due: due.asistencia, deliveredAt: asistenciaAt ? new Date(asistenciaAt) : null },
+          evaluacion: { delivered: hasEval,       due: due.evaluacion, deliveredAt: evaluacionAt ? new Date(evaluacionAt) : null },
+          acta:       { delivered: hasActa,       due: due.acta,       deliveredAt: actaAt ? new Date(actaAt) : null },
+          actaComp:   { delivered: hasActaComp,   due: due.actaComp,   deliveredAt: actaCompAt ? new Date(actaCompAt) : null },
+          informeOk:  { delivered: informeOk,     due: due.informeOk,  deliveredAt: null },
+          validado:   { delivered: validadoOk,    due: due.validado,   deliveredAt: validadoAt ? new Date(validadoAt) : null },
+        }
 
-    },
-    {
-      name: 'Semestre',
-      selector: row => {
-        const fecha = row.fecha_auditoria ? new Date(row.fecha_auditoria) : null
-        if (!fecha) return 'N/A'
-        const mes = fecha.getMonth() + 1
-        return mes >= 1 && mes <= 6 ? '1' : '2'
-      },
-      sortable: true,
-      width: '120px',
+        // Puntuaciones
+        const docScore = [hasPlan, hasAsis, hasEval, hasActa, hasActaComp, validadoOk].reduce((n, b) => n + (b ? 1 : 0), 0)
+        const infoScore = docScore + (informeOk ? 1 : 0)
 
-    },
-    {
-      name: 'Dependencia',
-      selector: row => row.dependencias?.nombre || 'N/A',
-      sortable: true
-    },
-    {
-      name: 'Auditor',
-      selector: row =>
-        row.usuarios ? `${row.usuarios.nombre} ${row.usuarios.apellido}` : 'No asignado',
-      sortable: true
-    },
-    {
-      name: 'Avance',
-      selector: row => calcularAvance(row),
-      sortable: true,
-      cell: row => {
-        const progreso = calcularAvance(row)
-        let color = 'text-gray-600'
-        if (progreso === 100) color = 'text-green-600'
-        else if (progreso >= 50) color = 'text-yellow-600'
-        else color = 'text-red-600'
+        return {
+          ...a,
+          _flags: { plan: hasPlan, asistencia: hasAsis, evaluacion: hasEval, acta: hasActa, actaComp: hasActaComp, informeOk, validado: validadoOk },
+          _stages,
+          _scores: { docScore, infoScore }
+        }
+      }))
 
-        return <span className={`font-semibold ${color}`}>{progreso}%</span>
+      setAuditorias(merged)
+    } catch (e) {
+      console.error(e)
+      setError(e.message || 'Error cargando datos')
+    } finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  const years = useMemo(() => {
+    const s = new Set()
+    auditorias.forEach(a => { const d = parseYMD(a.fecha_auditoria); if (d) s.add(d.getFullYear()) })
+    return Array.from(s).sort((a, b) => a - b)
+  }, [auditorias])
+
+  const filtered = useMemo(() => {
+    if (!selectedYear) return auditorias
+    return auditorias.filter(a => {
+      const d = parseYMD(a.fecha_auditoria)
+      return d && String(d.getFullYear()) === String(selectedYear)
+    })
+  }, [auditorias, selectedYear])
+
+  /* ===== agregación por dependencia + orden por completitud promedio ===== */
+  const matrix = useMemo(() => {
+    const today = startOfDay(new Date())
+    const m = new Map()
+
+    // Recolecta items por dependencia
+    for (const a of filtered) {
+      const depId = a.dependencia_id ?? 'SIN_DEP'
+      const depName = a?.dependencias?.nombre || 'Sin dependencia'
+      if (!m.has(depId)) {
+        m.set(depId, { depId, depName, items: [] })
       }
-    },
-    {
-      name: 'Validado',
-      selector: row => row.validado,
-      sortable: true,
-      cell: row => (
-        <span className={`font-semibold ${row.validado ? 'text-green-600' : 'text-red-500'}`}>
-          {row.validado ? 'Sí' : 'No'}
-        </span>
-      )
-    },
-
-    {
-      // FORTALEZAS
-      name: <div className="w-full flex justify-end pr-1">F</div>,
-      selector: row => row.fortalezas?.length ?? 0,
-      sortable: true,
-      width: '80px',
-      cell: row => (
-        <div className="w-full flex justify-end pr-1">
-          <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold text-xs">
-            {row.fortalezas?.length ?? 0}
-          </span>
-        </div>
-      ),
-    },
-    {
-      // OPORTUNIDADES DE MEJORA
-      name: <div className="w-full flex justify-end pr-1">OM</div>,
-      selector: row => row.oportunidades_mejora?.length ?? 0,
-      sortable: true,
-      width: '80px',
-      cell: row => (
-        <div className="w-full flex justify-end pr-1">
-          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold text-xs">
-            {row.oportunidades_mejora?.length ?? 0}
-          </span>
-        </div>
-      ),
-    },
-    {
-      // NO CONFORMIDADES
-      name: <div className="w-full flex justify-end pr-1">NC</div>,
-      selector: row => row.no_conformidades?.length ?? 0,
-      sortable: true,
-      width: '80px',
-      cell: row => (
-        <div className="w-full flex justify-end pr-1">
-          <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold text-xs">
-            {row.no_conformidades?.length ?? 0}
-          </span>
-        </div>
-      ),
-    },
-
-
-    {
-      name: 'Acciones',
-      cell: row => {
-        const progreso = calcularAvance(row)
-        const puedeDescargar = progreso === 100 && row.validado === true
-
-        return (
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                setInformeDetalle(row)
-                setMostrarDetalle(true)
-              }}
-              className="bg-blue-500 text-white px-1 py-1 rounded hover:bg-blue-600 text-s"
-            >
-              Ver más
-            </button>
-
-            {puedeDescargar && (
-              <button
-                onClick={() => handleDescargarValidacion(row, toast)}
-                className="bg-emerald-600 text-white px-1 py-1 rounded hover:bg-emerald-700 text-s"
-                title="Descargar informe validado"
-              >
-                Descargar
-              </button>
-            )}
-
-            <button
-              onClick={() => {
-                setInformeAEliminar(row.id)
-                setMostrarConfirmacion(true)
-              }}
-              className="bg-red-500 text-white px-1 py-1 rounded hover:bg-red-600 text-s"
-            >
-              Eliminar
-            </button>
-          </div>
-        )
-      }
+      m.get(depId).items.push(a)
     }
 
+    // Agrega métricas agregadas + % avance + tooltips
+    const cols = ['plan','asistencia','evaluacion','acta','actaComp','informeOk','validado']
+    const list = Array.from(m.values()).map(row => {
+      const total = row.items.length
+      const agg = {}
+      let sumDone = 0
 
+      for (const key of cols) {
+        let done = 0, overdue = 0, pending = 0
+        let nextDue = null, lastDelivered = null
+
+        for (const a of row.items) {
+          const st = a._stages?.[key]
+          if (!st) continue
+          if (st.delivered) {
+            done++
+            if (st.deliveredAt && (!lastDelivered || st.deliveredAt > lastDelivered)) {
+              lastDelivered = st.deliveredAt
+            }
+          } else {
+            pending++
+            if (st.due) {
+              if (st.due < today) overdue++
+              if (st.due >= today && (!nextDue || st.due < nextDue)) nextDue = st.due
+            }
+          }
+        }
+
+        sumDone += done
+        agg[key] = { done, total, overdue, pending, nextDue, lastDelivered }
+      }
+
+      const completion = total ? (sumDone / (total * cols.length)) : 0
+      return { depId: row.depId, depName: row.depName, total, completion, _agg: agg }
+    })
+
+    // Orden por mayor completitud promedio (más “información subida” primero)
+    return list.sort((a, b) => (b.completion - a.completion) || a.depName.localeCompare(b.depName))
+  }, [filtered])
+
+  /* ===== KPIs globales ===== */
+  const kpis = useMemo(() => {
+    const t = { total: filtered.length, plan: 0, asistencia: 0, evaluacion: 0, acta: 0, actaComp: 0, informeOk: 0, validado: 0 }
+    filtered.forEach(a => {
+      const f = a._flags || {}
+      if (f.plan) t.plan++
+      if (f.asistencia) t.asistencia++
+      if (f.evaluacion) t.evaluacion++
+      if (f.acta) t.acta++
+      if (f.actaComp) t.actaComp++
+      if (f.informeOk) t.informeOk++
+      if (f.validado) t.validado++
+    })
+    const pct = (n) => (t.total ? Math.round((n / t.total) * 100) : 0)
+    return { ...t, pct }
+  }, [filtered])
+
+  const columns = [
+    { key: 'plan',       title: 'Plan' },
+    { key: 'asistencia', title: 'Asistencia' },
+    { key: 'evaluacion', title: 'Evaluación' },
+    { key: 'acta',       title: 'Acta' },
+    { key: 'actaComp',   title: 'Acta Comp.' },
+    { key: 'informeOk',  title: 'Informe OK' },
+    { key: 'validado',   title: 'Validado' },
   ]
 
+  return (
+    <div className={styles.wrapper}>
+      <main className={styles.content}>
+        {/* Toolbar / Filtros / KPIs */}
+        <div className={styles.toolbar}>
+          <div className={styles.toolbarTop}>
+            <h3 className={styles.toolbarTitle}>Malla de control — Vista general</h3>
+            <div className={styles.toolbarActions}>
+              <label className={styles.inputGroup}>
+                <span className={styles.inputLabel}>Año</span>
+                <select className={styles.inputBase} value={selectedYear} onChange={e => setSelectedYear(e.target.value)}>
+                  <option value="">Todos</option>
+                  {years.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </label>
+              <button className={styles.refreshBtn} onClick={loadData} title="Recargar">↻</button>
+            </div>
+          </div>
+
+          <div className={styles.kpisBar}>
+            <KpiChip label="Total" value={kpis.total} />
+            <KpiChip label="Plan" value={`${kpis.plan}/${kpis.total} — ${kpis.pct(kpis.plan)}%`} />
+            <KpiChip label="Asistencia" value={`${kpis.asistencia}/${kpis.total} — ${kpis.pct(kpis.asistencia)}%`} />
+            <KpiChip label="Evaluación" value={`${kpis.evaluacion}/${kpis.total} — ${kpis.pct(kpis.evaluacion)}%`} />
+            <KpiChip label="Acta" value={`${kpis.acta}/${kpis.total} — ${kpis.pct(kpis.acta)}%`} />
+            <KpiChip label="Acta Comp." value={`${kpis.actaComp}/${kpis.total} — ${kpis.pct(kpis.actaComp)}%`} />
+            <KpiChip label="Informe OK" value={`${kpis.informeOk}/${kpis.total} — ${kpis.pct(kpis.informeOk)}%`} />
+            <KpiChip label="Validados" value={`${kpis.validado}/${kpis.total} — ${kpis.pct(kpis.validado)}%`} />
+          </div>
+        </div>
+
+        {/* Leyenda de colores */}
+        <div className={styles.legend}>
+          <span>Progreso por celda:</span>
+          <i className={`${styles.legendBox} ${styles.heat0}`} title="0%"></i>
+          <i className={`${styles.legendBox} ${styles.heat1}`} title=">0%"></i>
+          <i className={`${styles.legendBox} ${styles.heat2}`} title="≥25%"></i>
+          <i className={`${styles.legendBox} ${styles.heat3}`} title="≥50%"></i>
+          <i className={`${styles.legendBox} ${styles.heat4}`} title="≥70%"></i>
+          <i className={`${styles.legendBox} ${styles.heat5}`} title="≥90%"></i>
+        </div>
+
+        {/* Heatmap por dependencia */}
+        <section className={styles.gridCard}>
+          <div className={styles.gridHeader}>
+            <div className={styles.gridHeadSticky}>Dependencia</div>
+            <div className={styles.gridHead}>Avance %</div>
+            {['Plan','Asistencia','Evaluación','Acta','Acta Comp.','Informe OK','Validado'].map(h => (
+              <div key={h} className={styles.gridHead}>{h}</div>
+            ))}
+          </div>
+
+          {loading && <div className={styles.skeletonList} style={{ padding: 12 }}>Cargando…</div>}
+          {error && <div className={styles.errorBox}>⚠️ {error}</div>}
+          {!loading && !error && matrix.length === 0 && (
+            <div className={styles.emptyBox}>Sin resultados para el filtro seleccionado.</div>
+          )}
+
+          <div className={styles.gridBody}>
+            {matrix.map(row => {
+              const pct = Math.round(row.completion * 100)
+              return (
+                <div key={row.depId} className={styles.gridRow}>
+                  <div
+                    className={`${styles.depCell} ${styles.depCellClickable}`}
+                    onClick={() => setDetailDepId(row.depId)}
+                    title="Click para ver detalle por auditoría"
+                  >
+                    {row.depName}
+                  </div>
+
+                  {/* % de avance */}
+                  <div className={styles.progressCell}>
+                    <div className={styles.progressTrack}>
+                      <div className={styles.progressFill} style={{ width: `${pct}%` }} aria-label={`Avance ${pct}%`} />
+                    </div>
+                    <span className={styles.progressLabel}>{pct}%</span>
+                  </div>
+
+                  {columns.map(col => {
+                    const ag = row._agg[col.key] || { done: 0, total: row.total, overdue: 0, pending: 0, nextDue: null, lastDelivered: null }
+                    const localPct = ag.total ? Math.round((ag.done / ag.total) * 100) : 0
+                    const cls = heatClass(localPct, styles)
+                    const tip = buildTooltip(col.title, ag)
+                    return (
+                      <div key={col.key} className={`${styles.cell} ${cls}`} title={tip} aria-label={tip}>
+                        <span className={styles.cellText}>{ag.done}/{ag.total}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      </main>
+
+      {/* ===== Modal de detalle por dependencia (auditorías individuales) ===== */}
+      {detailDepId && (
+        <DetailModal
+          depId={detailDepId}
+          onClose={() => setDetailDepId(null)}
+          items={filtered.filter(a => (a.dependencia_id ?? 'SIN_DEP') === detailDepId)}
+        />
+      )}
+    </div>
+  )
+}
+
+/* ===== Subcomponentes UI ===== */
+function KpiChip({ label, value }) {
+  return (
+    <span className={styles.kpiChip}>
+      <strong>{label}:</strong> {value}
+    </span>
+  )
+}
+
+function heatClass(pct, s) {
+  if (pct >= 90) return s.heat5
+  if (pct >= 70) return s.heat4
+  if (pct >= 50) return s.heat3
+  if (pct >= 25) return s.heat2
+  if (pct > 0)  return s.heat1
+  return s.heat0
+}
+
+function buildTooltip(title, ag) {
+  const parts = []
+  parts.push(`${title}: ${ag.done}/${ag.total}`)
+  if (typeof ag.pending === 'number') parts.push(`Pendientes: ${ag.pending}`)
+  if (typeof ag.overdue === 'number') parts.push(`Vencidos: ${ag.overdue}`)
+  if (ag.nextDue) parts.push(`Próximo límite: ${fmt(ag.nextDue)}`)
+  if (ag.lastDelivered) parts.push(`Última entrega: ${fmt(ag.lastDelivered)}`)
+  return parts.join(' · ')
+}
+
+/* ===== Modal detalle ===== */
+function DetailModal({ depId, onClose, items }) {
+  const today = startOfDay(new Date())
+
+  const cols = [
+    { key: 'plan',       title: 'Plan' },
+    { key: 'asistencia', title: 'Asistencia' },
+    { key: 'evaluacion', title: 'Evaluación' },
+    { key: 'acta',       title: 'Acta' },
+    { key: 'actaComp',   title: 'Acta Comp.' },
+    { key: 'informeOk',  title: 'Informe OK' },
+    { key: 'validado',   title: 'Validado' },
+  ]
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-700">Informes de Auditoría</h2>
+    <div className={styles.modalOverlay} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className={styles.modalCard}>
+        <button className={styles.modalClose} onClick={onClose}>✖</button>
+        <h3 className={styles.modalTitle}>Detalle por auditoría</h3>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
-        {/* Búsqueda */}
-        <input
-          type="text"
-          placeholder="Buscar por nombre, dependencia o ID"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="border p-2 rounded w-full"
-        />
-
-        {/* Dependencia */}
-        <select
-          value={filtroDependencia}
-          onChange={(e) => setFiltroDependencia(e.target.value)}
-          className="border p-2 rounded w-full"
-        >
-          <option value="">Todas las dependencias</option>
-          {dependencias.map((dep) => (
-            <option key={dep.dependencia_id} value={dep.dependencia_id}>
-              {dep.nombre}
-            </option>
+        <div className={styles.auditTable}>
+          <div className={`${styles.auditTh} ${styles.auditColId}`}>ID</div>
+          <div className={`${styles.auditTh} ${styles.auditColFecha}`}>Fecha auditoría</div>
+          {cols.map(c => (
+            <div key={c.key} className={`${styles.auditTh} ${styles.auditColStage}`}>{c.title}</div>
           ))}
-        </select>
 
-        {/* Auditor */}
-        <select
-          value={filtroAuditor}
-          onChange={(e) => setFiltroAuditor(e.target.value)}
-          className="border p-2 rounded w-full"
-        >
-          <option value="">Todos los auditores</option>
-          {auditores.map((a) => (
-            <option key={a.usuario_id} value={a.usuario_id}>
-              {a.nombre} {a.apellido}
-            </option>
-          ))}
-        </select>
-
-        {/* Año */}
-        <select
-          value={filtroAnio}
-          onChange={(e) => setFiltroAnio(e.target.value)}
-          className="border p-2 rounded w-full"
-        >
-          <option value="">Todos los años</option>
-          {[...new Set(informes.map((i) =>
-            i.fecha_auditoria ? new Date(i.fecha_auditoria).getFullYear() : null
-          ))]
-            .filter((a) => a)
-            .sort()
-            .map((anio) => (
-              <option key={anio} value={anio}>{anio}</option>
-            ))}
-        </select>
-
-        {/* Semestre */}
-        <select
-          value={filtroSemestre}
-          onChange={(e) => setFiltroSemestre(e.target.value)}
-          className="border p-2 rounded w-full"
-        >
-          <option value="">Todos los semestres</option>
-          <option value="1">1</option>
-          <option value="2">2</option>
-        </select>
+          {items.map(a => {
+            const fa = parseYMD(a.fecha_auditoria)
+            return (
+              <FragmentRow key={a.id} a={a} fa={fa} cols={cols} today={today} />
+            )
+          })}
+        </div>
       </div>
-
-      {/* Tabla de informes */}
-      <DataTable
-        columns={columnas}
-        data={informesFiltrados}
-        pagination
-        highlightOnHover
-        responsive
-        striped
-        noDataComponent="No hay informes registrados."
-      />
-
-
-      {/* Botón para agregar nuevo */}
-      <div className="flex justify-center mt-4">
-        <button
-          onClick={() => setMostrarModal(true)}
-          className="text-3xl text-white bg-emerald-600 hover:bg-emerald-700 rounded-full w-14 h-14 flex items-center justify-center shadow-xl"
-          title="Crear nuevo informe"
-        >
-          +
-        </button>
-      </div>
-
-      {/* Modal */}
-      {mostrarModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md space-y-4">
-            <h3 className="text-xl font-bold text-gray-700">Nueva Auditoria</h3>
-
-            <div>
-              <label className="block text-sm font-medium">Dependencia</label>
-              <select
-                name="dependencia_id"
-                value={nuevoInforme.dependencia_id}
-                onChange={handleChange}
-                className="w-full border p-2 rounded"
-              >
-                <option value="">Seleccione una dependencia</option>
-                {dependencias.map((dep) => (
-                  <option key={dep.dependencia_id} value={dep.dependencia_id}>
-                    {dep.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium">Auditor Responsable</label>
-              <select
-                name="usuario_id"
-                value={nuevoInforme.usuario_id}
-                onChange={handleChange}
-                className="w-full border p-2 rounded"
-              >
-                <option value="">Seleccione un auditor</option>
-                {auditores.map((a) => (
-                  <option key={a.usuario_id} value={a.usuario_id}>
-                    {a.nombre} {a.apellido}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium">Fecha de Auditoría</label>
-              <input
-                type="date"
-                name="fecha_auditoria"
-                value={nuevoInforme.fecha_auditoria}
-                onChange={handleChange}
-                className="w-full border p-2 rounded"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setMostrarModal(false)}
-                className="px-4 py-2 rounded text-gray-500 hover:text-gray-700"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={crearInforme}
-                className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700"
-              >
-                Crear
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {mostrarConfirmacion && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md space-y-4">
-            <h3 className="text-lg font-bold text-gray-800">¿Eliminar informe?</h3>
-            <p className="text-sm text-gray-600">Esta acción eliminará el informe y todos sus hallazgos asociados. ¿Estás seguro?</p>
-
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setMostrarConfirmacion(false)}
-                className="px-4 py-2 rounded text-gray-500 hover:text-gray-700"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={async () => {
-                  await eliminarInforme(informeAEliminar)
-                  setMostrarConfirmacion(false)
-                }}
-                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-              >
-                Eliminar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {mostrarDetalle && informeDetalle && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold text-gray-700">Detalle del Informe</h3>
-
-            <div className="space-y-2 text-sm text-gray-800">
-              <p><strong>ID:</strong> {informeDetalle.id}</p>
-              <p><strong>Auditor Responsable:</strong> {informeDetalle.usuarios?.nombre} {informeDetalle.usuarios?.apellido}</p>
-              <p><strong>Dependencia:</strong> {informeDetalle.dependencias?.nombre}</p>
-              <p><strong>Fecha de Auditoría:</strong> {informeDetalle.fecha_auditoria || 'N/A'}</p>
-              <p><strong>Tipo de Asistencia:</strong> {informeDetalle.asistencia_tipo || 'N/A'}</p>
-              <p><strong>Fecha de Seguimiento:</strong> {informeDetalle.fecha_seguimiento || 'N/A'}</p>
-              <p><strong>Acompañantes:</strong> {informeDetalle.auditores_acompanantes?.join(', ') || 'N/A'}</p>
-              <p><strong>Objetivo:</strong> {informeDetalle.objetivo || 'N/A'}</p>
-              <p><strong>Criterios:</strong> {informeDetalle.criterios || 'N/A'}</p>
-              <p><strong>Conclusiones:</strong> {informeDetalle.conclusiones || 'N/A'}</p>
-              <p><strong>Recomendaciones:</strong> {informeDetalle.recomendaciones || 'N/A'}</p>
-              <p><strong>Fortalezas:</strong> {informeDetalle.fortalezas?.length || 0}</p>
-              <p><strong>Oportunidades de Mejora:</strong> {informeDetalle.oportunidades_mejora?.length || 0}</p>
-              <p><strong>No Conformidades:</strong> {informeDetalle.no_conformidades?.length || 0}</p>
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                onClick={() => setMostrarDetalle(false)}
-                className="px-4 py-2 rounded text-gray-600 hover:text-gray-800 border border-gray-300"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
+  )
+}
+
+function FragmentRow({ a, fa, cols, today }) {
+  return (
+    <>
+      <div className={styles.auditTd}>{a.id}</div>
+      <div className={styles.auditTd}>{fa ? fmt(fa) : '—'}</div>
+      {cols.map(c => {
+        const st = a._stages?.[c.key]
+        const delivered = !!st?.delivered
+        const due = st?.due || null
+        const deliveredAt = st?.deliveredAt || null
+
+        let label = ''
+        let cls = styles.chipPending
+
+        if (delivered) {
+          label = deliveredAt ? `Entregado • ${fmt(deliveredAt)}` : 'Entregado'
+          cls = styles.chipOk
+        } else if (due) {
+          const d = daysBetween(today, due)
+          if (d < 0) { label = `Vencido ${Math.abs(d)} d • ${fmt(due)}`; cls = styles.chipOverdue }
+          else if (d === 0) { label = `Hoy • ${fmt(due)}`; cls = styles.chipToday }
+          else if (d <= 3) { label = `Faltan ${d} d • ${fmt(due)}`; cls = styles.chipSoon }
+          else { label = `Faltan ${d} d • ${fmt(due)}`; cls = styles.chipPending }
+        } else {
+          label = 'Sin fecha'
+          cls = styles.chipPending
+        }
+
+        return <div key={c.key} className={styles.auditTd}><span className={`${styles.chip} ${cls}`}>{label}</span></div>
+      })}
+    </>
   )
 }
