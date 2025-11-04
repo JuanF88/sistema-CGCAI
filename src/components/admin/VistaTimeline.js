@@ -64,7 +64,7 @@ export default function AuditoriasVerificacionAdmin() {
 
   // modal detalle
   const [showDetail, setShowDetail] = useState(false)
-  const [setInformes] = useState([])
+  const [, setInformes] = useState([])
 
   // ✅ NUEVOS estados: modal/archivo/subida Acta de Compromiso
   const [actaCompModalOpen, setActaCompModalOpen] = useState(false)
@@ -217,8 +217,16 @@ const handleDateKeyDown = useCallback((e) => {
       const { error: upErr } = await supabase.storage.from('validaciones').upload(filePath, validateFile, { upsert: true, contentType: 'application/pdf' })
       if (upErr) throw upErr
 
-      await supabase.from('validaciones_informe').insert([{ informe_id: a.id, archivo_url: filePath }]).catch(() => {})
-      await supabase.from('informes_auditoria').update({ validado: true }).eq('id', a.id).catch(() => {})
+    const { error: upsertValErr } = await supabase
+      .from('validaciones_informe')
+      .upsert({ informe_id: a.id, archivo_url: filePath }, { onConflict: 'informe_id' })
+    if (upsertValErr) throw upsertValErr
+
+    const { error: updInfErr } = await supabase
+      .from('informes_auditoria')
+      .update({ validado: true })
+      .eq('id', a.id)
+    if (updInfErr) throw updInfErr
 
       const { data: signedVal } = await supabase.storage.from('validaciones').createSignedUrl(filePath, 3600)
       setAuditorias(prev => prev.map(x => x.id === a.id ? { ...x, validated: { file: filePath, url: signedVal?.signedUrl || null }, validado: true } : x))
@@ -292,7 +300,13 @@ const handleDateKeyDown = useCallback((e) => {
 
       const { data: userRes } = await supabase.auth.getUser()
       const enviado_por = userRes?.user?.id || null
-      await supabase.from('planes_auditoria_informe').upsert({ informe_id: a.id, archivo_path: filePath, enviado_por }, { onConflict: 'informe_id' }).catch(() => {})
+      const { error: upDbErr } = await supabase
+        .from('planes_auditoria_informe')
+        .upsert(
+          { informe_id: a.id, archivo_path: filePath, enviado_por },
+          { onConflict: 'informe_id' }
+        )
+      if (upDbErr) throw upDbErr
 
       const { data: signed } = await supabase.storage.from('planes').createSignedUrl(filePath, 3600)
       setAuditorias(prev => prev.map(x => x.id === a.id ? { ...x, plan: { path: filePath, enviado_at: new Date().toISOString(), url: signed?.signedUrl || null } } : x))
@@ -612,7 +626,10 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         explicitDone: Boolean(selected.plan?.url || selected.plan?.enviado_at),
         subtitle: selected.plan?.enviado_at ? `Enviado el ${fmt(new Date(selected.plan.enviado_at))}` : 'Programar y enviar (5 días antes).',
         actions: selected.plan?.url
-          ? [{ label: 'Ver plan', onClick: () => openInNewTab(selected.plan.url) }]
+            ? [
+                { label: 'Ver plan', onClick: () => openInNewTab(selected.plan.url) },
+                { label: 'Reemplazar plan', onClick: () => setPlanModalOpen(true) },
+              ]
           : [{ label: 'Subir plan', onClick: () => setPlanModalOpen(true) }]
       },
             {
@@ -623,7 +640,10 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         explicitDone: Boolean(selected.acta_compromiso?.url),
         subtitle: selected.acta_compromiso?.url ? 'Cargada.' : 'Subir PDF del acta de compromiso.',
         actions: selected.acta_compromiso?.url
-          ? [{ label: 'Ver acta compromiso', onClick: () => openInNewTab(selected.acta_compromiso.url) }]
+            ? [
+                { label: 'Ver acta compromiso', onClick: () => openInNewTab(selected.acta_compromiso.url) },
+                { label: 'Reemplazar acta compromiso', onClick: () => setActaCompModalOpen(true) },
+              ]
           : [{ label: 'Subir acta compromiso', onClick: () => setActaCompModalOpen(true) }]
       },
       {
@@ -634,7 +654,10 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         explicitDone: Boolean(selected.asistencia?.url),
         subtitle: selected.asistencia?.url ? 'Cargado.' : 'Subir PDF del listado de asistencia.',
         actions: selected.asistencia?.url
-          ? [{ label: 'Ver asistencia', onClick: () => openInNewTab(selected.asistencia.url) }]
+            ? [
+                { label: 'Ver asistencia', onClick: () => openInNewTab(selected.asistencia.url) },
+                { label: 'Reemplazar asistencia', onClick: () => setAsistenciaModalOpen(true) },
+              ]
           : [{ label: 'Subir asistencia', onClick: () => setAsistenciaModalOpen(true) }]
       },
       {
@@ -645,7 +668,10 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         explicitDone: Boolean(selected.evaluacion?.url),
         subtitle: selected.evaluacion?.url ? 'Cargada.' : 'Subir PDF de evaluación.',
         actions: selected.evaluacion?.url
-          ? [{ label: 'Ver evaluación', onClick: () => openInNewTab(selected.evaluacion.url) }]
+            ? [
+                { label: 'Ver evaluación', onClick: () => openInNewTab(selected.evaluacion.url) },
+                { label: 'Reemplazar evaluación', onClick: () => setEvaluacionModalOpen(true) },
+              ]
           : [{ label: 'Subir evaluación', onClick: () => setEvaluacionModalOpen(true) }]
       },
       {
@@ -656,7 +682,10 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         explicitDone: Boolean(selected.acta?.url),
         subtitle: selected.acta?.url ? 'Cargada.' : 'Subir PDF del acta de reunión.',
         actions: selected.acta?.url
-          ? [{ label: 'Ver acta', onClick: () => openInNewTab(selected.acta.url) }]
+            ? [
+                { label: 'Ver acta', onClick: () => openInNewTab(selected.acta.url) },
+                { label: 'Reemplazar acta', onClick: () => setActaModalOpen(true) },
+              ]
           : [{ label: 'Subir acta', onClick: () => setActaModalOpen(true) }]
       },
       {
@@ -670,28 +699,27 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
           : (!hasHallazgos
               ? 'Campos listos. Asignar hallazgos.'
               : (hasValidated ? 'Informe validado.' : 'Campos e hallazgos listos: descarga y valida.')),
-              actions: hasValidated
-  ? (validatedHref
-      ? [{
-          label: 'Ver informe validado',
-          onClick: () => openInNewTab(validatedHref)
-        }]
-      : [{
-          label: 'Abrir validado',
-          onClick: async () => {
-            const path = buildValidationPath(selected)
-            const { data } = await supabase.storage.from('validaciones').createSignedUrl(path, 3600)
-            if (data?.signedUrl) openInNewTab(data.signedUrl)
-            else toast.error('No se encontró el PDF validado en almacenamiento.')
-          }
-        }]
-    )
-  : (!isFilled || !hasHallazgos
-      ? [{ label: isFilled ? 'Editar/Llenar (auditor)' : 'Llenar (auditor)', onClick: () => toast.info('Edición desde vista del auditor'), ghost: true }]
-      : [
-          { label: '📄 Descargar informe', onClick: () => handleDescargarInforme(selected) },
-          { label: '✅ Subir validado', onClick: () => setValidateModalOpen(true) }
-        ])
+            actions: hasValidated
+              ? [
+                  validatedHref
+                    ? { label: 'Ver informe validado', onClick: () => openInNewTab(validatedHref) }
+                    : {
+                        label: 'Abrir validado',
+                        onClick: async () => {
+                          const path = buildValidationPath(selected)
+                          const { data } = await supabase.storage.from('validaciones').createSignedUrl(path, 3600)
+                          if (data?.signedUrl) openInNewTab(data.signedUrl)
+                          else toast.error('No se encontró el PDF validado en almacenamiento.')
+                        }
+                      },
+                  { label: 'Reemplazar validado', onClick: () => setValidateModalOpen(true) },
+                ]
+              : (!isFilled || !hasHallazgos
+                  ? [{ label: isFilled ? 'Editar/Llenar (auditor)' : 'Llenar (auditor)', onClick: () => toast.info('Edición desde vista del auditor'), ghost: true }]
+                  : [
+                      { label: '📄 Descargar informe', onClick: () => handleDescargarInforme(selected) },
+                      { label: '✅ Subir validado', onClick: () => setValidateModalOpen(true) }
+                    ])
 
       },
       {
@@ -1101,7 +1129,9 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         >
           <div className={styles.modalContenido}>
             <button className={styles.modalCerrar} onClick={() => { setActaCompModalOpen(false); setActaCompFile(null) }}>✖</button>
-            <h3 className={styles.modalTitulo}>Acta de compromiso — Subir PDF</h3>
+            <h3 className={styles.modalTitulo}>
+              {selected?.acta_compromiso?.url ? 'Reemplazar acta de compromiso' : 'Acta de compromiso — Subir PDF'}
+            </h3>
 
             {selected?.acta_compromiso?.url && (
               <a
@@ -1149,7 +1179,7 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
                 onClick={() => subirActaCompromiso(selected)}
                 disabled={!actaCompFile || uploadingActaComp}
               >
-                {uploadingActaComp ? 'Subiendo…' : 'Subir'}
+                {uploadingActaComp ? 'Subiendo…' : (selected?.acta_compromiso?.url ? 'Reemplazar' : 'Subir')}
               </button>
               <button className={styles.botonCancelar} onClick={() => { setActaCompModalOpen(false); setActaCompFile(null) }}>
                 Cancelar
@@ -1164,7 +1194,9 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         <div className={styles.modalOverlay} onClick={(e) => { if (e.target === e.currentTarget) { setAsistenciaModalOpen(false); setAsistenciaFile(null) } }}>
           <div className={styles.modalContenido}>
             <button className={styles.modalCerrar} onClick={() => { setAsistenciaModalOpen(false); setAsistenciaFile(null) }}>✖</button>
-            <h3 className={styles.modalTitulo}>Listado de asistencia — Subir PDF</h3>
+            <h3 className={styles.modalTitulo}>
+              {selected?.asistencia?.url ? 'Reemplazar listado de asistencia' : 'Listado de asistencia — Subir PDF'}
+            </h3>
 
             {selected?.asistencia?.url && (
               <a href={selected.asistencia.url} target="_blank" rel="noopener noreferrer" className={styles.btnVerActual} onClick={(e)=>{e.preventDefault(); openInNewTab(selected.asistencia.url)}}>
@@ -1199,7 +1231,7 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
 
             <div className={styles.modalBotones}>
               <button className={styles.botonSubir} onClick={() => subirAsistencia(selected)} disabled={!asistenciaFile || uploadingAsistencia}>
-                {uploadingAsistencia ? 'Subiendo…' : 'Subir'}
+                {uploadingAsistencia ? 'Subiendo…' : (selected?.asistencia?.url ? 'Reemplazar' : 'Subir')}
               </button>
               <button className={styles.botonCancelar} onClick={() => { setAsistenciaModalOpen(false); setAsistenciaFile(null) }}>Cancelar</button>
             </div>
@@ -1212,7 +1244,9 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         <div className={styles.modalOverlay} onClick={(e) => { if (e.target === e.currentTarget) { setEvaluacionModalOpen(false); setEvaluacionFile(null) } }}>
           <div className={styles.modalContenido}>
             <button className={styles.modalCerrar} onClick={() => { setEvaluacionModalOpen(false); setEvaluacionFile(null) }}>✖</button>
-            <h3 className={styles.modalTitulo}>Evaluación — Subir PDF</h3>
+            <h3 className={styles.modalTitulo}>
+            {selected?.evaluacion?.url ? 'Reemplazar evaluación' : 'Evaluación — Subir PDF'}
+            </h3>
 
             {selected?.evaluacion?.url && (
               <a href={selected.evaluacion.url} target="_blank" rel="noopener noreferrer" className={styles.btnVerActual} onClick={(e)=>{e.preventDefault(); openInNewTab(selected.evaluacion.url)}}>
@@ -1247,7 +1281,7 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
 
             <div className={styles.modalBotones}>
               <button className={styles.botonSubir} onClick={() => subirEvaluacion(selected)} disabled={!evaluacionFile || uploadingEvaluacion}>
-                {uploadingEvaluacion ? 'Subiendo…' : 'Subir'}
+                {uploadingEvaluacion ? 'Subiendo…' : (selected?.evaluacion?.url ? 'Reemplazar' : 'Subir')}
               </button>
               <button className={styles.botonCancelar} onClick={() => { setEvaluacionModalOpen(false); setEvaluacionFile(null) }}>Cancelar</button>
             </div>
@@ -1261,7 +1295,9 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         <div className={styles.modalOverlay} onClick={(e) => { if (e.target === e.currentTarget) { setActaModalOpen(false); setActaFile(null) } }}>
           <div className={styles.modalContenido}>
             <button className={styles.modalCerrar} onClick={() => { setActaModalOpen(false); setActaFile(null) }}>✖</button>
-            <h3 className={styles.modalTitulo}>Acta de reunión — Subir PDF</h3>
+            <h3 className={styles.modalTitulo}>
+              {selected?.acta?.url ? 'Reemplazar acta de reunión' : 'Acta de reunión — Subir PDF'}
+            </h3>
 
             {selected?.acta?.url && (
               <a href={selected.acta.url} target="_blank" rel="noopener noreferrer" className={styles.btnVerActual} onClick={(e)=>{e.preventDefault(); openInNewTab(selected.acta.url)}}>
@@ -1296,7 +1332,7 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
 
             <div className={styles.modalBotones}>
               <button className={styles.botonSubir} onClick={() => subirActa(selected)} disabled={!actaFile || uploadingActa}>
-                {uploadingActa ? 'Subiendo…' : 'Subir'}
+                {uploadingActa ? 'Subiendo…' : (selected?.acta?.url ? 'Reemplazar' : 'Subir')}
               </button>
               <button className={styles.botonCancelar} onClick={() => { setActaModalOpen(false); setActaFile(null) }}>Cancelar</button>
             </div>
@@ -1309,7 +1345,9 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         <div className={styles.modalOverlay} onClick={(e) => { if (e.target === e.currentTarget) { setValidateModalOpen(false); setValidateFile(null) } }}>
           <div className={styles.modalContenido}>
             <button className={styles.modalCerrar} onClick={() => { setValidateModalOpen(false); setValidateFile(null) }}>✖</button>
-            <h3 className={styles.modalTitulo}>Validar informe — Subir PDF firmado</h3>
+            <h3 className={styles.modalTitulo}>
+              {selected?.validated?.url ? 'Reemplazar informe validado — Subir PDF firmado' : 'Validar informe — Subir PDF firmado'}
+            </h3>
 
             <label className={styles.dropArea}>
               <input
@@ -1338,7 +1376,7 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
 
             <div className={styles.modalBotones}>
               <button className={styles.botonSubir} onClick={() => handleValidarInforme(selected)} disabled={!validateFile || uploadingValidation}>
-                {uploadingValidation ? 'Subiendo…' : 'Subir y validar'}
+                {uploadingValidation ? 'Subiendo…' : (selected?.validated?.url ? 'Reemplazar validado' : 'Subir y validar')}
               </button>
               <button className={styles.botonCancelar} onClick={() => { setValidateModalOpen(false); setValidateFile(null) }}>Cancelar</button>
             </div>
