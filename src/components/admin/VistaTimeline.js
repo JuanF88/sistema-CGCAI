@@ -98,19 +98,22 @@ export default function AuditoriasVerificacionAdmin() {
       )
     }
 
-    return novedades.map((nv) => (
+    novedades.map((nv) => (
       <button
         key={nv.path}
         className={styles.btn}
         title={nv.name}
         onClick={(e) => {
           e.preventDefault()
-          nv.url && openInNewTab(nv.url)
+          if (nv.url) {
+            openInNewTab(nv.url)
+          }
         }}
       >
         ⭐ {nv.displayLabel}
       </button>
     ))
+
   }
 
   const eliminarInforme = async (id) => {
