@@ -85,6 +85,34 @@ export default function AuditoriasVerificacionAdmin() {
   const [actaCompFile, setActaCompFile] = useState(null)
   const [uploadingActaComp, setUploadingActaComp] = useState(false)
 
+  const renderNovedades = () => {
+    if (novedadesLoading) {
+      return (
+        <span className={styles.kpiChip2}>Cargando novedades…</span>
+      )
+    }
+
+    if (novedades.length === 0) {
+      return (
+        <span className={styles.kpiChip2}>Sin novedades registradas</span>
+      )
+    }
+
+    return novedades.map((nv) => (
+      <button
+        key={nv.path}
+        className={styles.btn}
+        title={nv.name}
+        onClick={(e) => {
+          e.preventDefault()
+          nv.url && openInNewTab(nv.url)
+        }}
+      >
+        ⭐ {nv.displayLabel}
+      </button>
+    ))
+  }
+
   const eliminarInforme = async (id) => {
     try {
       const res = await fetch('/api/informes', {
@@ -1242,32 +1270,31 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
               Haz clic en una novedad para abrirla.
             </p>
 
-            {/* Lista de novedades como chips (estilo ya usado) */}
-        
-              <div className={styles.kpisBar2} style={{ margin: '8px 0 16px' }}>
-                {novedadesLoading ? (
-                  <span className={styles.kpiChip2}>Cargando novedades…</span>
-                ) : novedades.length === 0 ? (
-                  <span className={styles.kpiChip2}>Sin novedades registradas</span>
-                ) : (
-                  novedades.map((nv) => (
-                    <button
-                      key={nv.path}
-                      className={styles.btn}
-                      title={nv.name}
-                      onClick={(e) => {
-                        e.preventDefault()
-                        nv.url && openInNewTab(nv.url)
-                      }}
-                    >
-                      ⭐ {nv.displayLabel}
-                    </button>
-                  ))
-                )}
-              </div>
+            {/* Lista de novedades como chips (estilo ya usado)
+            <div className={styles.kpisBar2} style={{ margin: '8px 0 16px' }}>
+            {novedadesLoading ? (
+              <span className={styles.kpiChip2}>Cargando novedades…</span>
+            ) : novedades.length === 0 ? (
+              <span className={styles.kpiChip2}>Sin novedades registradas</span>
+            ) : (
+              novedades.map((nv) => (
+                <button
+                  key={nv.path}
+                  className={styles.btn}
+                  title={nv.name}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    nv.url && openInNewTab(nv.url)
+                  }}
+                >
+                  ⭐ {nv.displayLabel}
+                </button>
+              ))
+            )}
+            </div> */}
 
-
-
+            <div className={styles.kpisBar2} style={{ margin: '8px 0 16px' }}>
+              {renderNovedades()}
             </div>
 
             {/* Subir nueva novedad */}
