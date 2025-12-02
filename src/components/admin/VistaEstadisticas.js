@@ -23,48 +23,12 @@ const cn = (...classes) => classes.filter(Boolean).join(' ')
 const toNum = (v) => Number(v) || 0
 const norm = (s) => String(s ?? '').trim().toLowerCase()
 
-const getIsoCode = (row) => {
-  if (!row) return null
-
-  // Preferimos el texto si ya viene desde la API
-  let isoVal =
-    row.iso ??          // si ya viene '9001' / '14001'
-    row.iso_codigo ??
-    row.isoNombre ??
-    row.iso_nombre ??
-    null
-
-  // Si no viene texto, usamos iso_id (1 o 2)
-  if (isoVal == null && row.iso_id != null) isoVal = row.iso_id
-  if (isoVal == null && row.isoId != null) isoVal = row.isoId
-
-  if (isoVal == null) return null
-
-  const str = String(isoVal).trim()
-
-  // Mapa especial para tu caso
-  if (str === '1') return '9001'
-  if (str === '2') return '14001'
-
-  // Si ya venía como '9001', '14001' o algo similar, lo dejamos así
-  return str
-}
-
 const normalizeTipo = (t) => {
   const k = norm(t)
   if (k.startsWith('fort')) return 'Fortaleza'
   if (k.startsWith('oport')) return 'Oportunidad de Mejora'
   if (k.startsWith('no con')) return 'No Conformidad'
   return 'OTRO'
-}
-
-const isoLabel = (v) => {
-  const str = String(v)
-  if (str === '1') return 'ISO 9001'
-  if (str === '2') return 'ISO 14001'
-  if (str === '9001') return 'ISO 9001'
-  if (str === '14001') return 'ISO 14001'
-  return str
 }
 
 // -------------------- Gestiones (pestañas) --------------------
@@ -553,13 +517,6 @@ export default function VistaEstadisticas() {
   const tiposDisponibles = Array.from(new Set(
     (detalleBase.length ? detalleBase : porTipo).map(p => p.tipo).filter(Boolean)
   ))
-
-  const isosDisponibles = useMemo(() => {
-    const src = detalleBase.filter(it => it.iso != null && s(it.iso) !== '')
-    const set = new Set()
-    src.forEach(it => set.add(s(it.iso)))
-    return Array.from(set).sort()
-  }, [detalleBase])
 
   // --------- Interacción: ocultar series en timeline ---------
   const [hidden, setHidden] = useState({
