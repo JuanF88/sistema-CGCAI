@@ -23,12 +23,245 @@ const cn = (...classes) => classes.filter(Boolean).join(' ')
 const toNum = (v) => Number(v) || 0
 const norm = (s) => String(s ?? '').trim().toLowerCase()
 
+const getIsoCode = (row) => {
+  if (!row) return null
+
+  // Preferimos el texto si ya viene desde la API
+  let isoVal =
+    row.iso ??          // si ya viene '9001' / '14001'
+    row.iso_codigo ??
+    row.isoNombre ??
+    row.iso_nombre ??
+    null
+
+  // Si no viene texto, usamos iso_id (1 o 2)
+  if (isoVal == null && row.iso_id != null) isoVal = row.iso_id
+  if (isoVal == null && row.isoId != null) isoVal = row.isoId
+
+  if (isoVal == null) return null
+
+  const str = String(isoVal).trim()
+
+  // Mapa especial para tu caso
+  if (str === '1') return '9001'
+  if (str === '2') return '14001'
+
+  // Si ya venía como '9001', '14001' o algo similar, lo dejamos así
+  return str
+}
+
 const normalizeTipo = (t) => {
   const k = norm(t)
   if (k.startsWith('fort')) return 'Fortaleza'
   if (k.startsWith('oport')) return 'Oportunidad de Mejora'
   if (k.startsWith('no con')) return 'No Conformidad'
   return 'OTRO'
+}
+
+const isoLabel = (v) => {
+  const str = String(v)
+  if (str === '1') return 'ISO 9001'
+  if (str === '2') return 'ISO 14001'
+  if (str === '9001') return 'ISO 9001'
+  if (str === '14001') return 'ISO 14001'
+  return str
+}
+
+// -------------------- Gestiones (pestañas) --------------------
+
+// Claves de gestión para las pestañas
+const GESTION_TABS = [
+  { key: 'todas', label: 'Todas las gestiones' },
+  { key: 'estrategica', label: 'Gestión Estratégica' },
+  { key: 'academica', label: 'Gestión Académica' },
+  { key: 'investigacion', label: 'Gestión de la Investigación' },
+  { key: 'administrativa', label: 'Gestión Administrativa' },
+  { key: 'cultura', label: 'Gestión de Cultura y Bienestar' },
+  { key: 'control', label: 'Gestión de Control' },
+  { key: 'otras', label: 'Otras / sin clasificar' },
+]
+
+// 🎯 Mapa de dependencias → gestión
+// IMPORTANTE: rellena esto con tus propias dependencias.
+// Usa el nombre tal como viene de la BD, pero en minúsculas.
+// 🎯 Mapa de dependencias → gestión
+// Usa norm() para asegurar coincidencia con el nombre real en BD.
+const GESTION_DEP_MAP = {
+  [norm('ADMINISTRACIÓN DE EMPRESAS PREGRADO')]: 'academica',
+  [norm('ADMINISTRACIÓN FINANCIERA POR CICLOS')]: 'academica',
+  [norm('ÁREA DE ADQUISICIONES E INVENTARIOS')]: 'administrativa',
+  [norm('ÁREA DE DESARROLLO EDITORIAL')]: 'academica',
+  [norm('ÁREA DE EGRESADOS')]: 'estrategica',
+  [norm('ÁREA DE GESTIÓN DOCUMENTAL')]: 'administrativa',
+  [norm('ÁREA DE INTERACCIÓN SOCIAL')]: 'estrategica',
+  [norm('ÁREA DE SEGURIDAD, CONTROL Y MOVILIDAD')]: 'control',
+
+  [norm('ARTES PLÁSTICAS PREGRADO')]: 'academica',
+  [norm('BIOLOGÍA PREGRADO')]: 'academica',
+  [norm('CENTRO DE GESTIÓN DE LA CALIDAD Y LA ACREDITACION INSTITUCIONAL')]: 'control',
+  [norm('CENTRO DE GESTIÓN DE LAS COMUNICACIONES')]: 'estrategica',
+  [norm('CENTRO DE POSGRADOS')]: 'academica',
+  [norm('CIENCIA POLÍTICA PREGRADO')]: 'academica',
+  [norm('COMUNICACIÓN SOCIAL PREGRADO')]: 'academica',
+  [norm('CONTADURÍA PÚBLICA PREGRADO')]: 'academica',
+
+  [norm('DERECHO - SEDE POPAYÁN PREGRADO')]: 'academica',
+  [norm('DERECHO - SEDE SANTANDER DE QUILICHAO PREGRADO')]: 'academica',
+  [norm('DERECHO NOCTURNO - SEDE POPAYÁN PREGRADO')]: 'academica',
+  [norm('DERECHO NOCTURNO - SEDE SANTANDER DE QUILICHAO PREGRADO')]: 'academica',
+  [norm('DERECHO PREGRADO')]: 'academica',
+  [norm('DIRECCIÓN DE BANDA PREGRADO')]: 'academica',
+  [norm('DISEÑO GRÁFICO PREGRADO')]: 'academica',
+
+  [norm('DIVISIÓN DE ADMISIONES, REGISTRO Y CONTROL ACADÉMICO - DARCA')]: 'academica',
+  [norm('DIVISIÓN DE GESTIÓN DE LA CULTURA')]: 'cultura',
+  [norm('DIVISIÓN DE GESTIÓN DE LA RECREACIÓN Y EL DEPORTE')]: 'cultura',
+  [norm('DIVISIÓN DE GESTIÓN DE MEDIOS Y RECURSOS BIBLIOGRÁFICOS')]: 'academica',
+  [norm('DIVISIÓN DE GESTIÓN DE SALUD INTEGRAL Y DESARROLLO HUMANO')]: 'cultura',
+  [norm('DIVISIÓN DE GESTIÓN DEL TALENTO HUMANO')]: 'administrativa',
+  [norm('DIVISIÓN DE GESTIÓN FINANCIERA')]: 'administrativa',
+  [norm('DIVISIÓN DE INNOVACIÓN, EMPRENDIMIENTO Y ARTICULACIÓN CON EL ENTORNO - DAE')]: 'estrategica',
+  [norm('DIVISIÓN DE TECNOLOGÍAS DE LA INFORMACIÓN Y LAS COMUNICACIONES - TICs')]: 'administrativa',
+
+  [norm('DOCTORADO EN ANTROPOLOGÍA')]: 'investigacion',
+  [norm('DOCTORADO EN CIENCIAS - QUIMICA')]: 'investigacion',
+  [norm('DOCTORADO EN CIENCIAS AGRARIAS Y AGROINDUSTRIALES')]: 'investigacion',
+  [norm('DOCTORADO EN CIENCIAS DE LA EDUCACIÓN')]: 'investigacion',
+  [norm('DOCTORADO EN CIENCIAS DE LA ELECTRÓNICA')]: 'investigacion',
+  [norm('DOCTORADO EN CIENCIAS HUMANAS')]: 'investigacion',
+  [norm('DOCTORADO EN CIENCIAS MATEMÁTICAS')]: 'investigacion',
+  [norm('DOCTORADO EN ETNOBIOLOGÍA Y ESTUDIOS BIOCULTURALES')]: 'investigacion',
+  [norm('DOCTORADO EN INGENIERÍA TELEMÁTICA')]: 'investigacion',
+
+  [norm('ECONOMÍA PREGRADO')]: 'academica',
+  [norm('ENFERMERÍA PREGRADO')]: 'academica',
+
+  [norm('ESPECIALIZACIÓN EN ADMINISTRACIÓN HOSPITALARIA')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN ANATOMÍA PATOLÓGICA')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN AUDITORÍA Y GARANTÍA DE LA CALIDAD EN SALUD CON ÉNFASIS EN EPIDEMIOLOGÍA CONVENIO EAN')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN BIOÉTICA, MODALDIAD A DISTANCIA EN CONVENIO CON LA UNIVERSIDAD DEL BOSQUE')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN CIRUGÍA GENERAL')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN CONTABILIDAD PÚBLICA')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN DERECHO ADMINISTRATIVO')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN DESARROLLO DE SOLUCIONES INFORMÁTICAS')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN EDUCACIÓN COMUNITARIA')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN GERENCIA DE IMPUESTOS')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN GERENCIA DE PROYECTOS')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN GERENCIA DE PROYECTOS CONVENIO UNINARIÑO')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN GINECOLOGÍA Y OBSTETRICIA')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN INGENIERÍA DE LA CONSTRUCCIÓN')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN INGENIERÍA DE VÍAS TERRESTRES')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN INTERVENCIÓN DEL LENGUAJE INFANTIL')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN MEDICINA FAMILIAR')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN MEDICINA INTERNA')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN MERCADEO CORPORATIVO')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN NEUROREHABILITACIÓN')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN PAVIMENTOS')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN PEDIATRÍA')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN REDES Y SERVICIOS TELEMÁTICOS')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN REVISORIA FISCAL Y AUDITORÍA INTERNACIONAL')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN SEGURIDAD Y SALUD EN EL TRABAJO')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN SISTEMAS DE RADIOCOMUNICACIONES')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN SISTEMAS INTEGRADOS DE LA CALIDAD')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN TELEMÁTICA')]: 'academica',
+  [norm('ESPECIALIZACIÓN EN TRÁNSITO')]: 'academica',
+
+  [norm('FACULTAD DE ARTES')]: 'academica',
+  [norm('FACULTAD DE CIENCIAS AGRARIAS')]: 'academica',
+  [norm('FACULTAD DE CIENCIAS CONTABLES, ECONÓMICAS Y ADMINISTRATIVAS')]: 'academica',
+  [norm('FACULTAD DE CIENCIAS DE LA SALUD')]: 'academica',
+  [norm('FACULTAD DE CIENCIAS HUMANAS Y SOCIALES')]: 'academica',
+  [norm('FACULTAD DE CIENCIAS NATURALES, EXACTAS Y DE LA EDUCACIÓN')]: 'academica',
+  [norm('FACULTAD DE DERECHO, CIENCIAS POLÍTICAS Y SOCIALES')]: 'academica',
+  [norm('FACULTAD DE INGENIERÍA CIVIL')]: 'academica',
+  [norm('FACULTAD DE INGENIERÍA ELECTRÓNICA Y TELECOMUNICACIONES')]: 'academica',
+
+  [norm('FILOSOFÍA PREGRADO')]: 'academica',
+  [norm('FISIOTERAPIA PREGRADO')]: 'academica',
+  [norm('FONOAUDIOLOGÍA PREGRADO')]: 'academica',
+  [norm('GEOGRAFÍA DEL DESARROLLO REGIONAL Y AMBIENTAL PREGRADO')]: 'academica',
+  [norm('GEOTECNOLOGÍA')]: 'academica',
+
+  [norm('GESTIÓN ACADÉMICA')]: 'academica',
+  [norm('GESTIÓN ADMINISTRATIVA')]: 'administrativa',
+  [norm('GESTIÓN DE BIENES Y SERVICIOS')]: 'administrativa',
+  [norm('GESTIÓN DE LA INVESTIGACIÓN')]: 'investigacion',
+  [norm('GESTIÓN DEL MANTENIMIENTO DE BIENES MUEBLES, INMUEBLES Y EQUIPOS')]: 'administrativa',
+
+  [norm('HISTORIA PREGRADO')]: 'academica',
+  [norm('INGENIERÍA AGROINDUSTRIAL PREGRADO')]: 'academica',
+  [norm('INGENIERÍA AGROPECUARIA PREGRADO')]: 'academica',
+  [norm('INGENIERÍA AMBIENTAL PREGRADO')]: 'academica',
+  [norm('INGENIERÍA CIVIL PREGRADO')]: 'academica',
+  [norm('INGENIERÍA DE SISTEMAS PREGRADO')]: 'academica',
+  [norm('INGENIERÍA ELECTRÓNICA Y DE TELECOMUNICACIONES PREGRADO')]: 'academica',
+  [norm('INGENIERÍA EN AUTOMÁTICA INDUSTRIAL PREGRADO')]: 'academica',
+  [norm('INGENIERÍA FÍSICA PREGRADO')]: 'academica',
+
+    [norm('INGENIERÍA FORESTAL PREGRADO')]: 'academica',
+  [norm('LICENCIATURA EN EDUCACIÓN BÁSICA CON ÉNFASIS EN CIENCIAS NATURALES Y EDUCACIÓN AMBIENTAL PREGRADO')]: 'academica',
+  [norm('LICENCIATURA EN EDUCACIÓN BÁSICA CON ÉNFASIS EN EDUCACIÓN ARTÍSTICA PREGRADO')]: 'academica',
+  [norm('LICENCIATURA EN EDUCACIÓN BÁSICA CON ÉNFASIS EN LENGUA CASTELLANA E INGLÉS PREGRADO')]: 'academica',
+  [norm('LICENCIATURA EN EDUCACIÓN BÁSICA PRIMARIA PREGRADO')]: 'academica',
+  [norm('LICENCIATURA EN EDUCACIÓN FÍSICA, RECREACIÓN Y DEPORTES PREGRADO')]: 'academica',
+  [norm('LICENCIATURA EN ETNOEDUCACIÓN PREGRADO')]: 'academica',
+  [norm('LICENCIATURA EN LENGUAS MODERNAS CON ÉNFASIS EN INGLÉS Y FRANCÉS - SEDE POPAYÁN PREGRADO')]: 'academica',
+  [norm('LICENCIATURA EN LENGUAS MODERNAS CON ÉNFASIS EN INGLÉS Y FRANCÉS - SEDE SANTANDER PREGRADO')]: 'academica',
+  [norm('LICENCIATURA EN LITERATURA Y LENGUA CASTELLANA PREGRADO')]: 'academica',
+  [norm('LICENCIATURA EN MATEMÁTICAS PREGRADO')]: 'academica',
+  [norm('LICENCIATURA EN MÚSICA PREGRADO')]: 'academica',
+
+  [norm('MAESTRÍA EN ADMINISTRACIÓN DE EMPRESAS DE SALUD - MBA_EN_SALUD')]: 'academica',
+  [norm('MAESTRÍA EN ANTROPOLOGÍA')]: 'academica',
+  [norm('MAESTRÍA EN ARTES INTEGRADAS CON EL AMBIENTE')]: 'academica',
+  [norm('MAESTRÍA EN CIENCIAS AGRARIAS')]: 'academica',
+  [norm('MAESTRÍA EN CIENCIAS HUMANAS')]: 'academica',
+  [norm('MAESTRÍA EN CIENCIAS MATEMÁTICAS')]: 'academica',
+  [norm('MAESTRÍA EN CIENCIAS QUÍMICAS')]: 'academica',
+  [norm('MAESTRÍA EN COMPUTACIÓN')]: 'academica',
+  [norm('MAESTRÍA EN CONTABILIDAD Y FINANZAS')]: 'academica',
+  [norm('MAESTRÍA EN COOPERACIÓN INTERNACIONAL CONVENIO NORTE SUR - UNIVERSIDAD DEL CAUCA')]: 'academica',
+  [norm('MAESTRÍA EN EDUCACIÓN')]: 'academica',
+  [norm('MAESTRÍA EN EDUCACIÓN POPULAR')]: 'academica',
+  [norm('MAESTRÍA EN ESTUDIOS DE RIESGOS DE DESASTRE Y ORDENAMIENTO TERRITORIAL')]: 'academica',
+  [norm('MAESTRÍA EN ESTUDIOS INTERCULTURALES')]: 'academica',
+  [norm('MAESTRÍA EN ESTUDIOS MULTIDISCIPLINARIOS DEL DESARROLLO')]: 'academica',
+  [norm('MAESTRÍA EN ÉTICA Y FILOSOFÍA POLÍTICA')]: 'academica',
+  [norm('MAESTRÍA EN GESTIÓN DE ORGANIZACIONES Y PROYÉCTOS')]: 'academica',
+  [norm('MAESTRÍA EN GOBIERNO')]: 'academica',
+  [norm('MAESTRÍA EN HISTORIA')]: 'academica',
+  [norm('MAESTRÍA EN INGENIERÍA - ÁREA ELECTRÓNICA Y TELECOMUNICACIONES')]: 'academica',
+  [norm('MAESTRÍA EN INGENIERÍA FÍSICA')]: 'academica',
+  [norm('MAESTRÍA EN INGENIERÍA TELEMÁTICA')]: 'academica',
+  [norm('MAESTRÍA EN MÚSICA')]: 'academica',
+  [norm('MAESTRÍA EN RECURSOS HIDROBIOLÓGICAS CONTINENTALES')]: 'academica',
+  [norm('MAESTRÍA EN REVITALIZACIÓN Y ENSEÑANZA DE LENGUAS INDÍGENAS')]: 'academica',
+
+  [norm('MATEMÁTICAS PREGRADO')]: 'academica',
+  [norm('MEDICINA PREGRADO')]: 'academica',
+  [norm('MÚSICA INSTRUMENTAL PREGRADO')]: 'academica',
+
+  [norm('OFICINA DE CONTROL INTERNO - OCI')]: 'control',
+  [norm('OFICINA DE PLANEACIÓN Y DESARROLLO INSTITUCIONAL')]: 'estrategica',
+  [norm('OFICINA DE RELACIONES INTERINSTITUCIONALES E INTERNACIONALES - ORI')]: 'estrategica',
+  [norm('OFICINA JURÍDICA')]: 'administrativa',
+
+  [norm('PROGRAMA DE PERMANENCIA Y GRADUACIÓN')]: 'academica',
+  [norm('QUÍMICA PREGRADO')]: 'academica',
+  [norm('SECRETARIA GENERAL')]: 'administrativa',
+  [norm('TECNOLOGÍA EN TELEMÁTICA')]: 'academica',
+  [norm('TURISMO PREGRADO')]: 'academica',
+
+  [norm('UNIDAD DE SALUD')]: 'cultura',
+  [norm('VICERRECTORÍA DE CULTURA Y BIENESTAR')]: 'cultura',
+
+}
+
+
+const getGestionFromDependencia = (dep) => {
+  if (!dep) return 'otras'
+  const key = norm(dep)
+  return GESTION_DEP_MAP[key] || 'otras'
 }
 
 // -------------------- Mini-UI --------------------
@@ -88,7 +321,7 @@ const SelectItem = ({ children, value }) => (
 
 // -------------------- Página --------------------
 export default function VistaEstadisticas() {
-  // Dataset unificado recomendado desde la API: [{ anio, dependencia, tipo, cantidad }]
+  // Dataset unificado recomendado desde la API: [{ anio, dependencia, tipo, cantidad, iso }]
   const [detalle, setDetalle] = useState([])
 
   // Back-compat con datasets antiguos
@@ -98,6 +331,9 @@ export default function VistaEstadisticas() {
   const [filtroAnio, setFiltroAnio] = useState('todos')
   const [filtroDependencia, setFiltroDependencia] = useState('todas')
   const [filtroTipo, setFiltroTipo] = useState('todos')
+  const [filtroIso, setFiltroIso] = useState('todos')
+  const [filtroGestion, setFiltroGestion] = useState('todas')
+
   const [aniosDisponibles, setAniosDisponibles] = useState([])
   const [dependenciasDisponibles, setDependenciasDisponibles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -121,6 +357,9 @@ export default function VistaEstadisticas() {
           dependencias = []
         } = json
 
+        console.log('detalleApi[0]:', detalleApi?.[0])
+
+        // detalleApi se guarda tal cual para conservar campos extra (iso, etc.)
         setDetalle(Array.isArray(detalleApi) ? detalleApi : [])
         setDataResumen(resumenPorDependencia ?? [])
         setPorTipo(resumenPorTipo ?? [])
@@ -138,50 +377,126 @@ export default function VistaEstadisticas() {
 
   // -------------------- Filtrado unificado --------------------
   const detalleBase = useMemo(() => {
-    if (detalle.length) return detalle
+  if (detalle.length) {
+    // Normalizamos siempre tipo e ISO
+    return detalle.map(it => ({
+      ...it,
+      tipo: normalizeTipo(it.tipo),
+      // aquí miramos varios nombres posibles
+      iso: it.iso ?? it.iso_id ?? it.isoId ?? null,
+    }))
+  }
 
-    // Fallback: intenta derivar del porTipo si trae campos suficientes
-    const tieneCampos = porTipo.some(i => 'tipo' in i && 'cantidad' in i && ('anio' in i || 'dependencia' in i))
-    if (tieneCampos) return porTipo.map(i => ({
+  // Fallback: intenta derivar del porTipo si trae campos suficientes
+  const tieneCampos = porTipo.some(
+    i => 'tipo' in i && 'cantidad' in i && ('anio' in i || 'dependencia' in i)
+  )
+
+  if (tieneCampos) {
+    return porTipo.map(i => ({
       anio: i.anio ?? null,
       dependencia: i.dependencia ?? null,
       tipo: normalizeTipo(i.tipo),
       cantidad: toNum(i.cantidad),
+      iso: i.iso ?? i.iso_id ?? null,   // por si el resumen trae algo de ISO
     }))
+  }
+
+  return []
+}, [detalle, porTipo])
+
+  const dependenciasFiltradas = useMemo(() => {
+    // Si tenemos detalleBase (caso normal)
+    if (detalleBase.length) {
+      const set = new Set()
+
+      detalleBase.forEach(it => {
+        if (!it.dependencia) return
+
+        const okAnio = filtroAnio === 'todos' || s(it.anio) === s(filtroAnio)
+        const okTipo = filtroTipo === 'todos' || s(it.tipo) === s(filtroTipo)
+        const okIso  = filtroIso === 'todos'  || s(it.iso)  === s(filtroIso)
+
+        const gestionItem = getGestionFromDependencia(it.dependencia)
+        const okGestion = filtroGestion === 'todas' || gestionItem === filtroGestion
+
+        if (okAnio && okTipo && okIso && okGestion) {
+          set.add(s(it.dependencia))
+        }
+      })
+
+      return Array.from(set).sort()
+    }
+
+    // Fallback: si por alguna razón no hay detalleBase,
+    // usamos la lista que viene de la API filtrada por gestión
+    if (dependenciasDisponibles.length) {
+      if (filtroGestion === 'todas') {
+        return [...dependenciasDisponibles].sort()
+      }
+      return dependenciasDisponibles
+        .filter(dep => getGestionFromDependencia(dep) === filtroGestion)
+        .sort()
+    }
+
     return []
-  }, [detalle, porTipo])
+  }, [detalleBase, dependenciasDisponibles, filtroAnio, filtroTipo, filtroIso, filtroGestion])
+
+  useEffect(() => {
+    if (
+      filtroDependencia !== 'todas' &&
+      !dependenciasFiltradas.includes(filtroDependencia)
+    ) {
+      setFiltroDependencia('todas')
+    }
+  }, [filtroDependencia, dependenciasFiltradas])
 
   const detalleFiltrado = useMemo(() => {
     return detalleBase.filter(item => {
       const okAnio = filtroAnio === 'todos' || s(item.anio) === s(filtroAnio)
       const okDep  = filtroDependencia === 'todas' || s(item.dependencia) === s(filtroDependencia)
       const okTipo = filtroTipo === 'todos' || s(item.tipo) === s(filtroTipo)
-      return okAnio && okDep && okTipo
+      const okIso  = filtroIso === 'todos' || s(item.iso) === s(filtroIso)
+      const gestionItem = getGestionFromDependencia(item.dependencia)
+      const okGestion = filtroGestion === 'todas' || gestionItem === filtroGestion
+      return okAnio && okDep && okTipo && okIso && okGestion
     })
-  }, [detalleBase, filtroAnio, filtroDependencia, filtroTipo])
+  }, [detalleBase, filtroAnio, filtroDependencia, filtroTipo, filtroIso, filtroGestion])
 
   // --------- BARRAS (por dependencia) ---------
   const dataBar = useMemo(() => {
     if (!detalleBase.length) {
-      // Degradación: aplica solo filtros disponibles sobre el resumen
+      // Degradación: aplica filtros posibles sobre el resumen
       return dataResumen.filter(item => {
         const okAnio = filtroAnio === 'todos' || s(item.anio) === s(filtroAnio)
         const okDep  = filtroDependencia === 'todas' || s(item.dependencia) === s(filtroDependencia)
-        return okAnio && okDep
+        const okIso  = filtroIso === 'todos' || s(item.iso) === s(filtroIso)
+        const gestionItem = getGestionFromDependencia(item.dependencia)
+        const okGestion = filtroGestion === 'todas' || gestionItem === filtroGestion
+        return okAnio && okDep && okIso && okGestion
       })
     }
     const map = new Map()
     for (const it of detalleFiltrado) {
- const key = s(it.dependencia) || 'SIN_DEP'
- map.set(key, (map.get(key) || 0) + toNum(it.cantidad))
+      const key = s(it.dependencia) || 'SIN_DEP'
+      map.set(key, (map.get(key) || 0) + toNum(it.cantidad))
     }
     return Array.from(map, ([dependencia, cantidad]) => ({ dependencia, cantidad }))
-  }, [detalleBase, detalleFiltrado, dataResumen, filtroAnio, filtroDependencia])
+  }, [detalleBase, detalleFiltrado, dataResumen, filtroAnio, filtroDependencia, filtroIso, filtroGestion])
 
   // --------- PIE (por tipo) ---------
   const porTipoGrafico = useMemo(() => {
     if (!detalleBase.length) {
-      const base = porTipo.filter(i => (filtroTipo === 'todos' ? true : s(i.tipo) === s(filtroTipo)))
+      const base = porTipo.filter(i => {
+        const okTipo = filtroTipo === 'todos' || s(i.tipo) === s(filtroTipo)
+        const okAnio = filtroAnio === 'todos' || s(i.anio) === s(filtroAnio)
+        const okDep  = filtroDependencia === 'todas' || s(i.dependencia) === s(filtroDependencia)
+        const okIso  = filtroIso === 'todos' || s(i.iso) === s(filtroIso)
+        const gestionItem = getGestionFromDependencia(i.dependencia)
+        const okGestion = filtroGestion === 'todas' || gestionItem === filtroGestion
+        return okTipo && okAnio && okDep && okIso && okGestion
+      })
+
       const map = new Map()
       for (const it of base) {
         const key = s(it.tipo) || 'SIN_TIPO'
@@ -189,13 +504,14 @@ export default function VistaEstadisticas() {
       }
       return Array.from(map, ([tipo, cantidad]) => ({ tipo, cantidad }))
     }
+
     const map = new Map()
     for (const it of detalleFiltrado) {
- const key = normalizeTipo(it.tipo)
- map.set(key, (map.get(key) || 0) + toNum(it.cantidad))
+      const key = normalizeTipo(it.tipo)
+      map.set(key, (map.get(key) || 0) + toNum(it.cantidad))
     }
     return Array.from(map, ([tipo, cantidad]) => ({ tipo, cantidad }))
-  }, [detalleBase, detalleFiltrado, porTipo, filtroTipo])
+  }, [detalleBase, detalleFiltrado, porTipo, filtroTipo, filtroAnio, filtroDependencia, filtroIso, filtroGestion])
 
   // --------- TIMELINE (stacked áreas por año) ---------
   // Ignoramos el filtro de tipo para mostrar SIEMPRE las 3 categorías simultáneamente.
@@ -203,23 +519,29 @@ export default function VistaEstadisticas() {
     const base = detalleBase.filter(it => {
       const okAnio = filtroAnio === 'todos' || s(it.anio) === s(filtroAnio)
       const okDep  = filtroDependencia === 'todas' || s(it.dependencia) === s(filtroDependencia)
-      return okAnio && okDep
+      const okIso  = filtroIso === 'todos' || s(it.iso) === s(filtroIso)
+      const gestionItem = getGestionFromDependencia(it.dependencia)
+      const okGestion = filtroGestion === 'todas' || gestionItem === filtroGestion
+      return okAnio && okDep && okIso && okGestion
     })
+
     const map = new Map() // anio => { Fortaleza, Oportunidad de Mejora, No Conformidad }
     for (const it of base) {
       const year = s(it.anio) || 'SIN_AÑO'
-      if (!map.has(year)) map.set(year, { anio: year, Fortaleza: 0, 'Oportunidad de Mejora': 0, 'No Conformidad': 0 })
+      if (!map.has(year)) {
+        map.set(year, { anio: year, Fortaleza: 0, 'Oportunidad de Mejora': 0, 'No Conformidad': 0 })
+      }
       const row = map.get(year)
- const t = normalizeTipo(it.tipo)
- if (t === 'Fortaleza') row.Fortaleza += toNum(it.cantidad)
- else if (t === 'Oportunidad de Mejora') row['Oportunidad de Mejora'] += toNum(it.cantidad)
- else if (t === 'No Conformidad') row['No Conformidad'] += toNum(it.cantidad)
+      const t = normalizeTipo(it.tipo)
+      if (t === 'Fortaleza') row.Fortaleza += toNum(it.cantidad)
+      else if (t === 'Oportunidad de Mejora') row['Oportunidad de Mejora'] += toNum(it.cantidad)
+      else if (t === 'No Conformidad') row['No Conformidad'] += toNum(it.cantidad)
     }
     const arr = Array.from(map.values())
     // Ordenar por año ascendente si es numérico
     arr.sort((a, b) => Number(a.anio) - Number(b.anio))
     return arr
-  }, [detalleBase, filtroAnio, filtroDependencia])
+  }, [detalleBase, filtroAnio, filtroDependencia, filtroIso, filtroGestion])
 
   // --------- Totales y catálogos ---------
   const totalHallazgos = porTipoGrafico.reduce((sum, i) => sum + i.cantidad, 0)
@@ -232,8 +554,19 @@ export default function VistaEstadisticas() {
     (detalleBase.length ? detalleBase : porTipo).map(p => p.tipo).filter(Boolean)
   ))
 
+  const isosDisponibles = useMemo(() => {
+    const src = detalleBase.filter(it => it.iso != null && s(it.iso) !== '')
+    const set = new Set()
+    src.forEach(it => set.add(s(it.iso)))
+    return Array.from(set).sort()
+  }, [detalleBase])
+
   // --------- Interacción: ocultar series en timeline ---------
-  const [hidden, setHidden] = useState({ Fortaleza: false, 'Oportunidad de Mejora': false, 'No Conformidad': false })
+  const [hidden, setHidden] = useState({
+    Fortaleza: false,
+    'Oportunidad de Mejora': false,
+    'No Conformidad': false
+  })
   const toggleSeries = (key) => setHidden(prev => ({ ...prev, [key]: !prev[key] }))
 
   // --------- Loading / Error ---------
@@ -265,7 +598,9 @@ export default function VistaEstadisticas() {
       <div className={styles.headerRow}>
         <div>
           <h2 className={styles.title}>Estadísticas de Hallazgos</h2>
-          <p className={styles.subtitle}>Panel interactivo por año, dependencia y tipo</p>
+          <p className={styles.subtitle}>
+            Panel interactivo por gestión, año, dependencia, tipo e ISO
+          </p>
         </div>
 
         {/* Filtros principales */}
@@ -297,9 +632,12 @@ export default function VistaEstadisticas() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todas">Todas</SelectItem>
-                {dependenciasDisponibles.map(dep => (
-                  <SelectItem key={String(dep)} value={String(dep)}>{dep}</SelectItem>
+                {dependenciasFiltradas.map(dep => (
+                  <SelectItem key={dep} value={dep}>
+                    {dep}
+                  </SelectItem>
                 ))}
+
               </SelectContent>
             </Select>
           </div>
@@ -321,13 +659,42 @@ export default function VistaEstadisticas() {
             </Select>
           </div>
 
-          {(filtroAnio !== 'todos' || filtroDependencia !== 'todas' || filtroTipo !== 'todos') && (
+
+          {(filtroAnio !== 'todos' ||
+            filtroDependencia !== 'todas' ||
+            filtroTipo !== 'todos' ||
+            filtroIso !== 'todos' ||
+            filtroGestion !== 'todas') && (
             <Button
               variant="outline"
-              onClick={() => { setFiltroAnio('todos'); setFiltroDependencia('todas'); setFiltroTipo('todos') }}
-            >Limpiar</Button>
+              onClick={() => {
+                setFiltroAnio('todos')
+                setFiltroDependencia('todas')
+                setFiltroTipo('todos')
+                setFiltroIso('todos')
+                setFiltroGestion('todas')
+              }}
+            >
+              Limpiar
+            </Button>
           )}
         </div>
+      </div>
+
+      {/* PESTAÑAS DE GESTIÓN */}
+      <div className={styles.tabsRow}>
+        {GESTION_TABS.map(tab => (
+          <button
+            key={tab.key}
+            className={cn(
+              styles.tabBtn,
+              filtroGestion === tab.key && styles.tabBtnActive
+            )}
+            onClick={() => setFiltroGestion(tab.key)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* KPIs */}
@@ -336,7 +703,7 @@ export default function VistaEstadisticas() {
         <KPI label="Fortalezas" value={totalFortalezas} accent="green" />
         <KPI label="Oportunidades de Mejora" value={totalOportunidades} accent="amber" />
         <KPI label="No Conformidades" value={totalNoConformidades} accent="red" />
-        <KPI label="Dependencias" value={dependenciasDisponibles.length}/>
+        <KPI label="Dependencias" value={dependenciasFiltradas.length} />
       </div>
 
       {/* Gráficas */}
@@ -352,10 +719,17 @@ export default function VistaEstadisticas() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dataBar} margin={{ top: 6, right: 12, bottom: 6, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="dependencia" tick={{ fontSize: 0 }} interval={0} angle={-25} textAnchor="end" height={8} />
+                  <XAxis
+                    dataKey="dependencia"
+                    tick={{ fontSize: 0 }}
+                    interval={0}
+                    angle={-25}
+                    textAnchor="end"
+                    height={8}
+                  />
                   <YAxis allowDecimals={false} />
                   <Tooltip wrapperStyle={{ outline: 'none' }} />
-                  <Bar dataKey="cantidad" fill={BRAND} radius={[6,6,0,0]} isAnimationActive />
+                  <Bar dataKey="cantidad" fill={BRAND} radius={[6, 6, 0, 0]} isAnimationActive />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -400,7 +774,11 @@ export default function VistaEstadisticas() {
       <Card>
         <CardHeader
           title="Evolución anual por tipo"
-          subtitle={filtroDependencia === 'todas' ? 'Todas las dependencias' : `Dependencia: ${filtroDependencia}`}
+          subtitle={
+            filtroDependencia === 'todas'
+              ? 'Todas las dependencias'
+              : `Dependencia: ${filtroDependencia}`
+          }
           right={(
             <div className={styles.legendToggles}>
               {[
@@ -408,7 +786,11 @@ export default function VistaEstadisticas() {
                 { k: 'Oportunidad de Mejora', c: AMBER },
                 { k: 'No Conformidad', c: RED },
               ].map(({ k, c }) => (
-                <button key={k} className={cn(styles.legendBtn, hidden[k] && styles.legendBtn_off)} onClick={() => toggleSeries(k)}>
+                <button
+                  key={k}
+                  className={cn(styles.legendBtn, hidden[k] && styles.legendBtn_off)}
+                  onClick={() => toggleSeries(k)}
+                >
                   <span className={styles.legendDot} style={{ backgroundColor: c }} />
                   {k}
                 </button>
@@ -425,13 +807,34 @@ export default function VistaEstadisticas() {
                 <YAxis allowDecimals={false} />
                 <Tooltip wrapperStyle={{ outline: 'none' }} />
                 {!hidden['Fortaleza'] && (
-                  <Area type="monotone" dataKey="Fortaleza" stroke={GREEN} fill={GREEN} fillOpacity={0.18} strokeWidth={2} />
+                  <Area
+                    type="monotone"
+                    dataKey="Fortaleza"
+                    stroke={GREEN}
+                    fill={GREEN}
+                    fillOpacity={0.18}
+                    strokeWidth={2}
+                  />
                 )}
                 {!hidden['Oportunidad de Mejora'] && (
-                  <Area type="monotone" dataKey="Oportunidad de Mejora" stroke={AMBER} fill={AMBER} fillOpacity={0.18} strokeWidth={2} />
+                  <Area
+                    type="monotone"
+                    dataKey="Oportunidad de Mejora"
+                    stroke={AMBER}
+                    fill={AMBER}
+                    fillOpacity={0.18}
+                    strokeWidth={2}
+                  />
                 )}
                 {!hidden['No Conformidad'] && (
-                  <Area type="monotone" dataKey="No Conformidad" stroke={RED} fill={RED} fillOpacity={0.18} strokeWidth={2} />
+                  <Area
+                    type="monotone"
+                    dataKey="No Conformidad"
+                    stroke={RED}
+                    fill={RED}
+                    fillOpacity={0.18}
+                    strokeWidth={2}
+                  />
                 )}
               </AreaChart>
             </ResponsiveContainer>

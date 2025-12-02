@@ -39,6 +39,20 @@ const buildActaPath = (a) => `Acta_${a.id}_${toSlugUpper(a?.dependencias?.nombre
 // ✅ NUEVO: ruta para Acta de Compromiso
 const buildActaCompromisoPath = (a) => `ActaCompromiso_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
 
+// ✅ Bucket de novedades
+const NOVEDADES_BUCKET = 'novedades'
+
+// Carpeta de novedades por auditoría
+const buildNovedadesFolder = (a) => `auditoria_${a.id}`
+
+// ✅ Guardar como "Novedad_<numero>_<YYYY-MM-DD>.ext"
+const buildNovedadPath = (a, file, index) => {
+  const folder = buildNovedadesFolder(a)
+  const today = toYMD(new Date()) // reutilizamos tu helper (YYYY-MM-DD)
+  const ext = (file?.name?.split('.').pop() || 'pdf').toLowerCase()
+  return `${folder}/Novedad_${index}_${today}.${ext}`
+}
+
 
 export default function AuditoriasVerificacionAdmin() {
   const [loading, setLoading] = useState(true)
@@ -128,6 +142,13 @@ export default function AuditoriasVerificacionAdmin() {
   const selected = useMemo(() => auditorias.find(a => a.id === selectedId) || null, [auditorias, selectedId])
   const isAuditValidated = (a) => Boolean(a?.validated?.url) || a?.validado === true
 
+    // ✅ Novedades (varias por auditoría)
+  const [novedadesModalOpen, setNovedadesModalOpen] = useState(false)
+  const [novedadesLoading, setNovedadesLoading] = useState(false)
+  const [novedades, setNovedades] = useState([])
+  const [novedadFile, setNovedadFile] = useState(null)
+  const [uploadingNovedad, setUploadingNovedad] = useState(false)
+
 const beginEditFecha = useCallback(() => {
   const sel = auditorias.find(a => a.id === selectedId)
   if (!sel) return
@@ -192,6 +213,142 @@ const handleDateKeyDown = useCallback((e) => {
     a.remove()
     setTimeout(() => { openingRef.current = false }, 300)
   }, [])
+
+    // ✅ Cargar novedades desde el bucket
+  const loadNovedades = useCallback(async (a) => {
+    if (!a) return
+    setNovedadesLoading(true)
+    try {
+      const folder = buildNovedadesFolder(a)
+      const { data, error } = await supabase
+        .storage
+        .from(NOVEDADES_BUCKET)
+        .list(folder, {
+          limit: 100,
+          sortBy: { column: 'name', order: 'asc' },
+        })
+
+      if (error) {
+        console.error('Error de Supabase al listar novedades:', {
+          message: error.message,
+          statusCode: error.statusCode,
+          name: error.name,
+        })
+        toast.error(error.message || 'No se pudieron cargar las novedades.')
+        setNovedades([])
+        return
+      }
+
+      if (!data || !data.length) {
+        setNovedades([])
+        return
+      }
+
+      // ✅ Filtrar el placeholder (emptyfolderplaceholder, .emptyFolderPlaceholder, etc.)
+      const filtered = data.filter((obj) => {
+        const n = (obj.name || '').toLowerCase()
+        if (!n) return false
+        if (n.includes('emptyfolderplaceholder')) return false
+        if (n === '.emptyfolderplaceholder') return false
+        if (n === '.emptyfolder') return false
+        return true
+      })
+
+      if (!filtered.length) {
+        setNovedades([])
+        return
+      }
+
+      const items = await Promise.all(
+        filtered.map(async (obj, index) => {
+          const path = `${folder}/${obj.name}`
+          const { data: s } = await supabase
+            .storage
+            .from(NOVEDADES_BUCKET)
+            .createSignedUrl(path, 3600)
+
+          const createdAt = obj.created_at ? new Date(obj.created_at) : null
+          const fechaTexto = createdAt ? fmt(createdAt) : ''
+          const numero = index + 1
+
+          return {
+            name: obj.name,
+            path,
+            url: s?.signedUrl || null,
+            createdAt,
+            displayLabel: `Novedad ${numero}${fechaTexto ? ` — ${fechaTexto}` : ''}`,
+          }
+        })
+      )
+
+      setNovedades(items)
+    } catch (e) {
+      console.error('Cargar novedades error inesperado:', e, {
+        message: e?.message,
+        stack: e?.stack,
+      })
+      toast.error('No se pudieron cargar las novedades (error inesperado).')
+      setNovedades([])
+    } finally {
+      setNovedadesLoading(false)
+    }
+  }, [])
+
+
+  // ✅ Abrir modal de novedades
+  const abrirModalNovedades = useCallback((a) => {
+    if (!a) return
+    setNovedades([])
+    setNovedadFile(null)
+    setNovedadesModalOpen(true)
+    loadNovedades(a)
+  }, [loadNovedades])
+
+  // ✅ Subir una nueva novedad
+  const subirNovedad = async (a) => {
+    if (!a || !novedadFile) return
+    setUploadingNovedad(true)
+
+    try {
+      // ✅ siguiente número de novedad (Novedad 1, Novedad 2, ...)
+      const nextIndex = (novedades?.length || 0) + 1
+      const path = buildNovedadPath(a, novedadFile, nextIndex)
+
+      const { data, error } = await supabase
+        .storage
+        .from(NOVEDADES_BUCKET)
+        .upload(path, novedadFile, {
+          upsert: false, // si quieres permitir reemplazar, cámbialo a true
+          contentType: novedadFile.type || 'application/pdf',
+        })
+
+      if (error) {
+        console.error('Error de Supabase al subir novedad:', {
+          message: error.message,
+          statusCode: error.statusCode,
+          name: error.name,
+        })
+        toast.error(error.message || 'Error de Supabase al subir la novedad.')
+        return
+      }
+
+      console.log('Novedad subida OK:', data)
+      toast.success('Novedad registrada.')
+      setNovedadFile(null)
+
+      // recargar lista de novedades para ver Novedad 1 — fecha, Novedad 2 — fecha, etc.
+      await loadNovedades(a)
+    } catch (err) {
+      console.error('Novedad error inesperado:', err, {
+        message: err?.message,
+        stack: err?.stack,
+      })
+      toast.error(err?.message || 'No se pudo registrar la novedad (error inesperado).')
+    } finally {
+      setUploadingNovedad(false)
+    }
+  }
+
 
   // ====== DESCARGAS / VALIDACIÓN / PM ======
   const handleDescargarInforme = async (a) => {
@@ -948,13 +1105,36 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
                 {selected.asistencia_tipo && <div className={styles.meta}>Asistencia: <strong>{selected.asistencia_tipo}</strong></div>}
               </div>
 
-              <div className={styles.headerActions}>
-                <button className={`${styles.btn} ${styles.btnGhost}`} onClick={() => setShowDetail(true)} title="Ver más">Ver más</button>
-                <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => {
-                  const ok = window.confirm(`¿Eliminar la auditoría #${selected.id}?`)
-                  if (ok) eliminarInforme(selected.id)
-                }} title="Eliminar auditoría">Eliminar</button>
-              </div>
+<div className={styles.headerActions}>
+  <button
+    className={`${styles.btn} ${styles.btnGhost}`}
+    onClick={() => setShowDetail(true)}
+    title="Ver más"
+  >
+    Ver más
+  </button>
+
+  {/* ⭐ Nuevo botón Novedades */}
+  <button
+    className={styles.btn}
+    onClick={() => abrirModalNovedades(selected)}
+    title="Ver / registrar novedades"
+  >
+    ⭐ Novedades
+  </button>
+
+  <button
+    className={`${styles.btn} ${styles.btnDanger}`}
+    onClick={() => {
+      const ok = window.confirm(`¿Eliminar la auditoría #${selected.id}?`)
+      if (ok) eliminarInforme(selected.id)
+    }}
+    title="Eliminar auditoría"
+  >
+    Eliminar
+  </button>
+</div>
+
             </header>
 
             <ol className={styles.timeline}>
@@ -1026,6 +1206,116 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
               <div><strong>Asistencia:</strong> {selected.asistencia?.url ? <a href={selected.asistencia.url} onClick={(e) => { e.preventDefault(); openInNewTab(selected.asistencia.url) }} className={styles.linkLike}>Ver</a> : '—'}</div>
               <div><strong>Evaluación:</strong> {selected.evaluacion?.url ? <a href={selected.evaluacion.url} onClick={(e) => { e.preventDefault(); openInNewTab(selected.evaluacion.url) }} className={styles.linkLike}>Ver</a> : '—'}</div>
               <div><strong>Acta:</strong> {selected.acta?.url ? <a href={selected.acta.url} onClick={(e) => { e.preventDefault(); openInNewTab(selected.acta.url) }} className={styles.linkLike}>Ver</a> : '—'}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ MODAL NOVEDADES */}
+      {novedadesModalOpen && selected && (
+        <div
+          className={styles.modalOverlay}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setNovedadesModalOpen(false)
+              setNovedadFile(null)
+            }
+          }}
+        >
+          <div className={styles.modalContenido}>
+            <button
+              className={styles.modalCerrar}
+              onClick={() => {
+                setNovedadesModalOpen(false)
+                setNovedadFile(null)
+              }}
+              title="Cerrar"
+            >
+              ✖
+            </button>
+
+            <h3 className={styles.modalTitulo}>
+              Novedades — Auditoría #{selected.id}
+            </h3>
+
+            <p style={{ marginBottom: 8 }}>
+              Haz clic en una novedad para abrirla.
+            </p>
+
+            {/* Lista de novedades como chips (estilo ya usado) */}
+            <div className={styles.kpisBar2} style={{ margin: '8px 0 16px' }}>
+            {novedadesLoading ? (
+              <span className={styles.kpiChip2}>Cargando novedades…</span>
+            ) : novedades.length === 0 ? (
+              <span className={styles.kpiChip2}>Sin novedades registradas</span>
+            ) : (
+              novedades.map((nv) => (
+                <button
+                  key={nv.path}
+                  className={styles.btn}
+                  title={nv.name}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    nv.url && openInNewTab(nv.url)
+                  }}
+                >
+                  ⭐ {nv.displayLabel}
+                </button>
+              ))
+            )}
+
+
+            </div>
+
+            {/* Subir nueva novedad */}
+            <label className={styles.dropArea}>
+              <input
+                type="file"
+                accept="application/pdf"
+                className={styles.inputArchivo}
+                onChange={(e) => {
+                  const f = e.target.files?.[0] || null
+                  if (f && f.size > 2 * 1024 * 1024) {
+                    toast.warn('Máximo 2MB')
+                    e.target.value = null
+                    return
+                  }
+                  setNovedadFile(f)
+                }}
+              />
+              {!novedadFile ? (
+                <>
+                  <div className={styles.iconoSubida}>📎</div>
+                  <p className={styles.instrucciones}>
+                    Haz clic para seleccionar el PDF de la novedad
+                    <br />
+                    <span className={styles.subtexto}>
+                      Solo PDF (máx. 2 MB)
+                    </span>
+                  </p>
+                </>
+              ) : (
+                <p className={styles.nombreArchivo}>✅ {novedadFile.name}</p>
+              )}
+            </label>
+
+            <div className={styles.modalBotones}>
+              <button
+                className={styles.botonSubir}
+                onClick={() => subirNovedad(selected)}
+                disabled={!novedadFile || uploadingNovedad}
+              >
+                {uploadingNovedad ? 'Subiendo…' : 'Registrar novedad'}
+              </button>
+              <button
+                className={styles.botonCancelar}
+                onClick={() => {
+                  setNovedadesModalOpen(false)
+                  setNovedadFile(null)
+                }}
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>
