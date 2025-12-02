@@ -212,7 +212,7 @@ const handleDateKeyDown = useCallback((e) => {
     a.click()
     a.remove()
     setTimeout(() => { openingRef.current = false }, 300)
-  }, [])
+  }, [novedades, openInNewTab])
 
     // ✅ Cargar novedades desde el bucket
   const loadNovedades = useCallback(async (a) => {
