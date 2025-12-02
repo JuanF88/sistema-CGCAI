@@ -212,7 +212,7 @@ const handleDateKeyDown = useCallback((e) => {
     a.click()
     a.remove()
     setTimeout(() => { openingRef.current = false }, 300)
-  }, [novedades, openInNewTab])
+  }, [])
 
     // ✅ Cargar novedades desde el bucket
   const loadNovedades = useCallback(async (a) => {
@@ -1244,7 +1244,7 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
 
             {/* Lista de novedades como chips (estilo ya usado) */}
             <div className={styles.kpisBar2} style={{ margin: '8px 0 16px' }}>
-            {novedadesLoading ? (
+            {/* {novedadesLoading ? (
               <span className={styles.kpiChip2}>Cargando novedades…</span>
             ) : novedades.length === 0 ? (
               <span className={styles.kpiChip2}>Sin novedades registradas</span>
@@ -1262,7 +1262,7 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
                   ⭐ {nv.displayLabel}
                 </button>
               ))
-            )}
+            )} */}
 
 
             </div>
