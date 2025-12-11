@@ -1273,7 +1273,6 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
               Haz clic en una novedad para abrirla.
             </p>
 
-            {/* Lista de novedades como chips (estilo ya usado)
             <div className={styles.kpisBar2} style={{ margin: '8px 0 16px' }}>
             {novedadesLoading ? (
               <span className={styles.kpiChip2}>Cargando novedades…</span>
@@ -1294,7 +1293,7 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
                 </button>
               ))
             )}
-            </div> */}
+            </div>
 
             <div className={styles.kpisBar2} style={{ margin: '8px 0 16px' }}>
               {renderNovedades()}
