@@ -402,13 +402,17 @@ const handleDateKeyDown = useCallback((e) => {
     setUploadingValidation(true)
     try {
       const filePath = buildValidationPath(a)
-      const { error: upErr } = await supabase.storage.from('validaciones').upload(filePath, validateFile, { upsert: true, contentType: 'application/pdf' })
-      if (upErr) throw upErr
 
-    const { error: upsertValErr } = await supabase
-      .from('validaciones_informe')
-      .upsert({ informe_id: a.id, archivo_url: filePath }, { onConflict: 'informe_id' })
-    if (upsertValErr) throw upsertValErr
+      await supabase.storage.from('validaciones').remove([filePath])
+
+      // ahora sube normal sin upsert
+      const { error: upErr } = await supabase.storage
+        .from('validaciones')
+        .upload(filePath, validateFile, {
+          upsert: false,
+          contentType: 'application/pdf',
+        })
+      if (upErr) throw upErr
 
     const { error: updInfErr } = await supabase
       .from('informes_auditoria')
@@ -608,6 +612,7 @@ const handleDateKeyDown = useCallback((e) => {
         .from('informes_auditoria')
         .select(`
           id, fecha_auditoria, fecha_seguimiento,
+          validado,
           objetivo, criterios, conclusiones, recomendaciones,
           asistencia_tipo, usuario_id, dependencia_id, validado,
           dependencias:dependencias ( nombre ),
@@ -652,7 +657,11 @@ const handleDateKeyDown = useCallback((e) => {
           const acta = await trySign('actas', buildActaPath(a))
           const acta_compromiso = await trySign('actascompromiso', buildActaCompromisoPath(a))
           // VALIDADO: intenta firmar por ruta exacta
-          const validated = await trySign('validaciones', buildValidationPath(a))
+          const valRec = a.validacion?.[0] || null
+          const validated = valRec?.archivo_url
+            ? await trySign('validaciones', valRec.archivo_url)
+            : await trySign('validaciones', buildValidationPath(a)) // fallback si quieres
+
           // Conteos de hallazgos
           const fCount = a.fortalezas?.length || 0
           const omCount = a.oportunidades_mejora?.length || 0
