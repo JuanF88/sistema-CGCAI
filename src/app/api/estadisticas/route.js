@@ -1,8 +1,33 @@
 // src/app/api/estadisticas/route.js
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabaseClient'
+import { getAuthenticatedClient } from '@/lib/authHelper'
+import { createClient } from '@supabase/supabase-js'
+
+const normalizeGestion = (g) => {
+  if (!g) return null
+  const v = String(g)
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+  const allowed = ['estrategica', 'academica', 'investigacion', 'administrativa', 'cultura', 'control', 'otras']
+  return allowed.includes(v) ? v : null
+}
 
 export async function GET() {
+  const { error } = await getAuthenticatedClient()
+  
+  if (error) {
+    return NextResponse.json({ error }, { status: 401 })
+  }
+
+  // Usar service role para consultas (bypass RLS temporal)
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+
   const tipos = [
     { tabla: 'fortalezas', tipo: 'Fortaleza' },
     { tabla: 'oportunidades_mejora', tipo: 'Oportunidad de Mejora' },
@@ -17,10 +42,10 @@ export async function GET() {
           .from(tabla)
           .select(`
             id,
-            informes_auditoria (
+            informes_auditoria:informe_id (
               id,
               fecha_auditoria,
-              dependencias ( nombre )
+              dependencias:dependencia_id ( nombre, gestion )
             )
           `)
 
@@ -30,6 +55,7 @@ export async function GET() {
 
     // 2) Construye DETALLE unificado [{ anio, dependencia, tipo, cantidad }]
     const detalle = []
+    const depsMap = new Map() // nombre -> { nombre, gestion }
     for (const { tipo, data, error, tabla } of results) {
       if (error) {
         console.error(`Error cargando ${tabla}:`, error)
@@ -44,10 +70,19 @@ export async function GET() {
           fecha && !Number.isNaN(fecha.getTime()) ? fecha.getFullYear() : null
 
         const dependencia = ia.dependencias?.nombre || 'Desconocida'
+        const gestion = normalizeGestion(ia.dependencias?.gestion) || null
+
+        if (dependencia) {
+          const prev = depsMap.get(dependencia)
+          if (!prev || !prev.gestion) {
+            depsMap.set(dependencia, { nombre: dependencia, gestion })
+          }
+        }
 
         detalle.push({
           anio,                 // puede ser null; el front lo tolera
           dependencia,
+          gestion,
           tipo,
           cantidad: 1,          // cada hallazgo cuenta 1
         })
@@ -83,9 +118,9 @@ export async function GET() {
       new Set(detalle.map(d => d.anio).filter(v => v != null))
     ).sort((a, b) => Number(a) - Number(b))
 
-    const dependencias = Array.from(
-      new Set(detalle.map(d => d.dependencia).filter(Boolean))
-    ).sort((a, b) => a.localeCompare(b))
+    const dependencias = Array.from(depsMap.values()).sort((a, b) =>
+      (a.nombre || '').localeCompare(b.nombre || '')
+    )
 
     return NextResponse.json({
       // dataset unificado para el front

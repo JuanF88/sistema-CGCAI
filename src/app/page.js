@@ -29,42 +29,54 @@ export default function LoginPage() {
   const handleLogin = async (e) => {
     e.preventDefault()
 
-    const { data, error } = await supabase
-      .from('usuarios')
-      .select('*')
-      .eq('email', email)
-      .eq('password', password)
-      .eq('estado', 'activo')
-      .single()
-
-    if (error || !data) {
-      setErrorMsg('Correo, contraseña incorrectos o usuario inactivo')
-      return
-    }
-    if (!data.rol) {
-      setErrorMsg('Este usuario no tiene un rol definido.')
-      return
-    }
-
-    // ✅ guardamos el último correo usado
     try {
-      localStorage.setItem(STORAGE_KEY_LAST_EMAIL, email)
-    } catch { /* ignore */ }
+      // Llamar a la API de login
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
 
-    localStorage.setItem('clienteLogueado', JSON.stringify(data))
+      const data = await response.json()
 
-    switch (data.rol.trim().toLowerCase()) {
-      case 'auditor':
-        router.push('/auditor')
-        break
-      case 'admin':
-        router.push('/admin')
-        break
-      case 'gestor':
-        router.push('/gestor')
-        break
-      default:
-        setErrorMsg(`Rol no reconocido: ${data.rol}`)
+      if (!response.ok) {
+        setErrorMsg(data.error || 'Error al iniciar sesión')
+        return
+      }
+
+      // ✅ guardamos el último correo usado
+      try {
+        localStorage.setItem(STORAGE_KEY_LAST_EMAIL, email)
+      } catch { /* ignore */ }
+
+      // Guardar datos del usuario (compatibilidad con código existente)
+      localStorage.setItem('clienteLogueado', JSON.stringify(data.usuario))
+
+      // ✅ Establecer la sesión en el cliente Supabase
+      if (data.session) {
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        })
+      }
+
+      // Redirigir según rol
+      switch (data.usuario.rol.trim().toLowerCase()) {
+        case 'auditor':
+          router.push('/auditor')
+          break
+        case 'admin':
+          router.push('/admin')
+          break
+        case 'gestor':
+          router.push('/gestor')
+          break
+        default:
+          setErrorMsg(`Rol no reconocido: ${data.usuario.rol}`)
+      }
+    } catch (error) {
+      console.error('Error en login:', error)
+      setErrorMsg('Error de conexión. Intenta nuevamente.')
     }
   }
 

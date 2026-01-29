@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react' // 👈 useMemo
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'react-toastify'
 import { useRouter } from 'next/navigation'
 import DataTable from 'react-data-table-component'
-import { Eye, EyeOff, Mail } from 'lucide-react' // (puedes mantener como tenías)
+import { Eye, EyeOff, Mail, Edit2, Trash2, Send } from 'lucide-react'
+import styles from './CSS/VistaAdministrarUsuarios.module.css'
 
 export default function VistaAdministrarUsuarios() {
   const [usuarios, setUsuarios] = useState([])
@@ -278,82 +279,175 @@ export default function VistaAdministrarUsuarios() {
     },
     {
       name: 'Acciones',
+      width: '280px',
       cell: row => (
-        <div className="flex gap-1">
+        <div className={styles.actionButtons}>
           <button
             onClick={() => abrirEdicion(row)}
-            className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+            className={styles.btnEdit}
+            title="Editar usuario"
           >
-            Editar
+            <Edit2 size={14} />
           </button>
 
           <button
             onClick={() => solicitarEliminacion(row)}
             disabled={eliminandoId === row.usuario_id}
-            className={`px-2 py-1 rounded text-white ${eliminandoId === row.usuario_id
-              ? 'bg-red-300 cursor-not-allowed'
-              : 'bg-red-600 hover:bg-red-700'
-              }`}
+            className={`${styles.btnDelete} ${eliminandoId === row.usuario_id ? styles.btnDisabled : ''}`}
             title="Eliminar usuario"
           >
-            {eliminandoId === row.usuario_id ? 'Eliminando...' : 'Eliminar'}
+            <Trash2 size={14} />
           </button>
 
-          {/* Enviar credenciales */}
           <button
             onClick={() => abrirCredenciales(row)}
-            className="bg-emerald-600 text-white px-2 py-1 rounded hover:bg-emerald-700 flex items-center gap-1"
-            title="Preparar correo con credenciales"
+            className={styles.btnCredentials}
+            title="Enviar credenciales"
           >
-            <Mail size={16} />
-            Credenciales
+            <Send size={14} />
           </button>
         </div>
       )
     }
   ]
 
-  return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-700">Usuarios</h2>
+  // KPIs
+  const stats = useMemo(() => {
+    const total = usuarios.length
+    const activos = usuarios.filter(u => u.estado === 'activo').length
+    const inactivos = usuarios.filter(u => u.estado === 'inactivo').length
+    const auditores = usuarios.filter(u => u.rol === 'auditor').length
+    const admins = usuarios.filter(u => u.rol === 'admin').length
+    const gestores = usuarios.filter(u => u.rol === 'gestor').length
+    return { total, activos, inactivos, auditores, admins, gestores }
+  }, [usuarios])
 
-      {/* 🔎 Barra de búsqueda */}
-      <div className="flex items-center gap-3">
-        <input
-          type="text"
-          placeholder="Buscar por nombre, email, rol o estado..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="border p-2 rounded w-full max-w-md"
-        />
-        {busqueda && (
-          <button
-            onClick={() => setBusqueda('')}
-            className="px-3 py-2 rounded border border-gray-300 hover:bg-gray-50"
-          >
-            Limpiar
-          </button>
-        )}
+  return (
+    <div className={styles.container}>
+      {/* HEADER MODERNO */}
+      <div className={styles.modernHeader}>
+        <div className={styles.headerContent}>
+          <div className={styles.headerLeft}>
+            <div className={styles.headerIcon}>👥</div>
+            <div className={styles.headerInfo}>
+              <h1 className={styles.headerTitle}>Administrar Usuarios</h1>
+              <p className={styles.headerSubtitle}>Gestión de usuarios del sistema de auditoría</p>
+            </div>
+          </div>
+          <div className={styles.headerRight}>
+            <button className={styles.modernAddBtn} onClick={abrirNuevo} title="Crear nuevo usuario">
+              <span className={styles.addIcon}>+</span>
+              <span>Nuevo Usuario</span>
+            </button>
+          </div>
+        </div>
       </div>
 
-      <DataTable
-        columns={columnas}
-        data={usuariosVista}
-        pagination
-        highlightOnHover
-        responsive
-        striped
-        noDataComponent="No hay usuarios registrados."
-      />
+      {/* KPI CARDS */}
+      <div className={styles.kpiGrid}>
+        <div className={`${styles.kpiCard} ${styles.kpiCardBlue}`}>
+          <div className={styles.kpiIcon}>👥</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>Total Usuarios</div>
+            <div className={styles.kpiValue}>{stats.total}</div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardGreen}`}>
+          <div className={styles.kpiIcon}>✅</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>Usuarios Activos</div>
+            <div className={styles.kpiValue}>{stats.activos}</div>
+            <div className={styles.kpiProgress}>
+              <div className={styles.kpiProgressTrack}>
+                <div className={styles.kpiProgressFill} style={{ width: `${stats.total > 0 ? (stats.activos / stats.total * 100) : 0}%` }}></div>
+              </div>
+              <span className={styles.kpiPercent}>{stats.total > 0 ? Math.round(stats.activos / stats.total * 100) : 0}%</span>
+            </div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardOrange}`}>
+          <div className={styles.kpiIcon}>⚠️</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>Usuarios Inactivos</div>
+            <div className={styles.kpiValue}>{stats.inactivos}</div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardPurple}`}>
+          <div className={styles.kpiIcon}>🔍</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>Auditores</div>
+            <div className={styles.kpiValue}>{stats.auditores}</div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardIndigo}`}>
+          <div className={styles.kpiIcon}>🔑</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>Administradores</div>
+            <div className={styles.kpiValue}>{stats.admins}</div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardCyan}`}>
+          <div className={styles.kpiIcon}>📄</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>Gestores</div>
+            <div className={styles.kpiValue}>{stats.gestores}</div>
+          </div>
+        </div>
+      </div>
 
-      <div className="flex justify-center">
-        <button
-          onClick={abrirNuevo}
-          className="text-3xl text-white bg-blue-600 hover:bg-blue-700 rounded-full w-14 h-14 flex items-center justify-center shadow-xl"
-          title="Crear nuevo usuario"
-        >
-          +
-        </button>
+      {/* TABLA */}
+      <div className={styles.tableCard}>
+        <div className={styles.tableHeader}>
+          <h3 className={styles.tableTitle}>Listado de Usuarios</h3>
+          <div className={styles.searchBox}>
+            <input
+              type="text"
+              placeholder="Buscar por nombre, email, rol o estado..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className={styles.searchInput}
+            />
+            {busqueda && (
+              <button onClick={() => setBusqueda('')} className={styles.clearBtn}>
+                ✖
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className={styles.tableWrapper}>
+          <DataTable
+            columns={columnas}
+            data={usuariosVista}
+            pagination
+            highlightOnHover
+            responsive
+            striped
+            noDataComponent="No hay usuarios registrados."
+            customStyles={{
+              headRow: {
+                style: {
+                  backgroundColor: '#f8fafc',
+                  borderBottom: '2px solid #e5e7eb',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  color: '#475569',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }
+              },
+              rows: {
+                style: {
+                  fontSize: '14px',
+                  color: '#1e293b',
+                  '&:hover': {
+                    backgroundColor: '#f1f5f9'
+                  }
+                }
+              }
+            }}
+          />
+        </div>
       </div>
 
       {/* Modal crear/editar */}

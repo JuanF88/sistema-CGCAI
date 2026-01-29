@@ -4,6 +4,18 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import DataTable from 'react-data-table-component'
 import { toast } from 'react-toastify'
+import { Edit2, Trash2 } from 'lucide-react'
+import styles from './CSS/VistaAdministrarDependencias.module.css'
+
+const GESTIONES = [
+  { value: 'estrategica', label: 'Gestión Estratégica' },
+  { value: 'academica', label: 'Gestión Académica' },
+  { value: 'investigacion', label: 'Gestión de la Investigación' },
+  { value: 'administrativa', label: 'Gestión Administrativa' },
+  { value: 'cultura', label: 'Gestión de Cultura y Bienestar' },
+  { value: 'control', label: 'Gestión de Control' },
+  { value: 'otras', label: 'Otras / sin clasificar' },
+]
 
 export default function VistaAdministrarDependencias() {
   const router = useRouter()
@@ -18,7 +30,8 @@ export default function VistaAdministrarDependencias() {
   const [editando, setEditando] = useState(false)
   const [form, setForm] = useState({
     dependencia_id: null,
-    nombre: ''
+    nombre: '',
+    gestion: 'otras',
   })
 
   // Eliminar
@@ -48,19 +61,19 @@ export default function VistaAdministrarDependencias() {
   }, [router])
 
   const abrirNuevo = () => {
-    setForm({ dependencia_id: null, nombre: '' })
+    setForm({ dependencia_id: null, nombre: '', gestion: 'otras' })
     setEditando(false)
     setMostrarModal(true)
   }
 
   const abrirEdicion = (row) => {
-    setForm({ dependencia_id: row.dependencia_id, nombre: row.nombre })
+    setForm({ dependencia_id: row.dependencia_id, nombre: row.nombre, gestion: row.gestion || 'otras' })
     setEditando(true)
     setMostrarModal(true)
   }
 
   const cerrarModal = () => {
-    setForm({ dependencia_id: null, nombre: '' })
+    setForm({ dependencia_id: null, nombre: '', gestion: 'otras' })
     setEditando(false)
     setMostrarModal(false)
   }
@@ -82,6 +95,8 @@ export default function VistaAdministrarDependencias() {
         return
       }
 
+      const gestionVal = form.gestion || 'otras'
+
       if (editando) {
         if (!form.dependencia_id) {
           toast.error('Falta el ID para actualizar.')
@@ -90,13 +105,13 @@ export default function VistaAdministrarDependencias() {
         res = await fetch(`/api/dependencias?id=${form.dependencia_id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nombre: form.nombre.trim() })
+          body: JSON.stringify({ nombre: form.nombre.trim(), gestion: gestionVal })
         })
       } else {
         res = await fetch('/api/dependencias', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nombre: form.nombre.trim() })
+          body: JSON.stringify({ nombre: form.nombre.trim(), gestion: gestionVal })
         })
       }
 
@@ -194,77 +209,190 @@ export default function VistaAdministrarDependencias() {
       sortFunction: (a, b) => normalize(a.nombre).localeCompare(normalize(b.nombre)) // 👈 orden consistente al click
     },
     {
+      id: 'gestion',
+      name: 'Gestión',
+      selector: (row) => row.gestion || 'otras',
+      sortable: true,
+      width: '220px',
+      cell: (row) => {
+        const found = GESTIONES.find((g) => g.value === (row.gestion || 'otras'))
+        return found?.label || row.gestion || 'Otras / sin clasificar'
+      },
+      sortFunction: (a, b) => normalize(a.gestion || '').localeCompare(normalize(b.gestion || '')),
+    },
+    {
       name: 'Acciones',
+      width: '180px',
       cell: (row) => (
-        <div className="flex gap-2">
+        <div className={styles.actionButtons}>
           <button
             onClick={() => abrirEdicion(row)}
-            className="bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+            className={styles.btnEdit}
+            title="Editar dependencia"
           >
-            Editar
+            <Edit2 size={14} />
           </button>
 
           <button
             onClick={() => solicitarEliminacion(row)}
             disabled={eliminandoId === row.dependencia_id}
-            className={`px-2 py-1 rounded text-white ${
-              eliminandoId === row.dependencia_id
-                ? 'bg-red-300 cursor-not-allowed'
-                : 'bg-red-600 hover:bg-red-700'
-            }`}
+            className={`${styles.btnDelete} ${eliminandoId === row.dependencia_id ? styles.btnDisabled : ''}`}
             title="Eliminar dependencia"
           >
-            {eliminandoId === row.dependencia_id ? 'Eliminando...' : 'Eliminar'}
+            <Trash2 size={14} />
           </button>
         </div>
       )
     }
   ]
 
-  return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-700">Dependencias</h2>
+  // KPIs por gestión
+  const stats = useMemo(() => {
+    const total = dependencias.length
+    const porGestion = {}
+    GESTIONES.forEach(g => {
+      porGestion[g.value] = dependencias.filter(d => (d.gestion || 'otras') === g.value).length
+    })
+    return { total, ...porGestion }
+  }, [dependencias])
 
-      {/* 🔎 Buscador */}
-      <div className="flex items-center gap-3">
-        <input
-          type="text"
-          placeholder="Buscar por nombre..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="border p-2 rounded w-full max-w-md"
-        />
-        {busqueda && (
-          <button
-            onClick={() => setBusqueda('')}
-            className="px-3 py-2 rounded border border-gray-300 hover:bg-gray-50"
-          >
-            Limpiar
-          </button>
-        )}
+  return (
+    <div className={styles.container}>
+      {/* HEADER MODERNO */}
+      <div className={styles.modernHeader}>
+        <div className={styles.headerContent}>
+          <div className={styles.headerLeft}>
+            <div className={styles.headerIcon}>🏢</div>
+            <div className={styles.headerInfo}>
+              <h1 className={styles.headerTitle}>Administrar Dependencias</h1>
+              <p className={styles.headerSubtitle}>Gestión de dependencias y áreas organizacionales</p>
+            </div>
+          </div>
+          <div className={styles.headerRight}>
+            <button className={styles.modernAddBtn} onClick={abrirNuevo} title="Crear nueva dependencia">
+              <span className={styles.addIcon}>+</span>
+              <span>Nueva Dependencia</span>
+            </button>
+          </div>
+        </div>
       </div>
 
-      <DataTable
-        columns={columnas}
-        data={dependenciasVista}               // 👈 usamos la vista filtrada+ordenada
-        pagination
-        progressPending={cargando}
-        highlightOnHover
-        responsive
-        striped
-        noDataComponent="No hay dependencias registradas."
-        defaultSortFieldId="nombre"           // 👈 arranca ordenado por Nombre
-        defaultSortAsc={true}
-      />
+      {/* KPI CARDS */}
+      <div className={styles.kpiGrid}>
+        <div className={`${styles.kpiCard} ${styles.kpiCardBlue}`}>
+          <div className={styles.kpiIcon}>🏢</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>Total Dependencias</div>
+            <div className={styles.kpiValue}>{stats.total}</div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardPurple}`}>
+          <div className={styles.kpiIcon}>🎯</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>G. Estratégica</div>
+            <div className={styles.kpiValue}>{stats.estrategica || 0}</div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardGreen}`}>
+          <div className={styles.kpiIcon}>🎓</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>G. Académica</div>
+            <div className={styles.kpiValue}>{stats.academica || 0}</div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardCyan}`}>
+          <div className={styles.kpiIcon}>🔬</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>G. Investigación</div>
+            <div className={styles.kpiValue}>{stats.investigacion || 0}</div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardOrange}`}>
+          <div className={styles.kpiIcon}>💼</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>G. Administrativa</div>
+            <div className={styles.kpiValue}>{stats.administrativa || 0}</div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardPink}`}>
+          <div className={styles.kpiIcon}>🎨</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>G. Cultura</div>
+            <div className={styles.kpiValue}>{stats.cultura || 0}</div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardIndigo}`}>
+          <div className={styles.kpiIcon}>🔒</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>G. Control</div>
+            <div className={styles.kpiValue}>{stats.control || 0}</div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardGray}`}>
+          <div className={styles.kpiIcon}>📁</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>Otras</div>
+            <div className={styles.kpiValue}>{stats.otras || 0}</div>
+          </div>
+        </div>
+      </div>
 
-      <div className="flex justify-center">
-        <button
-          onClick={abrirNuevo}
-          className="text-3xl text-white bg-blue-600 hover:bg-blue-700 rounded-full w-14 h-14 flex items-center justify-center shadow-xl"
-          title="Crear dependencia"
-        >
-          +
-        </button>
+      {/* TABLA */}
+      <div className={styles.tableCard}>
+        <div className={styles.tableHeader}>
+          <h3 className={styles.tableTitle}>Listado de Dependencias</h3>
+          <div className={styles.searchBox}>
+            <input
+              type="text"
+              placeholder="Buscar por nombre..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className={styles.searchInput}
+            />
+            {busqueda && (
+              <button onClick={() => setBusqueda('')} className={styles.clearBtn}>
+                ✖
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className={styles.tableWrapper}>
+          <DataTable
+            columns={columnas}
+            data={dependenciasVista}
+            pagination
+            progressPending={cargando}
+            highlightOnHover
+            responsive
+            striped
+            noDataComponent="No hay dependencias registradas."
+            defaultSortFieldId="nombre"
+            defaultSortAsc={true}
+            customStyles={{
+              headRow: {
+                style: {
+                  backgroundColor: '#f8fafc',
+                  borderBottom: '2px solid #e5e7eb',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  color: '#475569',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }
+              },
+              rows: {
+                style: {
+                  fontSize: '14px',
+                  color: '#1e293b',
+                  '&:hover': {
+                    backgroundColor: '#f1f5f9'
+                  }
+                }
+              }
+            }}
+          />
+        </div>
       </div>
 
       {/* Modal crear/editar */}
@@ -283,6 +411,17 @@ export default function VistaAdministrarDependencias() {
             onChange={handleChange}
             className="w-full border p-2 rounded uppercase"
             />
+
+            <select
+              name="gestion"
+              value={form.gestion}
+              onChange={handleChange}
+              className="w-full border p-2 rounded"
+            >
+              {GESTIONES.map((g) => (
+                <option key={g.value} value={g.value}>{g.label}</option>
+              ))}
+            </select>
             
             <div className="flex justify-end gap-2">
               <button

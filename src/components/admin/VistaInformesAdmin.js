@@ -3,47 +3,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import styles from '@/components/admin/CSS/auditoriasMallaControl.module.css'
+import {
+  parseYMD,
+  addDays,
+  startOfDay,
+  diffInDays,
+  fmt,
+  buildPlanPath,
+  buildAsistenciaPath,
+  buildEvaluacionPath,
+  buildActaPath,
+  buildActaCompromisoPath,
+  buildValidationPath,
+  BUCKETS
+} from '@/hooks/useAuditTimeline'
 
-/* ===== utilidades fecha ===== */
-function parseYMD(ymd) {
-  if (!ymd) return null
-  const [y, m, d] = String(ymd).slice(0, 10).split('-').map(Number)
-  if (!y || !m || !d) return null
-  return new Date(y, m - 1, d)
-}
-function addDays(date, n) {
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  d.setDate(d.getDate() + n)
-  return d
-}
-function startOfDay(date) { return new Date(date.getFullYear(), date.getMonth(), date.getDate()) }
-function daysBetween(a, b) { return Math.round((startOfDay(b) - startOfDay(a)) / 86400000) }
-function fmt(date) {
-  try {
-    return new Intl.DateTimeFormat('es-CO', {
-      timeZone: 'America/Bogota', year: 'numeric', month: 'short', day: '2-digit'
-    }).format(date)
-  } catch { return date?.toLocaleDateString?.() ?? '' }
-}
-
-
-/* ===== helpers filename para detectar archivos en Storage ===== */
-const toSlugUpper = (s = '') =>
-  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase()
-
-const toYMD = (input) => {
-  if (!input) return new Date().toISOString().slice(0, 10)
-  const s = String(input)
-  return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : new Date(input).toISOString().slice(0, 10)
-}
-
-const buildPlanPath            = (a) => `PlanAuditoria_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
-const buildValidationPath      = (a) => `Auditoria_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEPENDENCIA')}_${toYMD(a?.fecha_auditoria)}.pdf`
-const buildAsistenciaPath      = (a) => `Asistencia_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
-const buildEvaluacionPath      = (a) => `Evaluacion_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
-const buildActaPath            = (a) => `Acta_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
-const buildActaCompromisoPath  = (a) => `ActaCompromiso_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
+// Helper local para compatibilidad (si se necesita en este archivo)
+const daysBetween = diffInDays
 
 /* ===== obtener timestamps desde Storage (created_at/updated_at) ===== */
 async function getFileTimestamps(supabase, bucket, fullPath) {
@@ -63,9 +39,6 @@ export default function AuditoriasMallaControl() {
   const [error, setError] = useState(null)
   const [auditorias, setAuditorias] = useState([])
   const [selectedYear, setSelectedYear] = useState('') // '' = todos
-
-  // modal detalle por dependencia
-  const [detailDepId, setDetailDepId] = useState(null)
 
   const loadData = useCallback(async () => {
     setLoading(true); setError(null)
@@ -87,11 +60,23 @@ export default function AuditoriasMallaControl() {
       if (error) throw error
       const rows = data || []
 
-      const trySign = async (bucket, path) => {
+      const fileExists = async (bucket, path) => {
         try {
-          const { data: s } = await supabase.storage.from(bucket).createSignedUrl(path, 60)
-          return Boolean(s?.signedUrl)
-        } catch { return false }
+          // Extraer directorio y nombre del archivo
+          const lastSlash = path.lastIndexOf('/')
+          const dir = lastSlash > 0 ? path.substring(0, lastSlash) : ''
+          const fileName = lastSlash > 0 ? path.substring(lastSlash + 1) : path
+          
+          // Listar archivos en el directorio
+          const { data, error } = await supabase.storage
+            .from(bucket)
+            .list(dir, { limit: 1000 })
+          
+          if (error) return false
+          return data?.some(file => file.name === fileName) || false
+        } catch { 
+          return false 
+        }
       }
 
       const merged = await Promise.all(rows.map(async (a) => {
@@ -107,13 +92,14 @@ export default function AuditoriasMallaControl() {
         } : {}
 
         const [hasPlan, hasAsis, hasEval, hasActa, hasActaComp, hasValid] = await Promise.all([
-          trySign('planes',         buildPlanPath(a)),
-          trySign('asistencias',    buildAsistenciaPath(a)),
-          trySign('evaluaciones',   buildEvaluacionPath(a)),
-          trySign('actas',          buildActaPath(a)),
-          trySign('actascompromiso',buildActaCompromisoPath(a)),
-          trySign('validaciones',   buildValidationPath(a)),
+          fileExists(BUCKETS.PLANES,            buildPlanPath(a)),
+          fileExists(BUCKETS.ASISTENCIAS,       buildAsistenciaPath(a)),
+          fileExists(BUCKETS.EVALUACIONES,      buildEvaluacionPath(a)),
+          fileExists(BUCKETS.ACTAS,             buildActaPath(a)),
+          fileExists(BUCKETS.ACTAS_COMPROMISO,  buildActaCompromisoPath(a)),
+          fileExists(BUCKETS.VALIDACIONES,      buildValidationPath(a)),
         ])
+
 
         // Campos e hallazgos completos = "informeOk"
         const isFilled = Boolean(a.objetivo?.trim()) && Boolean(a.criterios?.trim()) &&
@@ -227,8 +213,8 @@ export default function AuditoriasMallaControl() {
       return { depId: row.depId, depName: row.depName, total, completion, _agg: agg }
     })
 
-    // Orden por mayor completitud promedio (más “información subida” primero)
-    return list.sort((a, b) => (b.completion - a.completion) || a.depName.localeCompare(b.depName))
+    // Orden por menor completitud (para identificar rápidamente lo que falta)
+    return list.sort((a, b) => (a.completion - b.completion) || a.depName.localeCompare(b.depName))
   }, [filtered])
 
   /* ===== KPIs globales ===== */
@@ -261,113 +247,221 @@ export default function AuditoriasMallaControl() {
   return (
     <div className={styles.wrapper}>
       <main className={styles.content}>
-        {/* Toolbar / Filtros / KPIs */}
-        <div className={styles.toolbar}>
-          <div className={styles.toolbarTop}>
-            <h3 className={styles.toolbarTitle}>Malla de control — Vista general</h3>
-            <div className={styles.toolbarActions}>
-              <label className={styles.inputGroup}>
-                <span className={styles.inputLabel}>Año</span>
-                <select className={styles.inputBase} value={selectedYear} onChange={e => setSelectedYear(e.target.value)}>
-                  <option value="">Todos</option>
-                  {years.map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-              </label>
-              <button className={styles.refreshBtn} onClick={loadData} title="Recargar">↻</button>
+        {/* Header moderno con gradiente */}
+        <div className={styles.modernHeader}>
+          <div className={styles.headerContent}>
+            <div className={styles.headerText}>
+              <h1 className={styles.modernTitle}>Centro de Control de Auditorías</h1>
+              <p className={styles.modernSubtitle}>Monitoreo en tiempo real del estado de todas las auditorías</p>
+            </div>
+            <div className={styles.headerActions}>
+              <select className={styles.modernSelect} value={selectedYear} onChange={e => setSelectedYear(e.target.value)}>
+                <option value="">📅 Todos los años</option>
+                {years.map(y => <option key={y} value={y}>📅 {y}</option>)}
+              </select>
+              <button className={styles.modernRefresh} onClick={loadData} title="Recargar datos">
+                <span className={styles.refreshIcon}>↻</span>
+              </button>
             </div>
           </div>
-
-          <div className={styles.kpisBar}>
-            <KpiChip label="Total" value={kpis.total} />
-            <KpiChip label="Plan" value={`${kpis.plan}/${kpis.total} — ${kpis.pct(kpis.plan)}%`} />
-            <KpiChip label="Asistencia" value={`${kpis.asistencia}/${kpis.total} — ${kpis.pct(kpis.asistencia)}%`} />
-            <KpiChip label="Evaluación" value={`${kpis.evaluacion}/${kpis.total} — ${kpis.pct(kpis.evaluacion)}%`} />
-            <KpiChip label="Acta" value={`${kpis.acta}/${kpis.total} — ${kpis.pct(kpis.acta)}%`} />
-            <KpiChip label="Acta Comp." value={`${kpis.actaComp}/${kpis.total} — ${kpis.pct(kpis.actaComp)}%`} />
-            <KpiChip label="Informe OK" value={`${kpis.informeOk}/${kpis.total} — ${kpis.pct(kpis.informeOk)}%`} />
-            <KpiChip label="Validados" value={`${kpis.validado}/${kpis.total} — ${kpis.pct(kpis.validado)}%`} />
-          </div>
         </div>
 
-        {/* Leyenda de colores */}
-        <div className={styles.legend}>
-          <span>Progreso por celda:</span>
-          <i className={`${styles.legendBox} ${styles.heat0}`} title="0%"></i>
-          <i className={`${styles.legendBox} ${styles.heat1}`} title=">0%"></i>
-          <i className={`${styles.legendBox} ${styles.heat2}`} title="≥25%"></i>
-          <i className={`${styles.legendBox} ${styles.heat3}`} title="≥50%"></i>
-          <i className={`${styles.legendBox} ${styles.heat4}`} title="≥70%"></i>
-          <i className={`${styles.legendBox} ${styles.heat5}`} title="≥90%"></i>
+        {/* KPI Cards modernos */}
+        <div className={styles.kpiGrid}>
+          <KpiCard 
+            icon="📊" 
+            label="Total Auditorías" 
+            value={kpis.total} 
+            color="blue"
+          />
+          <KpiCard 
+            icon="📋" 
+            label="Planes" 
+            value={kpis.plan}
+            total={kpis.total}
+            percent={kpis.pct(kpis.plan)}
+            color="purple"
+          />
+          <KpiCard 
+            icon="✓" 
+            label="Asistencias" 
+            value={kpis.asistencia}
+            total={kpis.total}
+            percent={kpis.pct(kpis.asistencia)}
+            color="green"
+          />
+          <KpiCard 
+            icon="📝" 
+            label="Evaluaciones" 
+            value={kpis.evaluacion}
+            total={kpis.total}
+            percent={kpis.pct(kpis.evaluacion)}
+            color="orange"
+          />
+          <KpiCard 
+            icon="📄" 
+            label="Actas" 
+            value={kpis.acta}
+            total={kpis.total}
+            percent={kpis.pct(kpis.acta)}
+            color="cyan"
+          />
+          <KpiCard 
+            icon="📑" 
+            label="Actas Compromiso" 
+            value={kpis.actaComp}
+            total={kpis.total}
+            percent={kpis.pct(kpis.actaComp)}
+            color="pink"
+          />
+          <KpiCard 
+            icon="✅" 
+            label="Informes Completos" 
+            value={kpis.informeOk}
+            total={kpis.total}
+            percent={kpis.pct(kpis.informeOk)}
+            color="teal"
+          />
+          <KpiCard 
+            icon="🎯" 
+            label="Validados" 
+            value={kpis.validado}
+            total={kpis.total}
+            percent={kpis.pct(kpis.validado)}
+            color="indigo"
+          />
         </div>
 
-        {/* Heatmap por dependencia */}
-        <section className={styles.gridCard}>
-          <div className={styles.gridHeader}>
-            <div className={styles.gridHeadSticky}>Dependencia</div>
-            <div className={styles.gridHead}>Avance %</div>
-            {['Plan','Asistencia','Evaluación','Acta','Acta Comp.','Informe OK','Validado'].map(h => (
-              <div key={h} className={styles.gridHead}>{h}</div>
-            ))}
+        
+
+        {/* Heatmap por dependencia - MODERNA */}
+        <section className={styles.modernGridCard}>
+          <div className={styles.modernGridHeader}>
+            <h3 className={styles.gridTitle}>
+              <span className={styles.gridTitleIcon}>🎯</span>
+              Malla de Control por Dependencia
+            </h3>
+            <p className={styles.gridSubtitle}>Seguimiento detallado del progreso de cada dependencia</p>
           </div>
+          <div className={styles.modernTableContainer}>
+            <div className={styles.gridHeader}>
+              <div className={styles.gridHeadSticky}>
+                <span className={styles.columnIcon}>🏢</span> Dependencia
+              </div>
+              <div className={styles.gridHead}>
+                <span className={styles.columnIcon}>📈</span> Avance
+              </div>
+              {['📋 Plan','✓ Asistencia','📝 Evaluación','📄 Acta','📑 Acta Comp.','✅ Informe','🎯 Validado'].map(h => (
+                <div key={h} className={styles.gridHead}>{h}</div>
+              ))}
+            </div>
 
-          {loading && <div className={styles.skeletonList} style={{ padding: 12 }}>Cargando…</div>}
-          {error && <div className={styles.errorBox}>⚠️ {error}</div>}
-          {!loading && !error && matrix.length === 0 && (
-            <div className={styles.emptyBox}>Sin resultados para el filtro seleccionado.</div>
-          )}
-
-          <div className={styles.gridBody}>
-            {matrix.map(row => {
-              const pct = Math.round(row.completion * 100)
-              return (
-                <div key={row.depId} className={styles.gridRow}>
-                  <div
-                    className={`${styles.depCell} ${styles.depCellClickable}`}
-                    onClick={() => setDetailDepId(row.depId)}
-                    title="Click para ver detalle por auditoría"
-                  >
-                    {row.depName}
-                  </div>
-
-                  {/* % de avance */}
-                  <div className={styles.progressCell}>
-                    <div className={styles.progressTrack}>
-                      <div className={styles.progressFill} style={{ width: `${pct}%` }} aria-label={`Avance ${pct}%`} />
-                    </div>
-                    <span className={styles.progressLabel}>{pct}%</span>
-                  </div>
-
-                  {columns.map(col => {
-                    const ag = row._agg[col.key] || { done: 0, total: row.total, overdue: 0, pending: 0, nextDue: null, lastDelivered: null }
-                    const localPct = ag.total ? Math.round((ag.done / ag.total) * 100) : 0
-                    const cls = heatClass(localPct, styles)
-                    const tip = buildTooltip(col.title, ag)
-                    return (
-                      <div key={col.key} className={`${styles.cell} ${cls}`} title={tip} aria-label={tip}>
-                        <span className={styles.cellText}>{ag.done}/{ag.total}</span>
-                      </div>
-                    )
-                  })}
+            {loading && (
+              <div className={styles.modernLoader}>
+                <div className={styles.spinnerContainer}>
+                  <div className={styles.spinner}></div>
+                  <p>Cargando datos...</p>
                 </div>
-              )
-            })}
+              </div>
+            )}
+            
+            {error && (
+              <div className={styles.modernError}>
+                <span className={styles.errorIcon}>⚠️</span>
+                <div>
+                  <strong>Error al cargar los datos</strong>
+                  <p>{error}</p>
+                </div>
+              </div>
+            )}
+            
+            {!loading && !error && matrix.length === 0 && (
+              <div className={styles.modernEmpty}>
+                <span className={styles.emptyIcon}>📭</span>
+                <p>No hay resultados para el filtro seleccionado</p>
+              </div>
+            )}
+
+            <div className={styles.gridBody}>
+              {matrix.map(row => {
+                const pct = Math.round(row.completion * 100)
+                return (
+                  <div key={row.depId} className={styles.modernGridRow}>
+                    <div className={styles.depCell}>
+                      <div className={styles.depCellContent}>
+                        <span className={styles.depName}>{row.depName}</span>
+                        <span className={styles.depTotal}>{row.total} auditorías</span>
+                      </div>
+                    </div>
+
+                    {/* % de avance mejorado */}
+                    <div className={styles.modernProgressCell}>
+                      <div className={styles.modernProgressTrack}>
+                        <div 
+                          className={`${styles.modernProgressFill} ${getProgressColorClass(pct, styles)}`}
+                          style={{ width: `${pct}%` }} 
+                          aria-label={`Avance ${pct}%`} 
+                        />
+                      </div>
+                      <span className={styles.modernProgressLabel}>{pct}%</span>
+                    </div>
+
+                    {columns.map(col => {
+                      const ag = row._agg[col.key] || { done: 0, total: row.total, overdue: 0, pending: 0, nextDue: null, lastDelivered: null }
+                      const localPct = ag.total ? Math.round((ag.done / ag.total) * 100) : 0
+                      const cls = heatClass(localPct, styles)
+                      const tip = buildTooltip(col.title, ag)
+                      
+                      // Formatear fechas
+                      let dateInfo = ''
+                      if (ag.lastDelivered) {
+                        dateInfo = `✓ ${fmt(ag.lastDelivered)}`
+                      } else if (ag.nextDue) {
+                        dateInfo = `⏰ ${fmt(ag.nextDue)}`
+                      }
+                      
+                      return (
+                        <div key={col.key} className={`${styles.modernCell} ${cls}`} title={tip} aria-label={tip}>
+                          <span className={styles.cellFraction}>{ag.done}/{ag.total}</span>
+                          <span className={styles.cellPercent}>{localPct}%</span>
+                          {dateInfo && <span className={styles.cellDate}>{dateInfo}</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </section>
       </main>
-
-      {/* ===== Modal de detalle por dependencia (auditorías individuales) ===== */}
-      {detailDepId && (
-        <DetailModal
-          depId={detailDepId}
-          onClose={() => setDetailDepId(null)}
-          items={filtered.filter(a => (a.dependencia_id ?? 'SIN_DEP') === detailDepId)}
-        />
-      )}
     </div>
   )
 }
 
 /* ===== Subcomponentes UI ===== */
+function KpiCard({ icon, label, value, total, percent, color = 'blue' }) {
+  return (
+    <div className={`${styles.kpiCard} ${styles[`kpiCard${color.charAt(0).toUpperCase() + color.slice(1)}`]}`}>
+      <div className={styles.kpiIcon}>{icon}</div>
+      <div className={styles.kpiContent}>
+        <div className={styles.kpiLabel}>{label}</div>
+        <div className={styles.kpiValue}>
+          {total ? `${value}/${total}` : value}
+        </div>
+        {percent !== undefined && (
+          <div className={styles.kpiProgress}>
+            <div className={styles.kpiProgressBar}>
+              <div className={styles.kpiProgressFill} style={{ width: `${percent}%` }}></div>
+            </div>
+            <span className={styles.kpiPercent}>{percent}%</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function KpiChip({ label, value }) {
   return (
     <span className={styles.kpiChip}>
@@ -383,6 +477,14 @@ function heatClass(pct, s) {
   if (pct >= 25) return s.heat2
   if (pct > 0)  return s.heat1
   return s.heat0
+}
+
+function getProgressColorClass(pct, s) {
+  if (pct >= 90) return s.progressExcellent
+  if (pct >= 70) return s.progressGood
+  if (pct >= 50) return s.progressMedium
+  if (pct >= 25) return s.progressLow
+  return s.progressPoor
 }
 
 function buildTooltip(title, ag) {

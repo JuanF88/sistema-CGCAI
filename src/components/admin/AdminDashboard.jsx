@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, FileText, UserPlus, Home} from 'lucide-react'
+import { LogOut, FileText, UserPlus, Home, TrendingUp} from 'lucide-react'
 import { Lightbulb } from 'lucide-react'
 import { Building } from 'lucide-react'   
 import { BarChart } from 'lucide-react'
@@ -16,7 +16,8 @@ import VistaInformesAdmin from '@/components/admin/VistaInformesAdmin'
 import VistaAdministrarUsuarios from '@/components/admin/VistaAdministrarUsuarios'
 import VistaAdministrarDependencias from '@/components/admin/VistaAdministrarDependencias'
 import VistaAdministrarHallazgos from '@/components/admin/VistaAdministrarHallazgos'
-import VistaEstadisticas from '@/components/admin/VistaEstadisticas'
+import VistaEstadisticas from '@/components/admin/VistaEstadisticasNew'
+import VistaPowerBI from '@/components/admin/VistaPowerBI'
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -78,7 +79,7 @@ export default function AdminDashboard() {
               <UserPlus  className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Administrar Usuarios</span>
             </button>
 
-            <button
+            {/* <button
               onClick={() => {
                 setVista('adminDependencia')
                 window.history.pushState({}, '', '/admin?vista=adminDependencia')
@@ -108,6 +109,16 @@ export default function AdminDashboard() {
               <BarChart className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Estadísticas</span>
             </button>
 
+            <button
+              onClick={() => {
+                setVista('powerbi')
+                window.history.pushState({}, '', '/admin?vista=powerbi')
+              }}
+              className={`${styles.navButton} ${vista === 'powerbi' ? styles.active : ''}`}
+            >
+              <TrendingUp className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Estadísticas Power BI</span>
+            </button> */}
+
 
         </nav>
 
@@ -129,6 +140,7 @@ export default function AdminDashboard() {
   {vista === 'adminDependencia' && <VistaAdministrarDependencias />}
   {vista === 'administrarHallazgos' && <VistaAdministrarHallazgos />}
   {vista === 'estadisticas' && <VistaEstadisticas />}
+  {vista === 'powerbi' && <VistaPowerBI />}
   {vista === 'gestionarUsuarios' && (
     <p className="text-lg text-gray-700">Aquí irá la gestión de usuarios</p>
   )}

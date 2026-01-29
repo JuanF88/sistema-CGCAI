@@ -1,0 +1,216 @@
+/* Estilos para DocumentUploadModal - Reutilizable entre admin y auditor */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modalContenido {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 100%;
+  padding: 32px;
+  position: relative;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modalCerrar {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  color: #64748b;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.modalCerrar:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+.modalTitulo {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 20px 0;
+  padding-right: 40px; /* Espacio para botón cerrar */
+}
+
+.btnVerActual {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btnVerActual:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
+}
+
+.dropArea {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 40px 20px;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-height: 180px;
+}
+
+.dropArea:hover {
+  border-color: #667eea;
+  background: #f1f5f9;
+}
+
+.inputArchivo {
+  display: none;
+}
+
+.iconoSubida {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.instrucciones {
+  text-align: center;
+  color: #475569;
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.subtexto {
+  display: block;
+  font-size: 13px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+.nombreArchivo {
+  font-size: 15px;
+  font-weight: 600;
+  color: #10b981;
+  text-align: center;
+  margin: 0;
+}
+
+.modalBotones {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.botonSubir,
+.botonCancelar {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.botonSubir {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+}
+
+.botonSubir:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
+}
+
+.botonSubir:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.botonCancelar {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.botonCancelar:hover:not(:disabled) {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.botonCancelar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .modalContenido {
+    padding: 24px;
+    max-width: 95%;
+  }
+
+  .modalTitulo {
+    font-size: 18px;
+  }
+
+  .dropArea {
+    padding: 30px 15px;
+    min-height: 150px;
+  }
+
+  .iconoSubida {
+    font-size: 40px;
+  }
+
+  .modalBotones {
+    flex-direction: column;
+  }
+}

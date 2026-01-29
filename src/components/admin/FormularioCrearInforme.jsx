@@ -18,11 +18,11 @@ export default function VistaInformesAdmin() {
         resInformes.json(),
         resAuditores.json()
       ])
-      setInformes(dataInformes)
-      setAuditores(dataAuditores)
+      setInformes(dataInformes || [])
+      setAuditores(dataAuditores || [])
     }
     fetchData()
-  }, [router])
+  }, [])
 
   const handleChange = (e) => {
     const { name, value } = e.target

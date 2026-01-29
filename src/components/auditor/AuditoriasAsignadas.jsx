@@ -484,6 +484,19 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
 
   return (
     <div className={styles.contenedor}>
+      {/* MODERN HEADER */}
+      <div className={styles.modernHeader}>
+        <div className={styles.headerContent}>
+          <div className={styles.headerLeft}>
+            <div className={styles.headerIcon}>📋</div>
+            <div className={styles.headerInfo}>
+              <h1 className={styles.headerTitle}>Auditorías Internas</h1>
+              <p className={styles.headerSubtitle}>Gestiona y realiza el seguimiento de tus auditorías asignadas</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className={styles.encabezadoAuditor}>
         <div className={styles.resumenContenedor}>
           <div className={`${styles.resumenTarjeta} ${styles.tarjetaAsignadas}`}>

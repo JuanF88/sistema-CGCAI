@@ -1,6 +1,20 @@
-import { supabase } from '@/lib/supabaseClient'
+import { getAuthenticatedClient } from '@/lib/authHelper'
+import { createClient } from '@supabase/supabase-js'
 
 export async function GET() {
+  const { error } = await getAuthenticatedClient()
+  
+  if (error) {
+    return Response.json({ error }, { status: 401 })
+  }
+
+  // Usar service role para consultas (bypass RLS temporal)
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+
   // Fortalezas
   const { data: fortalezas, error: errorFortalezas } = await supabase
     .from('fortalezas')
@@ -14,8 +28,10 @@ export async function GET() {
       informes_auditoria:informe_id (
         id,
         fecha_auditoria,
+        recomendaciones,
+        conclusiones,
         usuarios:usuario_id ( nombre, apellido ),
-        dependencias:dependencia_id ( nombre )
+        dependencias:dependencia_id ( nombre, gestion )
       )
     `)
 
@@ -37,8 +53,10 @@ export async function GET() {
       informes_auditoria:informe_id (
         id,
         fecha_auditoria,
+        recomendaciones,
+        conclusiones,
         usuarios:usuario_id ( nombre, apellido ),
-        dependencias:dependencia_id ( nombre )
+        dependencias:dependencia_id ( nombre, gestion )
       )
     `)
 
@@ -60,8 +78,10 @@ export async function GET() {
       informes_auditoria:informe_id (
         id,
         fecha_auditoria,
+        recomendaciones,
+        conclusiones,
         usuarios:usuario_id ( nombre, apellido ),
-        dependencias:dependencia_id ( nombre )
+        dependencias:dependencia_id ( nombre, gestion )
       )
     `)
 

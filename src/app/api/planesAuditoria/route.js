@@ -1,15 +1,29 @@
 // Archivo: /app/api/plan-auditoria/route.js (o route.ts si usas TypeScript)
 
-import { supabase } from '@/lib/supabaseClient'
+import { getAuthenticatedClient } from '@/lib/authHelper'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
-  const { data, error } = await supabase
+  const { error } = await getAuthenticatedClient()
+  
+  if (error) {
+    return NextResponse.json({ error }, { status: 401 })
+  }
+
+  // Usar service role para consultas (bypass RLS temporal)
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+
+  const { data, error: dbError } = await supabase
     .from('plan_auditoria')
     .select('id, enlace, dependencias(nombre)') // accede al nombre de la dependencia
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (dbError) {
+    return NextResponse.json({ error: dbError.message }, { status: 500 })
   }
 
   // Formatear para devolver el nombre directamente

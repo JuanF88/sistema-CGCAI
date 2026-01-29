@@ -8,8 +8,9 @@ import ExcelJS from 'exceljs'
 import { supabase } from '@/lib/supabaseClient'
 
 import { Dialog } from '@headlessui/react'
-import { CloudUpload } from 'lucide-react'
+import { CloudUpload, Download, FilterX } from 'lucide-react'
 import { toast } from 'react-toastify'
+import styles from './CSS/VistaAdministrarHallazgos.module.css'
 
 /* ===================== Utils base ===================== */
 const getInforme = (row) =>
@@ -103,11 +104,33 @@ export const exportarExcel = async (hallazgos) => {
   const workbook = new ExcelJS.Workbook()
   const worksheet = workbook.addWorksheet('Hallazgos')
 
-  worksheet.addRow([
-    'Informe ID', 'Año', 'Semestre', 'Auditor', 'Dependencia',
-    'Tipo de Hallazgo', 'ISO', 'Capítulo', 'Numeral', 'Descripción'
-  ])
+  // Definir encabezados
+  worksheet.columns = [
+    { header: 'Informe ID', key: 'informe_id', width: 12 },
+    { header: 'Año', key: 'anio', width: 8 },
+    { header: 'Semestre', key: 'semestre', width: 10 },
+    { header: 'Auditor', key: 'auditor', width: 25 },
+    { header: 'Dependencia', key: 'dependencia', width: 30 },
+    { header: 'Tipo de Hallazgo', key: 'tipo', width: 22 },
+    { header: 'ISO', key: 'iso', width: 12 },
+    { header: 'Capítulo', key: 'capitulo', width: 15 },
+    { header: 'Numeral', key: 'numeral', width: 12 },
+    { header: 'Descripción', key: 'descripcion', width: 50 },
+    { header: 'Recomendaciones', key: 'recomendaciones', width: 50 },
+    { header: 'Conclusiones', key: 'conclusiones', width: 50 }
+  ]
 
+  // Estilo para el encabezado
+  worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
+  worksheet.getRow(1).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF667eea' }
+  }
+  worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' }
+  worksheet.getRow(1).height = 25
+
+  // Agregar datos
   for (const hallazgo of hallazgos) {
     const informe = getInforme(hallazgo)
     const fecha = new Date(informe?.fecha_auditoria)
@@ -120,20 +143,48 @@ export const exportarExcel = async (hallazgos) => {
     const capitulo = getCapituloLabel(hallazgo)
     const numeral = getNumeralLabel(hallazgo)
     const descripcion = hallazgo.descripcion || ''
+    const recomendaciones = informe?.recomendaciones || ''
+    const conclusiones = informe?.conclusiones || ''
 
-    worksheet.addRow([
-      hallazgo.informe_id ?? '',
-      anio || '',
-      semestre || '',
+    const row = worksheet.addRow({
+      informe_id: hallazgo.informe_id ?? '',
+      anio: anio || '',
+      semestre: semestre || '',
       auditor,
       dependencia,
-      tipo || '',
+      tipo: tipo || '',
       iso,
       capitulo,
       numeral,
-      descripcion
-    ])
+      descripcion,
+      recomendaciones,
+      conclusiones
+    })
+
+    // Ajustar texto en celdas con contenido largo
+    row.height = undefined // Auto altura
+    row.alignment = { vertical: 'top', wrapText: true }
+    
+    // Aplicar bordes a todas las celdas de la fila
+    row.eachCell((cell) => {
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
+      }
+    })
   }
+
+  // Aplicar bordes al encabezado también
+  worksheet.getRow(1).eachCell((cell) => {
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FF667eea' } },
+      left: { style: 'thin', color: { argb: 'FF667eea' } },
+      bottom: { style: 'thin', color: { argb: 'FF667eea' } },
+      right: { style: 'thin', color: { argb: 'FF667eea' } }
+    }
+  })
 
   const buffer = await workbook.xlsx.writeBuffer()
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
@@ -528,6 +579,15 @@ const {
     }
   }
 
+  /* ===================== KPIs ===================== */
+  const stats = useMemo(() => {
+    const total = hallazgos.length
+    const fortalezas = hallazgos.filter(h => (h.tipo || inferirTipoDesdeTabla(h)) === 'Fortalezas').length
+    const oportunidades = hallazgos.filter(h => (h.tipo || inferirTipoDesdeTabla(h)) === 'Oportunidades de Mejora').length
+    const noConformidades = hallazgos.filter(h => (h.tipo || inferirTipoDesdeTabla(h)) === 'No Conformidades').length
+    return { total, fortalezas, oportunidades, noConformidades, filtrados: filtrados.length }
+  }, [hallazgos, filtrados])
+
   /* ===================== Columnas ===================== */
   const columnas = [
     { name: 'Informe ID', selector: row => row.informe_id, sortable: true },
@@ -543,159 +603,242 @@ const {
   ]
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-700">Reporte de Hallazgos</h2>
-
-      {/* ========================== Filtros (fila 1) ========================== */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-2">
-        {/* Búsqueda */}
-        <input
-          type="text"
-          placeholder="Buscar por texto o ID de informe"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="border p-2 rounded w-full"
-        />
-
-        {/* Dependencia */}
-        <select
-          value={filtroDependencia}
-          onChange={(e) => setFiltroDependencia(e.target.value)}
-          className="border p-2 rounded w-full"
-        >
-          <option value="">Todas las dependencias</option>
-          {opcionesDependencias.map((d) => (
-            <option key={d.value} value={d.value}>{d.label}</option>
-          ))}
-        </select>
-
-        {/* Auditor */}
-        <select
-          value={filtroAuditor}
-          onChange={(e) => setFiltroAuditor(e.target.value)}
-          className="border p-2 rounded w-full"
-        >
-          <option value="">Todos los auditores</option>
-          {opcionesAuditores.map((a) => (
-            <option key={a.value} value={a.value}>{a.label}</option>
-          ))}
-        </select>
-
-        {/* Año */}
-        <select
-          value={filtroAnio}
-          onChange={(e) => setFiltroAnio(e.target.value)}
-          className="border p-2 rounded w-full"
-        >
-          <option value="">Todos los años</option>
-          {opcionesAnios.map((anio) => (
-            <option key={anio} value={anio}>{anio}</option>
-          ))}
-        </select>
-
-        {/* Semestre */}
-        <select
-          value={filtroSemestre}
-          onChange={(e) => setFiltroSemestre(e.target.value)}
-          className="border p-2 rounded w-full"
-        >
-          <option value="">Todos los semestres</option>
-          <option value="1">1</option>
-          <option value="2">2</option>
-        </select>
+    <div className={styles.container}>
+      {/* HEADER MODERNO */}
+      <div className={styles.modernHeader}>
+        <div className={styles.headerContent}>
+          <div className={styles.headerLeft}>
+            <div className={styles.headerIcon}>📊</div>
+            <div className={styles.headerInfo}>
+              <h1 className={styles.headerTitle}>Reporte de Hallazgos</h1>
+              <p className={styles.headerSubtitle}>Análisis y seguimiento de hallazgos de auditoría</p>
+            </div>
+          </div>
+          <div className={styles.headerRight}>
+            {/* <button 
+              onClick={() => setIsModalOpen(true)} 
+              disabled={estaCargando}
+              className={styles.modernBtn}
+              title="Cargar archivo Excel"
+            >
+              <CloudUpload size={18} />
+              <span>Importar</span>
+            </button> */}
+            <button
+              onClick={() => exportarExcel(filtrados)}
+              disabled={estaCargando}
+              className={styles.modernBtnSecondary}
+              title="Descargar reporte en Excel"
+            >
+              <Download size={18} />
+              <span>Exportar</span>
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* ========================== Filtros (fila 2) ========================== */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-        {/* Tipo */}
-        <select
-          value={filtroTipo}
-          onChange={(e) => setFiltroTipo(e.target.value)}
-          className="border p-2 rounded w-full"
-        >
-          <option value="">Todos los tipos</option>
-          {opcionesTipos.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
-
-        {/* ISO */}
-        <select
-          value={filtroISO}
-          onChange={(e) => setFiltroISO(e.target.value)}
-          className="border p-2 rounded w-full"
-        >
-          <option value="">Todas las ISO</option>
-          {opcionesISO.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-
-        {/* Capítulo */}
-        <select
-          value={filtroCapitulo}
-          onChange={(e) => setFiltroCapitulo(e.target.value)}
-          className="border p-2 rounded w-full"
-        >
-          <option value="">Todos los capítulos</option>
-          {opcionesCapitulos.map((c) => (
-            <option key={c.value} value={c.value}>{c.label}</option>
-          ))}
-        </select>
-
-        {/* Numeral */}
-        <select
-          value={filtroNumeral}
-          onChange={(e) => setFiltroNumeral(e.target.value)}
-          className="border p-2 rounded w-full"
-        >
-          <option value="">Todos los numerales</option>
-          {opcionesNumerales.map((n) => (
-            <option key={n.value} value={n.value}>{n.label}</option>
-          ))}
-        </select>
+      {/* KPI CARDS */}
+      <div className={styles.kpiGrid}>
+        <div className={`${styles.kpiCard} ${styles.kpiCardBlue}`}>
+          <div className={styles.kpiIcon}>📊</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>Total Hallazgos</div>
+            <div className={styles.kpiValue}>{stats.total}</div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardGreen}`}>
+          <div className={styles.kpiIcon}>✅</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>Fortalezas</div>
+            <div className={styles.kpiValue}>{stats.fortalezas}</div>
+            <div className={styles.kpiProgress}>
+              <div className={styles.kpiProgressTrack}>
+                <div className={styles.kpiProgressFill} style={{ width: `${stats.total > 0 ? (stats.fortalezas / stats.total * 100) : 0}%` }}></div>
+              </div>
+              <span className={styles.kpiPercent}>{stats.total > 0 ? Math.round(stats.fortalezas / stats.total * 100) : 0}%</span>
+            </div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardOrange}`}>
+          <div className={styles.kpiIcon}>💡</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>Oportunidades</div>
+            <div className={styles.kpiValue}>{stats.oportunidades}</div>
+            <div className={styles.kpiProgress}>
+              <div className={styles.kpiProgressTrack}>
+                <div className={styles.kpiProgressFill} style={{ width: `${stats.total > 0 ? (stats.oportunidades / stats.total * 100) : 0}%` }}></div>
+              </div>
+              <span className={styles.kpiPercent}>{stats.total > 0 ? Math.round(stats.oportunidades / stats.total * 100) : 0}%</span>
+            </div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardRed}`}>
+          <div className={styles.kpiIcon}>⚠️</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>No Conformidades</div>
+            <div className={styles.kpiValue}>{stats.noConformidades}</div>
+            <div className={styles.kpiProgress}>
+              <div className={styles.kpiProgressTrack}>
+                <div className={styles.kpiProgressFill} style={{ width: `${stats.total > 0 ? (stats.noConformidades / stats.total * 100) : 0}%` }}></div>
+              </div>
+              <span className={styles.kpiPercent}>{stats.total > 0 ? Math.round(stats.noConformidades / stats.total * 100) : 0}%</span>
+            </div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardPurple}`}>
+          <div className={styles.kpiIcon}>🔍</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>Resultados Filtrados</div>
+            <div className={styles.kpiValue}>{stats.filtrados}</div>
+          </div>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2 mb-3">
-        <button
-          onClick={limpiarFiltros}
-          className="bg-gray-200 text-gray-800 px-3 py-2 rounded hover:bg-gray-300"
-        >
-          Limpiar filtros
-        </button>
+      {/* FILTROS */}
+      <div className={styles.filterCard}>
+        <div className={styles.filterHeader}>
+          <h3 className={styles.filterTitle}>🔍 Filtros de Búsqueda</h3>
+          <button onClick={limpiarFiltros} className={styles.clearFiltersBtn}>
+            <FilterX size={16} />
+            <span>Limpiar filtros</span>
+          </button>
+        </div>
+        
+        <div className={styles.filterGrid}>
+          <input
+            type="text"
+            placeholder="Buscar por texto o ID de informe"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className={styles.filterInput}
+          />
+
+          <select
+            value={filtroDependencia}
+            onChange={(e) => setFiltroDependencia(e.target.value)}
+            className={styles.filterSelect}
+          >
+            <option value="">Todas las dependencias</option>
+            {opcionesDependencias.map((d) => (
+              <option key={d.value} value={d.value}>{d.label}</option>
+            ))}
+          </select>
+
+          <select
+            value={filtroAuditor}
+            onChange={(e) => setFiltroAuditor(e.target.value)}
+            className={styles.filterSelect}
+          >
+            <option value="">Todos los auditores</option>
+            {opcionesAuditores.map((a) => (
+              <option key={a.value} value={a.value}>{a.label}</option>
+            ))}
+          </select>
+
+          <select
+            value={filtroAnio}
+            onChange={(e) => setFiltroAnio(e.target.value)}
+            className={styles.filterSelect}
+          >
+            <option value="">Todos los años</option>
+            {opcionesAnios.map((anio) => (
+              <option key={anio} value={anio}>{anio}</option>
+            ))}
+          </select>
+
+          <select
+            value={filtroSemestre}
+            onChange={(e) => setFiltroSemestre(e.target.value)}
+            className={styles.filterSelect}
+          >
+            <option value="">Todos los semestres</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+          </select>
+
+          <select
+            value={filtroTipo}
+            onChange={(e) => setFiltroTipo(e.target.value)}
+            className={styles.filterSelect}
+          >
+            <option value="">Todos los tipos</option>
+            {opcionesTipos.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+
+          <select
+            value={filtroISO}
+            onChange={(e) => setFiltroISO(e.target.value)}
+            className={styles.filterSelect}
+          >
+            <option value="">Todas las ISO</option>
+            {opcionesISO.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+
+          <select
+            value={filtroCapitulo}
+            onChange={(e) => setFiltroCapitulo(e.target.value)}
+            className={styles.filterSelect}
+          >
+            <option value="">Todos los capítulos</option>
+            {opcionesCapitulos.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </select>
+
+          <select
+            value={filtroNumeral}
+            onChange={(e) => setFiltroNumeral(e.target.value)}
+            className={styles.filterSelect}
+          >
+            <option value="">Todos los numerales</option>
+            {opcionesNumerales.map((n) => (
+              <option key={n.value} value={n.value}>{n.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {/* ===================== Acciones ===================== */}
-      <div className="flex justify-between items-center mb-4 gap-4">
-        <button
-          onClick={() => setIsModalOpen(true)}
-          disabled={estaCargando}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
-        >
-          <CloudUpload size={18} />
-          Cargar Excel
-        </button>
-
-        <button
-          onClick={() => exportarExcel(filtrados)}
-          disabled={estaCargando}
-          className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 disabled:opacity-50"
-        >
-          Descargar Excel
-        </button>
+      {/* TABLA */}
+      <div className={styles.tableCard}>
+        <div className={styles.tableWrapper}>
+          <DataTable
+            columns={columnas}
+            data={filtrados}
+            keyField="key"
+            pagination
+            highlightOnHover
+            responsive
+            striped
+            noDataComponent="No hay hallazgos registrados."
+            customStyles={{
+              headRow: {
+                style: {
+                  backgroundColor: '#f8fafc',
+                  borderBottom: '2px solid #e5e7eb',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  color: '#475569',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }
+              },
+              rows: {
+                style: {
+                  fontSize: '14px',
+                  color: '#1e293b',
+                  '&:hover': {
+                    backgroundColor: '#f1f5f9'
+                  }
+                }
+              }
+            }}
+          />
+        </div>
       </div>
-
-      {/* ===================== Tabla ===================== */}
-      <DataTable
-        columns={columnas}
-        data={filtrados}
-        keyField="key"
-        pagination
-        highlightOnHover
-        responsive
-        striped
-        noDataComponent="No hay hallazgos registrados."
-      />
 
       {/* ===================== Modal Carga Excel ===================== */}
       <Dialog open={isModalOpen} onClose={() => setIsModalOpen(false)} className="relative z-50">

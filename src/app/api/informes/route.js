@@ -1,7 +1,27 @@
-import { supabase } from '@/lib/supabaseClient'
+import { getAuthenticatedClient } from '@/lib/authHelper'
+import { createClient } from '@supabase/supabase-js'
 
 export async function GET() {
-  const { data, error } = await supabase
+  const { error } = await getAuthenticatedClient()
+  
+  if (error) {
+    console.log('❌ Error de autenticación:', error)
+    return Response.json({ error }, { status: 401 })
+  }
+
+  console.log('✅ Usuario autenticado correctamente')
+
+  // Usar service role para consultas (bypass RLS temporal)
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+
+  console.log('🔑 Service role key presente:', !!process.env.SUPABASE_SERVICE_ROLE_KEY)
+  console.log('🌐 URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
+
+  const { data, error: dbError } = await supabaseAdmin
     .from('informes_auditoria')
     .select(`
       id,
@@ -28,35 +48,61 @@ export async function GET() {
       no_conformidades ( id )
     `)
 
-  if (error) {
-    console.error('❌ Error al obtener informes:', error.message)
-    return Response.json({ error: error.message }, { status: 500 })
+  console.log('📊 Datos recibidos:', data)
+  console.log('📊 Cantidad de registros:', data?.length)
+  console.log('❌ Error de DB:', dbError)
+
+  if (dbError) {
+    console.error('❌ Error al obtener informes:', dbError.message)
+    return Response.json({ error: dbError.message }, { status: 500 })
   }
 
   return Response.json(data)
 }
 
 export async function DELETE(req) {
+  const { supabase, usuario, error } = await getAuthenticatedClient()
+  
+  if (error) {
+    return Response.json({ error }, { status: 401 })
+  }
+
+  // Solo admin o auditor pueden eliminar
+  if (!['admin', 'auditor'].includes(usuario?.rol)) {
+    return Response.json({ error: 'No autorizado' }, { status: 403 })
+  }
+
   const { id } = await req.json()
 
   if (!id) {
     return Response.json({ error: 'Falta el ID del informe a eliminar' }, { status: 400 })
   }
 
-  const { error } = await supabase
+  const { error: dbError } = await supabase
     .from('informes_auditoria')
     .delete()
     .eq('id', id)
 
-  if (error) {
-    console.error('❌ Error al eliminar informe:', error.message)
-    return Response.json({ error: error.message }, { status: 500 })
+  if (dbError) {
+    console.error('❌ Error al eliminar informe:', dbError.message)
+    return Response.json({ error: dbError.message }, { status: 500 })
   }
 
   return Response.json({ mensaje: 'Informe eliminado correctamente' })
 }
 
 export async function POST(req) {
+  const { supabase, usuario, error } = await getAuthenticatedClient()
+  
+  if (error) {
+    return Response.json({ error }, { status: 401 })
+  }
+
+  // Solo admin o auditor pueden crear informes
+  if (!['admin', 'auditor'].includes(usuario?.rol)) {
+    return Response.json({ error: 'No autorizado' }, { status: 403 })
+  }
+
   try {
     const raw = await req.json()
     console.log('[POST /api/informes] body recibido:', raw)

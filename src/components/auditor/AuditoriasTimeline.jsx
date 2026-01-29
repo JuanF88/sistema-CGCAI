@@ -7,88 +7,32 @@ import styles from './auditoriasTimeline.module.css'
 import { generarInformeAuditoria } from '@/components/auditor/Utilidades/generarInformeAuditoria.jsx'
 import { generarPlanMejora2 } from '@/components/auditor/Utilidades/generarPlanMejora2.xpp'
 
-function parseYMD(ymd) {
-    if (!ymd) return null
-    const [y, m, d] = ymd.split('-').map(Number)
-    if (!y || !m || !d) return null
-    return new Date(y, m - 1, d)
-}
-function addDays(date, n) {
-    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-    d.setDate(d.getDate() + n)
-    return d
-}
-function startOfDay(date) {
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate())
-}
-function diffInDays(from, to) {
-    const ms = startOfDay(to) - startOfDay(from)
-    return Math.round(ms / 86400000)
-}
-function fmt(date) {
-    try {
-        return new Intl.DateTimeFormat('es-CO', {
-            timeZone: 'America/Bogota',
-            year: 'numeric',
-            month: 'short',
-            day: '2-digit'
-        }).format(date)
-    } catch {
-        return date.toLocaleDateString()
-    }
-}
+// ✅ Importar utilidades compartidas desde el hook centralizado
+import {
+    parseYMD,
+    addDays,
+    startOfDay,
+    diffInDays,
+    fmt,
+    badgeFor as badgeForBase,
+    toSlugUpper,
+    toYMD,
+    buildPlanPath,
+    buildAsistenciaPath,
+    buildEvaluacionPath,
+    buildActaPath,
+    buildActaCompromisoPath,
+    buildValidationPath,
+    BUCKETS,
+} from '@/hooks/useAuditTimeline'
+
+// Wrapper para badgeFor con estilos locales y textos específicos del auditor
 function badgeFor(daysLeft, explicitDone = false) {
     if (explicitDone) return { label: 'Completado', cls: styles.badgeOk }
     if (daysLeft < 0) return { label: `Vencido hace ${Math.abs(daysLeft)} días`, cls: styles.badgeOverdue }
     if (daysLeft === 0) return { label: 'Hoy', cls: styles.badgeToday }
     if (daysLeft <= 3) return { label: `Quedan ${daysLeft} días`, cls: styles.badgeSoon }
     return { label: `Quedan ${daysLeft} días`, cls: styles.badgePending }
-}
-
-// Helpers para nombre de archivo consistente
-const toSlugUpper = (s = '') =>
-    s.normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^A-Za-z0-9]+/g, '_')
-        .replace(/^_+|_+$/g, '')
-        .toUpperCase()
-
-const toYMD = (input) => {
-    if (!input) return new Date().toISOString().slice(0, 10)
-    const s = String(input)
-    return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : new Date(input).toISOString().slice(0, 10)
-}
-
-const buildPlanPath = (auditoria) => {
-    const dep = toSlugUpper(auditoria?.dependencias?.nombre || 'SIN_DEP')
-    const ymd = toYMD(auditoria?.fecha_auditoria)
-    // Ej: PlanAuditoria_123_DEP_2025-10-08.pdf
-    return `PlanAuditoria_${auditoria.id}_${dep}_${ymd}.pdf`
-}
-
-// ✅ NUEVO: constructor de ruta para Acta de Compromiso
-const buildActaCompromisoPath = (auditoria) => {
-    const dep = toSlugUpper(auditoria?.dependencias?.nombre || 'SIN_DEP')
-    const ymd = toYMD(auditoria?.fecha_auditoria)
-    return `ActaCompromiso_${auditoria.id}_${dep}_${ymd}.pdf`
-}
-
-
-// ✅ NUEVO: constructores de rutas para los 3 documentos previos
-const buildAsistenciaPath = (auditoria) => {
-    const dep = toSlugUpper(auditoria?.dependencias?.nombre || 'SIN_DEP')
-    const ymd = toYMD(auditoria?.fecha_auditoria)
-    return `Asistencia_${auditoria.id}_${dep}_${ymd}.pdf`
-}
-const buildEvaluacionPath = (auditoria) => {
-    const dep = toSlugUpper(auditoria?.dependencias?.nombre || 'SIN_DEP')
-    const ymd = toYMD(auditoria?.fecha_auditoria)
-    return `Evaluacion_${auditoria.id}_${dep}_${ymd}.pdf`
-}
-const buildActaPath = (auditoria) => {
-    const dep = toSlugUpper(auditoria?.dependencias?.nombre || 'SIN_DEP')
-    const ymd = toYMD(auditoria?.fecha_auditoria)
-    return `Acta_${auditoria.id}_${dep}_${ymd}.pdf`
 }
 
 export default function AuditoriasTimeline({ usuario }) {
@@ -124,13 +68,6 @@ export default function AuditoriasTimeline({ usuario }) {
     const [validateModalOpen, setValidateModalOpen] = useState(false)
     const [validateFile, setValidateFile] = useState(null)
     const [uploadingValidation, setUploadingValidation] = useState(false)
-
-    // ✅ helper: nombre consistente del archivo validado
-    const buildValidationPath = (auditoria) => {
-        const dep = toSlugUpper(auditoria?.dependencias?.nombre || 'SIN_DEPENDENCIA')
-        const ymd = toYMD(auditoria?.fecha_auditoria)
-        return `Auditoria_${auditoria.id}_${dep}_${ymd}.pdf`
-    }
 
     // ✅ Generar y descargar el informe (borrador/no validado)
     const handleDownloadInforme = async (informe) => {
@@ -170,10 +107,10 @@ export default function AuditoriasTimeline({ usuario }) {
         try {
             const filePath = buildValidationPath(selected)
 
-            // 1) subir al bucket 'validaciones'
+            // 1) subir al bucket validaciones
             const { error: upErr } = await supabase
                 .storage
-                .from('validaciones')
+                .from(BUCKETS.VALIDACIONES)
                 .upload(filePath, validateFile, {
                     upsert: true,
                     contentType: 'application/pdf',
@@ -194,7 +131,7 @@ export default function AuditoriasTimeline({ usuario }) {
             // 4) firmar URL para usarla de inmediato en la UI
             const { data: signedVal } = await supabase
                 .storage
-                .from('validaciones')
+                .from(BUCKETS.VALIDACIONES)
                 .createSignedUrl(filePath, 60 * 60)
 
             // 5) refrescar estado local
@@ -269,7 +206,7 @@ export default function AuditoriasTimeline({ usuario }) {
 
             const { error: upErr } = await supabase
                 .storage
-                .from('planes')
+                .from(BUCKETS.PLANES)
                 .upload(filePath, planFile, { upsert: true, contentType: 'application/pdf' })
             if (upErr) throw upErr
 
@@ -287,7 +224,7 @@ export default function AuditoriasTimeline({ usuario }) {
 
             const { data: signed } = await supabase
                 .storage
-                .from('planes')
+                .from(BUCKETS.PLANES)
                 .createSignedUrl(filePath, 60 * 60)
 
             setAuditorias(prev => prev.map(a =>
@@ -311,9 +248,9 @@ export default function AuditoriasTimeline({ usuario }) {
         setUploadingAsistencia(true)
         try {
             const filePath = buildAsistenciaPath(selected)
-            const { error: upErr } = await supabase.storage.from('asistencias').upload(filePath, asistenciaFile, { upsert: true, contentType: 'application/pdf' })
+            const { error: upErr } = await supabase.storage.from(BUCKETS.ASISTENCIAS).upload(filePath, asistenciaFile, { upsert: true, contentType: 'application/pdf' })
             if (upErr) throw upErr
-            const { data: signed } = await supabase.storage.from('asistencias').createSignedUrl(filePath, 60 * 60)
+            const { data: signed } = await supabase.storage.from(BUCKETS.ASISTENCIAS).createSignedUrl(filePath, 60 * 60)
             setAuditorias(prev => prev.map(a => a.id === selected.id ? { ...a, asistencia: { path: filePath, url: signed?.signedUrl || null, uploaded_at: new Date().toISOString() } } : a))
             setAsistenciaModalOpen(false); setAsistenciaFile(null)
         } catch (e) {
@@ -329,9 +266,9 @@ export default function AuditoriasTimeline({ usuario }) {
         setUploadingEvaluacion(true)
         try {
             const filePath = buildEvaluacionPath(selected)
-            const { error: upErr } = await supabase.storage.from('evaluaciones').upload(filePath, evaluacionFile, { upsert: true, contentType: 'application/pdf' })
+            const { error: upErr } = await supabase.storage.from(BUCKETS.EVALUACIONES).upload(filePath, evaluacionFile, { upsert: true, contentType: 'application/pdf' })
             if (upErr) throw upErr
-            const { data: signed } = await supabase.storage.from('evaluaciones').createSignedUrl(filePath, 60 * 60)
+            const { data: signed } = await supabase.storage.from(BUCKETS.EVALUACIONES).createSignedUrl(filePath, 60 * 60)
             setAuditorias(prev => prev.map(a => a.id === selected.id ? { ...a, evaluacion: { path: filePath, url: signed?.signedUrl || null, uploaded_at: new Date().toISOString() } } : a))
             setEvaluacionModalOpen(false); setEvaluacionFile(null)
         } catch (e) {
@@ -347,9 +284,9 @@ export default function AuditoriasTimeline({ usuario }) {
         setUploadingActa(true)
         try {
             const filePath = buildActaPath(selected)
-            const { error: upErr } = await supabase.storage.from('actas').upload(filePath, actaFile, { upsert: true, contentType: 'application/pdf' })
+            const { error: upErr } = await supabase.storage.from(BUCKETS.ACTAS).upload(filePath, actaFile, { upsert: true, contentType: 'application/pdf' })
             if (upErr) throw upErr
-            const { data: signed } = await supabase.storage.from('actas').createSignedUrl(filePath, 60 * 60)
+            const { data: signed } = await supabase.storage.from(BUCKETS.ACTAS).createSignedUrl(filePath, 60 * 60)
             setAuditorias(prev => prev.map(a => a.id === selected.id ? { ...a, acta: { path: filePath, url: signed?.signedUrl || null, uploaded_at: new Date().toISOString() } } : a))
             setActaModalOpen(false); setActaFile(null)
         } catch (e) {
@@ -368,13 +305,13 @@ export default function AuditoriasTimeline({ usuario }) {
             const filePath = buildActaCompromisoPath(selected)
             const { error: upErr } = await supabase
                 .storage
-                .from('actascompromiso')
+                .from(BUCKETS.ACTAS_COMPROMISO)
                 .upload(filePath, actaCompFile, { upsert: true, contentType: 'application/pdf' })
             if (upErr) throw upErr
 
             const { data: signed } = await supabase
                 .storage
-                .from('actascompromiso')
+                .from(BUCKETS.ACTAS_COMPROMISO)
                 .createSignedUrl(filePath, 60 * 60)
 
             setAuditorias(prev => prev.map(a =>
@@ -438,7 +375,7 @@ export default function AuditoriasTimeline({ usuario }) {
                         try {
                             const { data: signed } = await supabase
                                 .storage
-                                .from('planes')
+                                .from(BUCKETS.PLANES)
                                 .createSignedUrl(rec.archivo_path, 60 * 60)
                             plan = {
                                 path: rec.archivo_path,
@@ -453,13 +390,13 @@ export default function AuditoriasTimeline({ usuario }) {
                     try {
                         const { data: files } = await supabase
                             .storage
-                            .from('validaciones')
+                            .from(BUCKETS.VALIDACIONES)
                             .list('', { limit: 100, sortBy: { column: 'name', order: 'asc' } })
                         const hit = (files || []).find(f => f.name.includes(String(a.id)))
                         if (hit) {
                             const { data: signedVal } = await supabase
                                 .storage
-                                .from('validaciones')
+                                .from(BUCKETS.VALIDACIONES)
                                 .createSignedUrl(hit.name, 60 * 60)
                             validated = { file: hit.name, url: signedVal?.signedUrl || null }
                         }
@@ -477,10 +414,10 @@ export default function AuditoriasTimeline({ usuario }) {
                     }
 
                     const [asistencia, evaluacion, acta, acta_compromiso] = await Promise.all([
-                    fetchDoc('asistencias'),
-                    fetchDoc('evaluaciones'),
-                    fetchDoc('actas'),
-                    fetchDoc('actascompromiso')
+                    fetchDoc(BUCKETS.ASISTENCIAS),
+                    fetchDoc(BUCKETS.EVALUACIONES),
+                    fetchDoc(BUCKETS.ACTAS),
+                    fetchDoc(BUCKETS.ACTAS_COMPROMISO)
                     ])
 
                     return { ...a, plan, validated, asistencia, evaluacion, acta, acta_compromiso }
@@ -685,7 +622,21 @@ export default function AuditoriasTimeline({ usuario }) {
     const planEnlace = selected?.dependencias?.plan_auditoria?.[0]?.enlace || ''
 
     return (
-        <div className={styles.wrapper}>
+        <div className={styles.container}>
+            {/* MODERN HEADER */}
+            <div className={styles.modernHeader}>
+                <div className={styles.headerContent}>
+                    <div className={styles.headerLeft}>
+                        <div className={styles.headerIcon}>📅</div>
+                        <div className={styles.headerInfo}>
+                            <h1 className={styles.headerTitle}>Timeline de Auditorías</h1>
+                            <p className={styles.headerSubtitle}>Seguimiento detallado de etapas y plazos de cada auditoría</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className={styles.wrapper}>
             <aside className={styles.sidebar}>
                 <div className={styles.sidebarHeader}>
                     <h3>Auditorías asignadas</h3>
@@ -1158,6 +1109,7 @@ export default function AuditoriasTimeline({ usuario }) {
                     </div>
                 )}
             </main>
+            </div>
         </div>
     )
 }

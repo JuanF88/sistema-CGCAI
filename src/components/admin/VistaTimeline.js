@@ -7,12 +7,26 @@ import { generarInformeAuditoria } from '@/components/auditor/Utilidades/generar
 import { generarPlanMejora2 } from '@/components/auditor/Utilidades/generarPlanMejora2.xpp'
 import { toast } from 'react-toastify'
 
-/* ---- utilidades fecha ---- */
-function parseYMD(ymd) { if (!ymd) return null; const [y, m, d] = ymd.split('-').map(Number); if (!y || !m || !d) return null; return new Date(y, m - 1, d) }
-function addDays(date, n) { const d = new Date(date.getFullYear(), date.getMonth(), date.getDate()); d.setDate(d.getDate() + n); return d }
-function startOfDay(date) { return new Date(date.getFullYear(), date.getMonth(), date.getDate()) }
-function diffInDays(from, to) { const ms = startOfDay(to) - startOfDay(from); return Math.round(ms / 86400000) }
-function fmt(date) { try { return new Intl.DateTimeFormat('es-CO', { timeZone: 'America/Bogota', year: 'numeric', month: 'short', day: '2-digit' }).format(date) } catch { return date.toLocaleDateString() } }
+// ✅ Importar utilidades compartidas desde el hook centralizado
+import {
+  parseYMD,
+  addDays,
+  startOfDay,
+  diffInDays,
+  fmt,
+  badgeFor as badgeForBase,
+  toSlugUpper,
+  toYMD,
+  buildPlanPath,
+  buildAsistenciaPath,
+  buildEvaluacionPath,
+  buildActaPath,
+  buildActaCompromisoPath,
+  buildValidationPath,
+  BUCKETS,
+} from '@/hooks/useAuditTimeline'
+
+// Wrapper para badgeFor con estilos locales y textos específicos del admin
 function badgeFor(daysLeft, explicitDone = false) {
   if (explicitDone) return { label: 'Completado', cls: styles.badgeOk }
   if (daysLeft < 0) return { label: `Vencido ${Math.abs(daysLeft)} d`, cls: styles.badgeOverdue }
@@ -20,27 +34,6 @@ function badgeFor(daysLeft, explicitDone = false) {
   if (daysLeft <= 3) return { label: `En ${daysLeft} d`, cls: styles.badgeSoon }
   return { label: `Faltan ${daysLeft} d`, cls: styles.badgePending }
 }
-
-/* ---- helpers nombre de archivo ---- */
-const toSlugUpper = (s = '') =>
-  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase()
-
-const toYMD = (input) => {
-  if (!input) return new Date().toISOString().slice(0, 10)
-  const s = String(input)
-  return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : new Date(input).toISOString().slice(0, 10)
-}
-
-const buildPlanPath = (a) => `PlanAuditoria_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
-const buildValidationPath = (a) => `Auditoria_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEPENDENCIA')}_${toYMD(a?.fecha_auditoria)}.pdf`
-const buildAsistenciaPath = (a) => `Asistencia_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
-const buildEvaluacionPath = (a) => `Evaluacion_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
-const buildActaPath = (a) => `Acta_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
-// ✅ NUEVO: ruta para Acta de Compromiso
-const buildActaCompromisoPath = (a) => `ActaCompromiso_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}_${toYMD(a?.fecha_auditoria)}.pdf`
-
-// ✅ Bucket de novedades
-const NOVEDADES_BUCKET = 'novedades'
 
 // Carpeta de novedades por auditoría
 const buildNovedadesFolder = (a) => `auditoria_${a.id}`
@@ -59,6 +52,30 @@ export default function AuditoriasVerificacionAdmin() {
   const [error, setError] = useState(null)
   const [auditorias, setAuditorias] = useState([])
   const [selectedId, setSelectedId] = useState(null)
+
+  // Helper: verificar existencia de archivo antes de crear URL firmada
+  const trySignFile = async (bucket, path) => {
+    try {
+      // Primero verificar si existe el archivo con .list()
+      const lastSlash = path.lastIndexOf('/')
+      const dir = lastSlash > 0 ? path.substring(0, lastSlash) : ''
+      const fileName = lastSlash > 0 ? path.substring(lastSlash + 1) : path
+      
+      const { data: listData, error: listError } = await supabase.storage
+        .from(bucket)
+        .list(dir, { limit: 1000 })
+      
+      if (listError || !listData?.some(file => file.name === fileName)) {
+        return null
+      }
+      
+      // Si existe, crear la URL firmada
+      const { data: s } = await supabase.storage.from(bucket).createSignedUrl(path, 3600)
+      return s?.signedUrl ? { file: path, url: s.signedUrl } : null
+    } catch { 
+      return null 
+    }
+  }
 
   // toolbar filtros
   const [q, setQ] = useState('')
@@ -253,7 +270,7 @@ const handleDateKeyDown = useCallback((e) => {
       const folder = buildNovedadesFolder(a)
       const { data, error } = await supabase
         .storage
-        .from(NOVEDADES_BUCKET)
+        .from(BUCKETS.NOVEDADES)
         .list(folder, {
           limit: 100,
           sortBy: { column: 'name', order: 'asc' },
@@ -295,7 +312,7 @@ const handleDateKeyDown = useCallback((e) => {
           const path = `${folder}/${obj.name}`
           const { data: s } = await supabase
             .storage
-            .from(NOVEDADES_BUCKET)
+            .from(BUCKETS.NOVEDADES)
             .createSignedUrl(path, 3600)
 
           const createdAt = obj.created_at ? new Date(obj.created_at) : null
@@ -347,7 +364,7 @@ const handleDateKeyDown = useCallback((e) => {
 
       const { data, error } = await supabase
         .storage
-        .from(NOVEDADES_BUCKET)
+        .from(BUCKETS.NOVEDADES)
         .upload(path, novedadFile, {
           upsert: false, // si quieres permitir reemplazar, cámbialo a true
           contentType: novedadFile.type || 'application/pdf',
@@ -403,11 +420,11 @@ const handleDateKeyDown = useCallback((e) => {
     try {
       const filePath = buildValidationPath(a)
 
-      await supabase.storage.from('validaciones').remove([filePath])
+      await supabase.storage.from(BUCKETS.VALIDACIONES).remove([filePath])
 
       // ahora sube normal sin upsert
       const { error: upErr } = await supabase.storage
-        .from('validaciones')
+        .from(BUCKETS.VALIDACIONES)
         .upload(filePath, validateFile, {
           upsert: false,
           contentType: 'application/pdf',
@@ -420,7 +437,7 @@ const handleDateKeyDown = useCallback((e) => {
       .eq('id', a.id)
     if (updInfErr) throw updInfErr
 
-      const { data: signedVal } = await supabase.storage.from('validaciones').createSignedUrl(filePath, 3600)
+      const { data: signedVal } = await supabase.storage.from(BUCKETS.VALIDACIONES).createSignedUrl(filePath, 3600)
       setAuditorias(prev => prev.map(x => x.id === a.id ? { ...x, validated: { file: filePath, url: signedVal?.signedUrl || null }, validado: true } : x))
 
       setValidateModalOpen(false)
@@ -487,7 +504,7 @@ const handleDateKeyDown = useCallback((e) => {
     setUploadingPlan(true)
     try {
       const filePath = buildPlanPath(a)
-      const { error: upErr } = await supabase.storage.from('planes').upload(filePath, planFile, { upsert: true, contentType: 'application/pdf' })
+      const { error: upErr } = await supabase.storage.from(BUCKETS.PLANES).upload(filePath, planFile, { upsert: true, contentType: 'application/pdf' })
       if (upErr) throw upErr
 
       const { data: userRes } = await supabase.auth.getUser()
@@ -500,7 +517,7 @@ const handleDateKeyDown = useCallback((e) => {
         )
       if (upDbErr) throw upDbErr
 
-      const { data: signed } = await supabase.storage.from('planes').createSignedUrl(filePath, 3600)
+      const { data: signed } = await supabase.storage.from(BUCKETS.PLANES).createSignedUrl(filePath, 3600)
       setAuditorias(prev => prev.map(x => x.id === a.id ? { ...x, plan: { path: filePath, enviado_at: new Date().toISOString(), url: signed?.signedUrl || null } } : x))
 
       setPlanModalOpen(false); setPlanFile(null)
@@ -518,9 +535,9 @@ const handleDateKeyDown = useCallback((e) => {
     setUploadingAsistencia(true)
     try {
       const filePath = buildAsistenciaPath(a)
-      const { error: upErr } = await supabase.storage.from('asistencias').upload(filePath, asistenciaFile, { upsert: true, contentType: 'application/pdf' })
+      const { error: upErr } = await supabase.storage.from(BUCKETS.ASISTENCIAS).upload(filePath, asistenciaFile, { upsert: true, contentType: 'application/pdf' })
       if (upErr) throw upErr
-      const { data: signed } = await supabase.storage.from('asistencias').createSignedUrl(filePath, 3600)
+      const { data: signed } = await supabase.storage.from(BUCKETS.ASISTENCIAS).createSignedUrl(filePath, 3600)
       setAuditorias(prev => prev.map(x => x.id === a.id ? { ...x, asistencia: { path: filePath, url: signed?.signedUrl || null, uploaded_at: new Date().toISOString() } } : x))
       setAsistenciaModalOpen(false); setAsistenciaFile(null)
       toast.success('Asistencia cargada.')
@@ -537,9 +554,9 @@ const handleDateKeyDown = useCallback((e) => {
     setUploadingEvaluacion(true)
     try {
       const filePath = buildEvaluacionPath(a)
-      const { error: upErr } = await supabase.storage.from('evaluaciones').upload(filePath, evaluacionFile, { upsert: true, contentType: 'application/pdf' })
+      const { error: upErr } = await supabase.storage.from(BUCKETS.EVALUACIONES).upload(filePath, evaluacionFile, { upsert: true, contentType: 'application/pdf' })
       if (upErr) throw upErr
-      const { data: signed } = await supabase.storage.from('evaluaciones').createSignedUrl(filePath, 3600)
+      const { data: signed } = await supabase.storage.from(BUCKETS.EVALUACIONES).createSignedUrl(filePath, 3600)
       setAuditorias(prev => prev.map(x => x.id === a.id ? { ...x, evaluacion: { path: filePath, url: signed?.signedUrl || null, uploaded_at: new Date().toISOString() } } : x))
       setEvaluacionModalOpen(false); setEvaluacionFile(null)
       toast.success('Evaluación cargada.')
@@ -556,9 +573,9 @@ const handleDateKeyDown = useCallback((e) => {
     setUploadingActa(true)
     try {
       const filePath = buildActaPath(a)
-      const { error: upErr } = await supabase.storage.from('actas').upload(filePath, actaFile, { upsert: true, contentType: 'application/pdf' })
+      const { error: upErr } = await supabase.storage.from(BUCKETS.ACTAS).upload(filePath, actaFile, { upsert: true, contentType: 'application/pdf' })
       if (upErr) throw upErr
-      const { data: signed } = await supabase.storage.from('actas').createSignedUrl(filePath, 3600)
+      const { data: signed } = await supabase.storage.from(BUCKETS.ACTAS).createSignedUrl(filePath, 3600)
       setAuditorias(prev => prev.map(x => x.id === a.id ? { ...x, acta: { path: filePath, url: signed?.signedUrl || null, uploaded_at: new Date().toISOString() } } : x))
       setActaModalOpen(false); setActaFile(null)
       toast.success('Acta cargada.')
@@ -578,13 +595,13 @@ const handleDateKeyDown = useCallback((e) => {
       const filePath = buildActaCompromisoPath(a)
       const { error: upErr } = await supabase
         .storage
-        .from('actascompromiso')
+        .from(BUCKETS.ACTAS_COMPROMISO)
         .upload(filePath, actaCompFile, { upsert: true, contentType: 'application/pdf' })
       if (upErr) throw upErr
 
       const { data: signed } = await supabase
         .storage
-        .from('actascompromiso')
+        .from(BUCKETS.ACTAS_COMPROMISO)
         .createSignedUrl(filePath, 3600)
 
       setAuditorias(prev => prev.map(x =>
@@ -631,36 +648,24 @@ const handleDateKeyDown = useCallback((e) => {
           let plan = null
           const rec = a.plan_informe?.[0] || null
           if (rec?.archivo_path) {
-            try {
-              const { data: signed } = await supabase.storage.from('planes').createSignedUrl(rec.archivo_path, 3600)
-              plan = { path: rec.archivo_path, enviado_at: rec.enviado_at, url: signed?.signedUrl || null }
-            } catch {}
+            const result = await trySignFile(BUCKETS.PLANES, rec.archivo_path)
+            if (result) plan = { path: rec.archivo_path, enviado_at: rec.enviado_at, url: result.url }
           } else {
-            try {
-              const guess = buildPlanPath(a)
-              const { data: signedGuess } = await supabase.storage.from('planes').createSignedUrl(guess, 3600)
-              if (signedGuess?.signedUrl) plan = { path: guess, enviado_at: null, url: signedGuess.signedUrl }
-            } catch {}
+            const guess = buildPlanPath(a)
+            const result = await trySignFile(BUCKETS.PLANES, guess)
+            if (result) plan = { path: guess, enviado_at: null, url: result.url }
           }
 
 
 
           // NUEVOS: asistencia / evaluación / acta (firmados si existen)
-          const trySign = async (bucket, path) => {
-            try {
-              const { data: s } = await supabase.storage.from(bucket).createSignedUrl(path, 3600)
-              return s?.signedUrl ? { file: path, url: s.signedUrl } : null
-            } catch { return null }
-          }
-          const asistencia = await trySign('asistencias', buildAsistenciaPath(a))
-          const evaluacion = await trySign('evaluaciones', buildEvaluacionPath(a))
-          const acta = await trySign('actas', buildActaPath(a))
-          const acta_compromiso = await trySign('actascompromiso', buildActaCompromisoPath(a))
-          // VALIDADO: intenta firmar por ruta exacta
-          const valRec = a.validacion?.[0] || null
-          const validated = valRec?.archivo_url
-            ? await trySign('validaciones', valRec.archivo_url)
-            : await trySign('validaciones', buildValidationPath(a)) // fallback si quieres
+          const asistencia = await trySignFile(BUCKETS.ASISTENCIAS, buildAsistenciaPath(a))
+          const evaluacion = await trySignFile(BUCKETS.EVALUACIONES, buildEvaluacionPath(a))
+          const acta = await trySignFile(BUCKETS.ACTAS, buildActaPath(a))
+          const acta_compromiso = await trySignFile(BUCKETS.ACTAS_COMPROMISO, buildActaCompromisoPath(a))
+          
+          // VALIDADO: intenta firmar por ruta directa
+          const validated = await trySignFile(BUCKETS.VALIDACIONES, buildValidationPath(a))
 
           // Conteos de hallazgos
           const fCount = a.fortalezas?.length || 0
@@ -904,7 +909,7 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
                         label: 'Abrir validado',
                         onClick: async () => {
                           const path = buildValidationPath(selected)
-                          const { data } = await supabase.storage.from('validaciones').createSignedUrl(path, 3600)
+                          const { data } = await supabase.storage.from(BUCKETS.VALIDACIONES).createSignedUrl(path, 3600)
                           if (data?.signedUrl) openInNewTab(data.signedUrl)
                           else toast.error('No se encontró el PDF validado en almacenamiento.')
                         }
@@ -982,14 +987,32 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
   }
 
   return (
-    <div className={styles.wrapper}>
+    <div className={styles.container}>
+      {/* HEADER MODERNO */}
+      <div className={styles.modernHeader}>
+        <div className={styles.headerContent}>
+          <div className={styles.headerLeft}>
+            <div className={styles.headerIcon}>📋</div>
+            <div className={styles.headerInfo}>
+              <h1 className={styles.headerTitle}>Administrar Auditorías</h1>
+              <p className={styles.headerSubtitle}>Gestión y seguimiento del proceso de auditoría</p>
+            </div>
+          </div>
+          <div className={styles.headerRight}>
+            <button className={styles.modernRefreshBtn} onClick={loadData} title="Recargar datos">
+              <span className={styles.refreshIcon}>↻</span>
+              <span>Actualizar</span>
+            </button>
+            <button className={styles.modernCreateBtn} onClick={() => setShowCreate(true)} title="Crear nueva auditoría">
+              <span className={styles.createIcon}>+</span>
+              <span>Nueva Auditoría</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* TOOLBAR SUPERIOR */}
       <div className={styles.toolbar}>
-        <div className={styles.toolbarTop}>
-          <h3 className={styles.toolbarTitle}>Panel de verificación (Admin)</h3>
-          <button className={styles.refreshBtn} onClick={loadData} title="Recargar">↻</button>
-        </div>
-
         <div className={styles.toolbarGrid}>
           <input className={`${styles.inputBase} ${styles.toolbarSearch}`} placeholder="Buscar (dependencia, auditor, ID)" value={q} onChange={e => setQ(e.target.value)} />
           <select className={styles.inputBase} value={depFilter} onChange={e => setDepFilter(e.target.value)}>
@@ -1026,30 +1049,80 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         </div>
 
         {/* Checks rápidos */}
-        <div className={styles.kpisBar}>
-        <label className={styles.kpiChip}>
-          <input type="checkbox" checked={onlyActaComp} onChange={e => setOnlyActaComp(e.target.checked)} /> Acta compromiso
-        </label>
-
-          <label className={styles.kpiChip}>
-            <input type="checkbox" checked={onlyAsistencia} onChange={e => setOnlyAsistencia(e.target.checked)} /> Asistencia
+        <div className={styles.quickFilters}>
+          <label className={styles.filterCheckbox}>
+            <input type="checkbox" checked={onlyActaComp} onChange={e => setOnlyActaComp(e.target.checked)} />
+            <span>Acta compromiso</span>
           </label>
-          <label className={styles.kpiChip}>
-            <input type="checkbox" checked={onlyEvaluacion} onChange={e => setOnlyEvaluacion(e.target.checked)} /> Evaluación
+          <label className={styles.filterCheckbox}>
+            <input type="checkbox" checked={onlyAsistencia} onChange={e => setOnlyAsistencia(e.target.checked)} />
+            <span>Asistencia</span>
           </label>
-          <label className={styles.kpiChip}>
-            <input type="checkbox" checked={onlyActa} onChange={e => setOnlyActa(e.target.checked)} /> Acta
+          <label className={styles.filterCheckbox}>
+            <input type="checkbox" checked={onlyEvaluacion} onChange={e => setOnlyEvaluacion(e.target.checked)} />
+            <span>Evaluación</span>
           </label>
-
-          <span className={styles.kpiChip} style={{ marginLeft: 'auto' }}>Total: <strong>{kpis.total}</strong></span>
-          <span className={styles.kpiChip}>Plan: <strong>{kpis.plan}</strong></span>
-          <span className={styles.kpiChip}>Informe OK: <strong>{kpis.informe}</strong></span>
-          <span className={styles.kpiChip}>Validados: <strong>{kpis.val}</strong></span>
+          <label className={styles.filterCheckbox}>
+            <input type="checkbox" checked={onlyActa} onChange={e => setOnlyActa(e.target.checked)} />
+            <span>Acta</span>
+          </label>
         </div>
       </div>
 
-      {/* LISTA IZQUIERDA */}
-      <aside className={styles.sidebar}>
+      {/* KPI CARDS MODERNAS */}
+      <div className={styles.kpiGrid}>
+        <div className={`${styles.kpiCard} ${styles.kpiCardBlue}`}>
+          <div className={styles.kpiIcon}>📊</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>Total Auditorías</div>
+            <div className={styles.kpiValue}>{kpis.total}</div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardPurple}`}>
+          <div className={styles.kpiIcon}>📄</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>Planes Enviados</div>
+            <div className={styles.kpiValue}>{kpis.plan}</div>
+            <div className={styles.kpiProgress}>
+              <div className={styles.kpiProgressTrack}>
+                <div className={styles.kpiProgressFill} style={{ width: `${kpis.total > 0 ? (kpis.plan / kpis.total * 100) : 0}%` }}></div>
+              </div>
+              <span className={styles.kpiPercent}>{kpis.total > 0 ? Math.round(kpis.plan / kpis.total * 100) : 0}%</span>
+            </div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardGreen}`}>
+          <div className={styles.kpiIcon}>✍️</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>Informes Completos</div>
+            <div className={styles.kpiValue}>{kpis.informe}</div>
+            <div className={styles.kpiProgress}>
+              <div className={styles.kpiProgressTrack}>
+                <div className={styles.kpiProgressFill} style={{ width: `${kpis.total > 0 ? (kpis.informe / kpis.total * 100) : 0}%` }}></div>
+              </div>
+              <span className={styles.kpiPercent}>{kpis.total > 0 ? Math.round(kpis.informe / kpis.total * 100) : 0}%</span>
+            </div>
+          </div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiCardIndigo}`}>
+          <div className={styles.kpiIcon}>✅</div>
+          <div className={styles.kpiContent}>
+            <div className={styles.kpiLabel}>Validados</div>
+            <div className={styles.kpiValue}>{kpis.val}</div>
+            <div className={styles.kpiProgress}>
+              <div className={styles.kpiProgressTrack}>
+                <div className={styles.kpiProgressFill} style={{ width: `${kpis.total > 0 ? (kpis.val / kpis.total * 100) : 0}%` }}></div>
+              </div>
+              <span className={styles.kpiPercent}>{kpis.total > 0 ? Math.round(kpis.val / kpis.total * 100) : 0}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* GRID DE 2 COLUMNAS */}
+      <div className={styles.wrapper}>
+        {/* LISTA IZQUIERDA */}
+        <aside className={styles.sidebar}>
         <div className={styles.sidebarHeader}><h3>Auditorías</h3></div>
         {loading && <div className={styles.skeletonList}>Cargando auditorías…</div>}
         {error && <div className={styles.errorBox}>⚠️ {error}</div>}
@@ -1073,12 +1146,6 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
             )
           })}
         </ul>
-
-        {/* TILE crear */}
-        <li className={styles.itemAdd} onClick={() => setShowCreate(true)} title="Crear nueva auditoría">
-          <div className={styles.addIcon}>+</div>
-          <div className={styles.addText}>Nueva auditoría</div>
-        </li>
       </aside>
 
       {/* CONTENIDO DERECHA */}
@@ -1216,6 +1283,8 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
           </div>
         )}
       </main>
+      </div>
+      {/* FIN WRAPPER GRID */}
 
       {/* MODAL VER MÁS */}
       {showDetail && selected && (
@@ -1719,5 +1788,5 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
       )}
 
     </div>
-  )
+)
 }
