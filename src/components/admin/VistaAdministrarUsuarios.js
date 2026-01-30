@@ -518,6 +518,7 @@ export default function VistaAdministrarUsuarios() {
               <option value="auditor">Auditor</option>
               <option value="admin">Administrador</option>
               <option value="gestor">Gestor</option>
+              <option value="visualizador">Visualizador (solo lectura)</option>
             </select>
 
             <select

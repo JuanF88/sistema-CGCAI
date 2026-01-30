@@ -70,16 +70,42 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Email, rol y contraseña son obligatorios.' }, { status: 400 })
     }
 
+    // PASO 1: Crear usuario en Supabase Auth
+    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true, // Confirmar email automáticamente
+    })
+
+    if (authError) {
+      console.error('Error al crear usuario en Auth:', authError)
+      if (authError.message.includes('already registered')) {
+        return NextResponse.json({ error: 'Este correo ya está registrado en el sistema.' }, { status: 409 })
+      }
+      return NextResponse.json({ error: authError.message }, { status: 500 })
+    }
+
+    // PASO 2: Insertar en tabla usuarios con el auth_user_id
     const { data, error: dbError } = await supabaseAdmin
       .from('usuarios')
-      .insert({ nombre, apellido, email, password, rol, estado })
-      .select('usuario_id, nombre, apellido, email, rol, estado')
+      .insert({ 
+        nombre, 
+        apellido, 
+        email, 
+        password, 
+        rol, 
+        estado,
+        auth_user_id: authUser.user.id // ← CLAVE: vincular con Supabase Auth
+      })
+      .select('usuario_id, nombre, apellido, email, rol, estado, auth_user_id')
       .single()
 
     if (dbError) {
+      // Si falla la inserción en la tabla, eliminar el usuario de Auth para mantener consistencia
+      await supabaseAdmin.auth.admin.deleteUser(authUser.user.id)
+      
       // 23505 = unique_violation
       if (dbError.code === '23505') {
-        // Puedes distinguir por el nombre del índice (constraint)
         const msg = dbError.message || ''
         if (msg.includes('usuarios_email_rol_key')) {
           return NextResponse.json({ error: 'Ya existe un usuario con ese correo y ese rol.' }, { status: 409 })
@@ -93,8 +119,9 @@ export async function POST(req) {
     }
 
     return NextResponse.json(data, { status: 201 })
-  } catch {
-    return NextResponse.json({ error: 'JSON inválido.' }, { status: 400 })
+  } catch (error) {
+    console.error('Error en POST /api/usuarios:', error)
+    return NextResponse.json({ error: 'Error interno del servidor.' }, { status: 500 })
   }
 }
 

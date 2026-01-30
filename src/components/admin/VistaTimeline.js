@@ -47,7 +47,7 @@ const buildNovedadPath = (a, file, index) => {
 }
 
 
-export default function AuditoriasVerificacionAdmin() {
+export default function AuditoriasVerificacionAdmin({ usuario, soloLectura = false }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [auditorias, setAuditorias] = useState([])
@@ -830,9 +830,9 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         actions: selected.plan?.url
             ? [
                 { label: 'Ver plan', onClick: () => openInNewTab(selected.plan.url) },
-                { label: 'Reemplazar plan', onClick: () => setPlanModalOpen(true) },
+                ...(!soloLectura ? [{ label: 'Reemplazar plan', onClick: () => setPlanModalOpen(true) }] : []),
               ]
-          : [{ label: 'Subir plan', onClick: () => setPlanModalOpen(true) }]
+          : (!soloLectura ? [{ label: 'Subir plan', onClick: () => setPlanModalOpen(true) }] : [])
       },
             {
         key: 'acta_compromiso',
@@ -844,9 +844,9 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         actions: selected.acta_compromiso?.url
             ? [
                 { label: 'Ver acta compromiso', onClick: () => openInNewTab(selected.acta_compromiso.url) },
-                { label: 'Reemplazar acta compromiso', onClick: () => setActaCompModalOpen(true) },
+                ...(!soloLectura ? [{ label: 'Reemplazar acta compromiso', onClick: () => setActaCompModalOpen(true) }] : []),
               ]
-          : [{ label: 'Subir acta compromiso', onClick: () => setActaCompModalOpen(true) }]
+          : (!soloLectura ? [{ label: 'Subir acta compromiso', onClick: () => setActaCompModalOpen(true) }] : [])
       },
       {
         key: 'asistencia',
@@ -858,9 +858,9 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         actions: selected.asistencia?.url
             ? [
                 { label: 'Ver asistencia', onClick: () => openInNewTab(selected.asistencia.url) },
-                { label: 'Reemplazar asistencia', onClick: () => setAsistenciaModalOpen(true) },
+                ...(!soloLectura ? [{ label: 'Reemplazar asistencia', onClick: () => setAsistenciaModalOpen(true) }] : []),
               ]
-          : [{ label: 'Subir asistencia', onClick: () => setAsistenciaModalOpen(true) }]
+          : (!soloLectura ? [{ label: 'Subir asistencia', onClick: () => setAsistenciaModalOpen(true) }] : [])
       },
       {
         key: 'evaluacion',
@@ -872,9 +872,9 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         actions: selected.evaluacion?.url
             ? [
                 { label: 'Ver evaluación', onClick: () => openInNewTab(selected.evaluacion.url) },
-                { label: 'Reemplazar evaluación', onClick: () => setEvaluacionModalOpen(true) },
+                ...(!soloLectura ? [{ label: 'Reemplazar evaluación', onClick: () => setEvaluacionModalOpen(true) }] : []),
               ]
-          : [{ label: 'Subir evaluación', onClick: () => setEvaluacionModalOpen(true) }]
+          : (!soloLectura ? [{ label: 'Subir evaluación', onClick: () => setEvaluacionModalOpen(true) }] : [])
       },
       {
         key: 'acta',
@@ -886,9 +886,9 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         actions: selected.acta?.url
             ? [
                 { label: 'Ver acta', onClick: () => openInNewTab(selected.acta.url) },
-                { label: 'Reemplazar acta', onClick: () => setActaModalOpen(true) },
+                ...(!soloLectura ? [{ label: 'Reemplazar acta', onClick: () => setActaModalOpen(true) }] : []),
               ]
-          : [{ label: 'Subir acta', onClick: () => setActaModalOpen(true) }]
+          : (!soloLectura ? [{ label: 'Subir acta', onClick: () => setActaModalOpen(true) }] : [])
       },
       {
         key: 'informe',
@@ -1003,10 +1003,12 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
               <span className={styles.refreshIcon}>↻</span>
               <span>Actualizar</span>
             </button>
-            <button className={styles.modernCreateBtn} onClick={() => setShowCreate(true)} title="Crear nueva auditoría">
-              <span className={styles.createIcon}>+</span>
-              <span>Nueva Auditoría</span>
-            </button>
+            {!soloLectura && (
+              <button className={styles.modernCreateBtn} onClick={() => setShowCreate(true)} title="Crear nueva auditoría">
+                <span className={styles.createIcon}>+</span>
+                <span>Nueva Auditoría</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1197,14 +1199,16 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
   ) : (
     <>
       <strong>{fmt(parseYMD(selected.fecha_auditoria))}</strong>{' '}
-      <button
-        className={`${styles.btn} ${styles.btnGhost}`}
-        onClick={beginEditFecha}
-        title="Editar fecha"
-        style={{ marginLeft: 6 }}
-      >
-        ✎
-      </button>
+      {!soloLectura && (
+        <button
+          className={`${styles.btn} ${styles.btnGhost}`}
+          onClick={beginEditFecha}
+          title="Editar fecha"
+          style={{ marginLeft: 6 }}
+        >
+          ✎
+        </button>
+      )}
     </>
   )}
 </div>

@@ -57,16 +57,16 @@ const getGestionFromDependencia = (dep, gestionHint) => {
   return normalized || 'otras'
 }
 
-// Tabs de gestión
-const GESTION_TABS = [
-  { key: 'todas', label: 'Todas', icon: '🌐' },
-  { key: 'estrategica', label: 'Estratégica', icon: '🎯' },
-  { key: 'academica', label: 'Académica', icon: '📚' },
-  { key: 'investigacion', label: 'Investigación', icon: '🔬' },
-  { key: 'administrativa', label: 'Administrativa', icon: '🏢' },
-  { key: 'cultura', label: 'Cultura', icon: '🎭' },
-  { key: 'control', label: 'Control', icon: '✅' },
-  { key: 'otras', label: 'Otras', icon: '📋' },
+// Opciones de gestión
+const OPCIONES_GESTION = [
+  { key: 'todas', label: 'Todas las áreas' },
+  { key: 'estrategica', label: 'Estratégica' },
+  { key: 'academica', label: 'Académica' },
+  { key: 'investigacion', label: 'Investigación' },
+  { key: 'administrativa', label: 'Administrativa' },
+  { key: 'cultura', label: 'Cultura' },
+  { key: 'control', label: 'Control' },
+  { key: 'otras', label: 'Otras' },
 ]
 
 // Períodos de comparación
@@ -217,6 +217,7 @@ export default function VistaEstadisticasNew() {
   
   const [aniosDisponibles, setAniosDisponibles] = useState([])
   const [dependenciasDisponibles, setDependenciasDisponibles] = useState([])
+  const [isosDisponibles, setIsosDisponibles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showFilters, setShowFilters] = useState(true)
@@ -277,6 +278,15 @@ export default function VistaEstadisticasNew() {
     }
     return []
   }, [detalle, porTipo])
+
+  // Generar lista de ISOs únicas disponibles
+  useEffect(() => {
+    const isos = new Set()
+    detalleBase.forEach(item => {
+      if (item.iso) isos.add(String(item.iso))
+    })
+    setIsosDisponibles(Array.from(isos).sort())
+  }, [detalleBase])
 
   // Dependencias filtradas
   const dependenciasFiltradas = useMemo(() => {
@@ -360,7 +370,7 @@ export default function VistaEstadisticasNew() {
       map.set(key, (map.get(key) || 0) + toNum(it.cantidad))
     }
     return Array.from(map, ([gestion, hallazgos]) => ({ 
-      gestion: GESTION_TABS.find(g => g.key === gestion)?.label || gestion, 
+      gestion: OPCIONES_GESTION.find(g => g.key === gestion)?.label || gestion, 
       hallazgos 
     }))
   }, [detalleFiltrado])
@@ -540,20 +550,6 @@ export default function VistaEstadisticasNew() {
 
         {showFilters && (
           <>
-            {/* PESTAÑAS DE GESTIÓN */}
-            <div className={styles.tabsRow}>
-              {GESTION_TABS.map(tab => (
-                <button
-                  key={tab.key}
-                  className={cn(styles.tabBtn, filtroGestion === tab.key && styles.tabBtnActive)}
-                  onClick={() => setFiltroGestion(tab.key)}
-                >
-                  <span className={styles.tabIcon}>{tab.icon}</span>
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
             <div className={styles.filterRow}>
               {/* Año */}
               <div className={styles.filterItem}>
@@ -638,6 +634,26 @@ export default function VistaEstadisticasNew() {
                 </Select>
               </div>
 
+              {/* ISO */}
+              <div className={styles.filterItem}>
+                <label className={styles.filterLabel}>
+                  <FileText className={styles.filterLabelIcon} />
+                  ISO
+                </label>
+                <Select value={filtroIso} onValueChange={setFiltroIso}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="ISO" />
+                    <ChevronDown className={styles.chevron} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todas las ISO</SelectItem>
+                    {isosDisponibles.map(iso => (
+                      <SelectItem key={String(iso)} value={String(iso)}>{iso}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Comparación */}
               <div className={styles.filterItem}>
                 <label className={styles.filterLabel}>
@@ -652,6 +668,25 @@ export default function VistaEstadisticasNew() {
                   <SelectContent>
                     {PERIODOS.map(p => (
                       <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Área/Gestión */}
+              <div className={styles.filterItem}>
+                <label className={styles.filterLabel}>
+                  <Target className={styles.filterLabelIcon} />
+                  Área
+                </label>
+                <Select value={filtroGestion} onValueChange={setFiltroGestion}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Área" />
+                    <ChevronDown className={styles.chevron} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {OPCIONES_GESTION.map(g => (
+                      <SelectItem key={g.key} value={g.key}>{g.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

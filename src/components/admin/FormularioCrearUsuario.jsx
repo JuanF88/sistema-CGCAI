@@ -91,6 +91,7 @@ export default function FormularioCrearUsuario() {
           <option value="auditor">Auditor</option>
           <option value="coordinador">Coordinador</option>
           <option value="gestor">Gestor</option>
+          <option value="visualizador">Visualizador (solo lectura)</option>
         </select>
       </div>
 

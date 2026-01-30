@@ -192,7 +192,7 @@ export const exportarExcel = async (hallazgos) => {
 }
 
 /* ===================== Componente ===================== */
-export default function VistaHallazgosAdmin() {
+export default function VistaHallazgosAdmin({ soloLectura = false }) {
   const [hallazgos, setHallazgos] = useState([])
 
   // Modal / carga Excel
@@ -213,6 +213,7 @@ export default function VistaHallazgosAdmin() {
   const [filtroISO, setFiltroISO] = useState('')                 // key estable
   const [filtroCapitulo, setFiltroCapitulo] = useState('')       // key estable
   const [filtroNumeral, setFiltroNumeral] = useState('')         // key estable
+  const [filtroGestion, setFiltroGestion] = useState('')         // área/gestión
 
   const fetchHallazgos = async () => {
     const res = await fetch('/api/hallazgos')
@@ -233,6 +234,7 @@ const {
   opcionesISO,
   opcionesCapitulos,
   opcionesNumerales,
+  opcionesGestiones,
 } = useMemo(() => {
   const toLabel = (x) => String(x ?? '').trim(); // <- fuerza a string
   const sortByLabel = (a, b) =>
@@ -245,6 +247,7 @@ const {
   const isos = new Map();          // key -> label (string)
   const capitulos = new Map();     // key -> label (string)
   const numerales = new Map();     // key -> label (string)
+  const gestiones = new Set();     // áreas/gestiones
 
   for (const row of hallazgos) {
     const y = getYear(row);
@@ -259,6 +262,11 @@ const {
     const dk = getDependenciaKey(row);
     const dl = toLabel(getDependenciaLabel(row));
     if (dk && dl) dependencias.set(dk, dl);
+
+    // Gestión (área)
+    const inf = getInforme(row);
+    const gestion = toLabel(inf?.dependencias?.gestion || '');
+    if (gestion) gestiones.add(gestion);
 
     // Tipo
     const tipo = toLabel(row?.tipo || inferirTipoDesdeTabla(row));
@@ -293,6 +301,9 @@ const {
       .sort(sortByLabel),
     opcionesNumerales: Array.from(numerales, ([value, label]) => ({ value, label: toLabel(label) }))
       .sort(sortByLabel),
+    opcionesGestiones: Array.from(gestiones)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
   };
 }, [hallazgos]);
 
@@ -306,6 +317,13 @@ const {
 
       if (filtroAuditor && getAuditorKey(row) !== filtroAuditor) return false
       if (filtroDependencia && getDependenciaKey(row) !== filtroDependencia) return false
+
+      // Filtro de gestión/área
+      if (filtroGestion) {
+        const inf = getInforme(row)
+        const gestion = norm(inf?.dependencias?.gestion || '')
+        if (gestion !== norm(filtroGestion)) return false
+      }
 
       const tipo = row?.tipo || inferirTipoDesdeTabla(row)
       if (filtroTipo && String(tipo) !== String(filtroTipo)) return false
@@ -346,6 +364,7 @@ const {
     filtroSemestre,
     filtroAuditor,
     filtroDependencia,
+    filtroGestion,
     filtroTipo,
     filtroISO,
     filtroCapitulo,
@@ -358,6 +377,7 @@ const {
     setFiltroAuditor('')
     setFiltroAnio('')
     setFiltroSemestre('')
+    setFiltroGestion('')
     setFiltroTipo('')
     setFiltroISO('')
     setFiltroCapitulo('')
@@ -797,6 +817,17 @@ const {
             <option value="">Todos los numerales</option>
             {opcionesNumerales.map((n) => (
               <option key={n.value} value={n.value}>{n.label}</option>
+            ))}
+          </select>
+
+          <select
+            value={filtroGestion}
+            onChange={(e) => setFiltroGestion(e.target.value)}
+            className={styles.filterSelect}
+          >
+            <option value="">Todas las áreas</option>
+            {opcionesGestiones.map((g) => (
+              <option key={g} value={g}>{g}</option>
             ))}
           </select>
         </div>

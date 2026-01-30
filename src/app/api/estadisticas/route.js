@@ -15,10 +15,16 @@ const normalizeGestion = (g) => {
 }
 
 export async function GET() {
-  const { error } = await getAuthenticatedClient()
+  const { usuario, error } = await getAuthenticatedClient()
   
   if (error) {
     return NextResponse.json({ error }, { status: 401 })
+  }
+
+  // Permitir acceso a admin, auditor y visualizador
+  const rolesPermitidos = ['admin', 'auditor', 'visualizador']
+  if (!rolesPermitidos.includes(usuario?.rol)) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
   }
 
   // Usar service role para consultas (bypass RLS temporal)
@@ -42,6 +48,7 @@ export async function GET() {
           .from(tabla)
           .select(`
             id,
+            iso:iso_id ( iso ),
             informes_auditoria:informe_id (
               id,
               fecha_auditoria,
@@ -71,6 +78,7 @@ export async function GET() {
 
         const dependencia = ia.dependencias?.nombre || 'Desconocida'
         const gestion = normalizeGestion(ia.dependencias?.gestion) || null
+        const iso = item.iso?.iso || null
 
         if (dependencia) {
           const prev = depsMap.get(dependencia)
@@ -84,6 +92,7 @@ export async function GET() {
           dependencia,
           gestion,
           tipo,
+          iso,                  // incluir ISO
           cantidad: 1,          // cada hallazgo cuenta 1
         })
       }

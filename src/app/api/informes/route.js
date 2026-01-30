@@ -2,11 +2,17 @@ import { getAuthenticatedClient } from '@/lib/authHelper'
 import { createClient } from '@supabase/supabase-js'
 
 export async function GET() {
-  const { error } = await getAuthenticatedClient()
+  const { usuario, error } = await getAuthenticatedClient()
   
   if (error) {
     console.log('❌ Error de autenticación:', error)
     return Response.json({ error }, { status: 401 })
+  }
+
+  // Permitir acceso a admin, auditor y visualizador
+  const rolesPermitidos = ['admin', 'auditor', 'visualizador']
+  if (!rolesPermitidos.includes(usuario?.rol)) {
+    return Response.json({ error: 'No autorizado' }, { status: 403 })
   }
 
   console.log('✅ Usuario autenticado correctamente')

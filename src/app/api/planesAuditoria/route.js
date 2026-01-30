@@ -5,10 +5,16 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
-  const { error } = await getAuthenticatedClient()
+  const { usuario, error } = await getAuthenticatedClient()
   
   if (error) {
     return NextResponse.json({ error }, { status: 401 })
+  }
+
+  // Permitir acceso a admin, auditor y visualizador
+  const rolesPermitidos = ['admin', 'auditor', 'visualizador']
+  if (!rolesPermitidos.includes(usuario?.rol)) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
   }
 
   // Usar service role para consultas (bypass RLS temporal)

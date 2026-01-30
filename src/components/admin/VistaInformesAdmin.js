@@ -34,7 +34,7 @@ async function getFileTimestamps(supabase, bucket, fullPath) {
   }
 }
 
-export default function AuditoriasMallaControl() {
+export default function AuditoriasMallaControl({ soloLectura = false }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [auditorias, setAuditorias] = useState([])
