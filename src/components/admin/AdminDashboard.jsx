@@ -79,7 +79,7 @@ export default function AdminDashboard() {
               <UserPlus  className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Administrar Usuarios</span>
             </button>
 
-            {/* <button
+            <button
               onClick={() => {
                 setVista('adminDependencia')
                 window.history.pushState({}, '', '/admin?vista=adminDependencia')
@@ -99,7 +99,7 @@ export default function AdminDashboard() {
               <Lightbulb className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}> Reporte de Hallazgos</span>
             </button>
 
-            <button
+            {/* <button
               onClick={() => {
                 setVista('estadisticas')
                 window.history.pushState({}, '', '/admin?vista=estadisticas')
