@@ -152,12 +152,16 @@ export default function FormularioRegistro({ usuario, auditoria }) {
     if (data) setListaNumerales(prev => ({ ...prev, [capituloId]: data }))
   }
 
-// Campos que NO deben ir en mayúsculas
+// Campos que NO deben ir en mayúsculas (incluimos campos de texto para que funcione el corrector ortográfico)
 const EXCLUDE_UPPERCASE = new Set([
  'auditores_acompanantes',
  'asistencia_tipo',
 'fecha_auditoria',
-'fecha_seguimiento'
+'fecha_seguimiento',
+'objetivo',
+'criterios',
+'conclusiones',
+'recomendaciones'
 ])
 
 const handleChange = (e) => {
@@ -170,6 +174,17 @@ const handleChange = (e) => {
   }))
 }
 
+// Convierte a mayúsculas cuando el usuario sale del campo (preserva corrector ortográfico mientras escribe)
+const handleBlur = (e) => {
+  const { name, value } = e.target
+  if (typeof value === 'string' && value.trim()) {
+    setForm(prev => ({
+      ...prev,
+      [name]: value.toUpperCase()
+    }))
+  }
+}
+
 
 
 const toUC = (v) => (typeof v === 'string' ? v.toUpperCase() : v)
@@ -177,25 +192,61 @@ const toUC = (v) => (typeof v === 'string' ? v.toUpperCase() : v)
 const handleFortalezaChange = (index, field, value) => {
   setFortalezas(prev => {
     const copy = [...prev]
-    copy[index] = { ...copy[index], [field]: toUC(value) }
+    // No convertir a mayúsculas los campos de texto para que funcione el corrector ortográfico
+    const shouldConvert = !['descripcion', 'razon'].includes(field)
+    copy[index] = { ...copy[index], [field]: shouldConvert ? toUC(value) : value }
     return copy
   })
+}
+
+const handleFortalezaBlur = (index, field, value) => {
+  if (typeof value === 'string' && value.trim()) {
+    setFortalezas(prev => {
+      const copy = [...prev]
+      copy[index] = { ...copy[index], [field]: value.toUpperCase() }
+      return copy
+    })
+  }
 }
 
 const handleOportunidadChange = (index, field, value) => {
   setOportunidades(prev => {
     const copy = [...prev]
-    copy[index] = { ...copy[index], [field]: toUC(value) }
+    // No convertir a mayúsculas los campos de texto para que funcione el corrector ortográfico
+    const shouldConvert = !['descripcion', 'para_que'].includes(field)
+    copy[index] = { ...copy[index], [field]: shouldConvert ? toUC(value) : value }
     return copy
   })
+}
+
+const handleOportunidadBlur = (index, field, value) => {
+  if (typeof value === 'string' && value.trim()) {
+    setOportunidades(prev => {
+      const copy = [...prev]
+      copy[index] = { ...copy[index], [field]: value.toUpperCase() }
+      return copy
+    })
+  }
 }
 
 const handleNoConformidadChange = (index, field, value) => {
   setNoConformidades(prev => {
     const copy = [...prev]
-    copy[index] = { ...copy[index], [field]: toUC(value) }
+    // No convertir a mayúsculas los campos de texto para que funcione el corrector ortográfico
+    const shouldConvert = !['descripcion', 'evidencia'].includes(field)
+    copy[index] = { ...copy[index], [field]: shouldConvert ? toUC(value) : value }
     return copy
   })
+}
+
+const handleNoConformidadBlur = (index, field, value) => {
+  if (typeof value === 'string' && value.trim()) {
+    setNoConformidades(prev => {
+      const copy = [...prev]
+      copy[index] = { ...copy[index], [field]: value.toUpperCase() }
+      return copy
+    })
+  }
 }
 
 
@@ -354,7 +405,7 @@ const handleNoConformidadChange = (index, field, value) => {
 
         <div className={styles.contenedorFechas}>
           <div className={styles.tarjetaCampo}>
-            <label className={styles.etiqueta} htmlFor="fecha_auditoria">Fecha de la auditoría</label>
+            <label className={styles.etiqueta} htmlFor="fecha_auditoria">📅 Fecha de la auditoría</label>
             <input
               type="date"
               id="fecha_auditoria"
@@ -367,7 +418,7 @@ const handleNoConformidadChange = (index, field, value) => {
           </div>
 
           <div className={styles.tarjetaCampo}>
-            <label className={styles.etiqueta} htmlFor="fecha_seguimiento">Fecha de seguimiento</label>
+            <label className={styles.etiqueta} htmlFor="fecha_seguimiento">🗓️ Fecha de seguimiento</label>
             <input
               type="date"
               id="fecha_seguimiento"
@@ -376,7 +427,9 @@ const handleNoConformidadChange = (index, field, value) => {
               onChange={handleChange}
               className={styles.inputEstilo}
             />
-            <label>En atención a la resolución 290 de 2019 de la Universidad del Cauca.</label>
+            <label className={styles.etiqueta} style={{fontSize: '0.85rem', fontStyle: 'italic'}}>
+              En atención a la resolución 290 de 2019 de la Universidad del Cauca.
+            </label>
             {errores.fecha_seguimiento && <p className={styles.errorTexto}>{errores.fecha_seguimiento}</p>}
           </div>
         </div>
@@ -384,7 +437,7 @@ const handleNoConformidadChange = (index, field, value) => {
 
         <div className={styles.contenedorFechas}>
           <div className={styles.tarjetaCampo}>
-            <label className={styles.etiqueta} htmlFor="asistencia_tipo">Asistencia</label>
+            <label className={styles.etiqueta} htmlFor="asistencia_tipo">📍 Asistencia</label>
             <select
               id="asistencia_tipo"
               name="asistencia_tipo"
@@ -398,7 +451,7 @@ const handleNoConformidadChange = (index, field, value) => {
             {errores.asistencia_tipo && <p className={styles.errorTexto}>{errores.asistencia_tipo}</p>}
           </div>
           <div className={styles.tarjetaCampo}>
-            <label className={styles.etiqueta} htmlFor="auditores_acompanantes">Auditores acompañantes (separados por ,)</label>
+            <label className={styles.etiqueta} htmlFor="auditores_acompanantes">👥 Auditores acompañantes (separados por ,)</label>
             <input
               type="text"
               id="auditores_acompanantes"
@@ -412,53 +465,97 @@ const handleNoConformidadChange = (index, field, value) => {
         </div>
 
         <div className={styles.tarjetaCampo}>
-          <label className={styles.etiqueta} htmlFor="objetivo">Objetivo de la auditoría</label>
+          <label className={styles.etiqueta} htmlFor="objetivo">📋 Objetivo de la auditoría <span style={{fontSize: '0.75rem', opacity: 0.7}}>✓ Corrector ortográfico activo</span></label>
           <textarea
             id="objetivo"
             name="objetivo"
             value={form.objetivo}
             onChange={handleChange}
+            onBlur={handleBlur}
             className={`${styles.inputEstilo} ${styles.textareaAuto}`}
             rows={1}
+            spellCheck="true"
+            lang="es-ES"
+            autoComplete="off"
           />
           {errores.objetivo && <p className={styles.errorTexto}>{errores.objetivo}</p>}
         </div>
 
         <div className={styles.tarjetaCampo}>
-          <label className={styles.etiqueta} htmlFor="criterios">Criterios de la auditoría</label>
+          <label className={styles.etiqueta} htmlFor="criterios">📊 Criterios de la auditoría <span style={{fontSize: '0.75rem', opacity: 0.7}}>✓ Corrector ortográfico activo</span></label>
           <textarea
             id="criterios"
             name="criterios"
             value={form.criterios}
             onChange={handleChange}
+            onBlur={handleBlur}
             className={`${styles.inputEstilo} ${styles.textareaAuto}`}
             rows={1}
+            spellCheck="true"
+            lang="es-ES"
+            autoComplete="off"
           />
           {errores.criterios && <p className={styles.errorTexto}>{errores.criterios}</p>}
         </div>
 
         <div className={styles.tarjetaCampo}>
-          <label className={styles.etiqueta} htmlFor="conclusiones">Conclusiones</label>
+          <label className={styles.etiqueta} htmlFor="conclusiones">✅ Conclusiones <span style={{fontSize: '0.75rem', opacity: 0.7}}>✓ Corrector ortográfico activo</span></label>
+          
+          {/* Botón de ayuda */}
+          <button
+            type="button"
+            onClick={() => {
+              setAyudaImagen('ayudas/AyudaFortalezas.png')
+              setAyudaOpen(true)
+            }}
+            className={`${styles.botonAyuda} ml-10 border-blue-400 text-blue-600`}
+            title="Ver ayuda"
+          >
+            ?
+          </button>
+
           <textarea
             id="conclusiones"
             name="conclusiones"
             value={form.conclusiones}
             onChange={handleChange}
+            onBlur={handleBlur}
             className={`${styles.inputEstilo} ${styles.textareaAuto}`}
             rows={1}
+            spellCheck="true"
+            lang="es-ES"
+            autoComplete="off"
           />
           {errores.conclusiones && <p className={styles.errorTexto}>{errores.conclusiones}</p>}
         </div>
 
         <div className={styles.tarjetaCampo}>
-          <label className={styles.etiqueta} htmlFor="recomendaciones">Recomendaciones</label>
+          <label className={styles.etiqueta} htmlFor="recomendaciones">💡 Recomendaciones <span style={{fontSize: '0.75rem', opacity: 0.7}}>✓ Corrector ortográfico activo</span></label>
+          
+          {/* Botón de ayuda */}
+          <button
+            type="button"
+            onClick={() => {
+              setAyudaImagen('ayudas/AyudaFortalezas.png')
+              setAyudaOpen(true)
+            }}
+            className={`${styles.botonAyuda} ml-10 border-blue-400 text-blue-600`}
+            title="Ver ayuda"
+          >
+            ?
+          </button>
+
           <textarea
             id="recomendaciones"
             name="recomendaciones"
             value={form.recomendaciones}
             onChange={handleChange}
+            onBlur={handleBlur}
             className={`${styles.inputEstilo} ${styles.textareaAuto}`}
             rows={1}
+            spellCheck="true"
+            lang="es-ES"
+            autoComplete="off"
           />
           {errores.recomendaciones && <p className={styles.errorTexto}>{errores.recomendaciones}</p>}
         </div>
@@ -501,7 +598,7 @@ const handleNoConformidadChange = (index, field, value) => {
             {/* ISO, Capítulo y Numeral en una sola fila */}
             <div className={styles.grupoFila}>
               <div className={styles.campoAgrupado}>
-                <label className={styles.etiqueta} htmlFor={`iso-${i}`}>ISO</label>
+                <label className={styles.etiqueta} htmlFor={`iso-${i}`}>📜 ISO</label>
                 <select
                   id={`iso-${i}`}
                   value={f.iso}
@@ -522,7 +619,7 @@ const handleNoConformidadChange = (index, field, value) => {
               </div>
 
               <div className={styles.campoAgrupado}>
-                <label className={styles.etiqueta} htmlFor={`capitulo-${i}`}>Capítulo</label>
+                <label className={styles.etiqueta} htmlFor={`capitulo-${i}`}>📖 Capítulo</label>
                 <select
                   id={`capitulo-${i}`}
                   value={f.capitulo}
@@ -543,7 +640,7 @@ const handleNoConformidadChange = (index, field, value) => {
               </div>
 
               <div className={styles.campoAgrupado}>
-                <label className={styles.etiqueta} htmlFor={`numeral-${i}`}>Numeral</label>
+                <label className={styles.etiqueta} htmlFor={`numeral-${i}`}>🔢 Numeral</label>
                 <select
                   id={`numeral-${i}`}
                   value={f.numeral}
@@ -560,24 +657,32 @@ const handleNoConformidadChange = (index, field, value) => {
             </div>
 
             {/* Descripción */}
-            <label className={styles.etiqueta} htmlFor={`descripcion-${i}`}>Descripción</label>
+            <label className={styles.etiqueta} htmlFor={`descripcion-${i}`}>📝 Descripción</label>
             <textarea
               id={`descripcion-${i}`}
               value={f.descripcion}
               onChange={(e) => handleFortalezaChange(i, 'descripcion', e.target.value)}
+              onBlur={(e) => handleFortalezaBlur(i, 'descripcion', e.target.value)}
               className={`${styles.textareaAdaptable} ${styles.textareaAuto}`}
               rows={1}
+              spellCheck="true"
+              lang="es-ES"
+              autoComplete="off"
             />
 
             {/* Razón */}
-            <label className={styles.etiqueta} htmlFor={`razon-${i}`}>Razón</label>
+            <label className={styles.etiqueta} htmlFor={`razon-${i}`}>🔍 Razón</label>
 
             <textarea
               id={`razon-${i}`}
               value={f.razon}
               onChange={(e) => handleFortalezaChange(i, 'razon', e.target.value)}
+              onBlur={(e) => handleFortalezaBlur(i, 'razon', e.target.value)}
               className={`${styles.textareaAdaptable} ${styles.textareaAuto}`}
               rows={1}
+              spellCheck="true"
+              lang="es-ES"
+              autoComplete="off"
             />
           </div>
         ))}
@@ -620,7 +725,7 @@ const handleNoConformidadChange = (index, field, value) => {
             {/* ISO, Capítulo y Numeral en una sola fila */}
             <div className={styles.grupoFila}>
               <div className={styles.campoAgrupado}>
-                <label className={styles.etiqueta} htmlFor={`oportunidad-iso-${i}`}>ISO</label>
+                <label className={styles.etiqueta} htmlFor={`oportunidad-iso-${i}`}>📜 ISO</label>
                 <select
                   id={`oportunidad-iso-${i}`}
                   value={o.iso}
@@ -639,7 +744,7 @@ const handleNoConformidadChange = (index, field, value) => {
               </div>
 
               <div className={styles.campoAgrupado}>
-                <label className={styles.etiqueta} htmlFor={`oportunidad-capitulo-${i}`}>Capítulo</label>
+                <label className={styles.etiqueta} htmlFor={`oportunidad-capitulo-${i}`}>📖 Capítulo</label>
                 <select
                   id={`oportunidad-capitulo-${i}`}
                   value={o.capitulo}
@@ -658,7 +763,7 @@ const handleNoConformidadChange = (index, field, value) => {
               </div>
 
               <div className={styles.campoAgrupado}>
-                <label className={styles.etiqueta} htmlFor={`oportunidad-numeral-${i}`}>Numeral</label>
+                <label className={styles.etiqueta} htmlFor={`oportunidad-numeral-${i}`}>🔢 Numeral</label>
                 <select
                   id={`oportunidad-numeral-${i}`}
                   value={o.numeral}
@@ -673,23 +778,31 @@ const handleNoConformidadChange = (index, field, value) => {
             </div>
 
             {/* Descripción */}
-            <label className={styles.etiqueta} htmlFor={`oportunidad-descripcion-${i}`}>Descripción</label>
+            <label className={styles.etiqueta} htmlFor={`oportunidad-descripcion-${i}`}>📝 Descripción</label>
             <textarea
               id={`oportunidad-descripcion-${i}`}
               value={o.descripcion}
               onChange={(e) => handleOportunidadChange(i, 'descripcion', e.target.value)}
+              onBlur={(e) => handleOportunidadBlur(i, 'descripcion', e.target.value)}
               className={`${styles.textareaAdaptable} ${styles.textareaAuto}`}
               rows={2}
+              spellCheck="true"
+              lang="es-ES"
+              autoComplete="off"
             />
 
             {/* ¿Para qué? */}
-            <label className={styles.etiqueta} htmlFor={`oportunidad-para-que-${i}`}>¿Para qué?</label>
+            <label className={styles.etiqueta} htmlFor={`oportunidad-para-que-${i}`}>❓ ¿Para qué?</label>
             <textarea
               id={`oportunidad-para-que-${i}`}
               value={o.para_que}
               onChange={(e) => handleOportunidadChange(i, 'para_que', e.target.value)}
+              onBlur={(e) => handleOportunidadBlur(i, 'para_que', e.target.value)}
               className={`${styles.textareaAdaptable} ${styles.textareaAuto}`}
               rows={2}
+              spellCheck="true"
+              lang="es-ES"
+              autoComplete="off"
             />
           </div>
         ))}
@@ -730,7 +843,7 @@ const handleNoConformidadChange = (index, field, value) => {
             {/* ISO, Capítulo y Numeral en una sola fila */}
             <div className={styles.grupoFila}>
               <div className={styles.campoAgrupado}>
-                <label className={styles.etiqueta} htmlFor={`noConformidad-iso-${i}`}>ISO</label>
+                <label className={styles.etiqueta} htmlFor={`noConformidad-iso-${i}`}>📜 ISO</label>
                 <select
                   id={`noConformidad-iso-${i}`}
                   value={n.iso}
@@ -749,7 +862,7 @@ const handleNoConformidadChange = (index, field, value) => {
               </div>
 
               <div className={styles.campoAgrupado}>
-                <label className={styles.etiqueta} htmlFor={`noConformidad-capitulo-${i}`}>Capítulo</label>
+                <label className={styles.etiqueta} htmlFor={`noConformidad-capitulo-${i}`}>📖 Capítulo</label>
                 <select
                   id={`noConformidad-capitulo-${i}`}
                   value={n.capitulo}
@@ -768,7 +881,7 @@ const handleNoConformidadChange = (index, field, value) => {
               </div>
 
               <div className={styles.campoAgrupado}>
-                <label className={styles.etiqueta} htmlFor={`noConformidad-numeral-${i}`}>Numeral</label>
+                <label className={styles.etiqueta} htmlFor={`noConformidad-numeral-${i}`}>🔢 Numeral</label>
                 <select
                   id={`noConformidad-numeral-${i}`}
                   value={n.numeral}
@@ -783,23 +896,31 @@ const handleNoConformidadChange = (index, field, value) => {
             </div>
 
             {/* Descripción */}
-            <label className={styles.etiqueta} htmlFor={`noConformidad-descripcion-${i}`}>Descripción</label>
+            <label className={styles.etiqueta} htmlFor={`noConformidad-descripcion-${i}`}>📝 Descripción</label>
             <textarea
               id={`noConformidad-descripcion-${i}`}
               value={n.descripcion}
               onChange={(e) => handleNoConformidadChange(i, 'descripcion', e.target.value)}
+              onBlur={(e) => handleNoConformidadBlur(i, 'descripcion', e.target.value)}
               className={`${styles.textareaAdaptable} ${styles.textareaAuto}`}
               rows={2}
+              spellCheck="true"
+              lang="es-ES"
+              autoComplete="off"
             />
 
             {/* Evidencia */}
-            <label className={styles.etiqueta} htmlFor={`noConformidad-evidencia-${i}`}>Evidencia</label>
+            <label className={styles.etiqueta} htmlFor={`noConformidad-evidencia-${i}`}>🔎 Evidencia</label>
             <textarea
               id={`noConformidad-evidencia-${i}`}
               value={n.evidencia}
               onChange={(e) => handleNoConformidadChange(i, 'evidencia', e.target.value)}
+              onBlur={(e) => handleNoConformidadBlur(i, 'evidencia', e.target.value)}
               className={`${styles.textareaAdaptable} ${styles.textareaAuto}`}
               rows={2}
+              spellCheck="true"
+              lang="es-ES"
+              autoComplete="off"
             />
           </div>
         ))}

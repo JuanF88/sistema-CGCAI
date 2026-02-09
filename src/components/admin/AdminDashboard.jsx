@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, FileText, UserPlus, Home, TrendingUp} from 'lucide-react'
+import { LogOut, FileText, UserPlus, Home, TrendingUp, Award} from 'lucide-react'
 import { Lightbulb } from 'lucide-react'
 import { Building } from 'lucide-react'   
 import { BarChart } from 'lucide-react'
@@ -18,6 +18,7 @@ import VistaAdministrarDependencias from '@/components/admin/VistaAdministrarDep
 import VistaAdministrarHallazgos from '@/components/admin/VistaAdministrarHallazgos'
 import VistaEstadisticas from '@/components/admin/VistaEstadisticasNew'
 import VistaPowerBI from '@/components/admin/VistaPowerBI'
+import VistaEvaluacionAuditores from '@/components/admin/VistaEvaluacionAuditores'
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -101,6 +102,16 @@ export default function AdminDashboard() {
 
             {/* <button
               onClick={() => {
+                setVista('evaluacionAuditores')
+                window.history.pushState({}, '', '/admin?vista=evaluacionAuditores')
+              }}
+              className={`${styles.navButton} ${vista === 'evaluacionAuditores' ? styles.active : ''}`}
+            >
+              <Award className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Evaluación de Auditores</span>
+            </button> */}
+
+            <button
+              onClick={() => {
                 setVista('estadisticas')
                 window.history.pushState({}, '', '/admin?vista=estadisticas')
               }}
@@ -117,7 +128,7 @@ export default function AdminDashboard() {
               className={`${styles.navButton} ${vista === 'powerbi' ? styles.active : ''}`}
             >
               <TrendingUp className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Estadísticas Power BI</span>
-            </button> */}
+            </button>
 
 
         </nav>
@@ -139,6 +150,7 @@ export default function AdminDashboard() {
   {vista === 'crearUsuario' && <VistaAdministrarUsuarios />}
   {vista === 'adminDependencia' && <VistaAdministrarDependencias />}
   {vista === 'administrarHallazgos' && <VistaAdministrarHallazgos />}
+  {vista === 'evaluacionAuditores' && <VistaEvaluacionAuditores />}
   {vista === 'estadisticas' && <VistaEstadisticas />}
   {vista === 'powerbi' && <VistaPowerBI />}
   {vista === 'gestionarUsuarios' && (

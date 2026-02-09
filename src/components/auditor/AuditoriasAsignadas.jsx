@@ -363,15 +363,14 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
 
                   {/* Acciones */}
                   <div className={styles.botonesAccion}>
-                    {progreso < 100 && (
-                      <button
-                        className={styles.botonEditar}
-                        onClick={() => setAuditoriaSeleccionada(a)}
-                        title="Editar auditoría"
-                      >
-                        ✏️ Editar
-                      </button>
-                    )}
+                    {/* Permitir ver el informe en cualquier momento */}
+                    <button
+                      className={styles.botonEditar}
+                      onClick={() => setAuditoriaSeleccionada(a)}
+                      title={progreso === 100 ? "Ver informe" : "Editar auditoría"}
+                    >
+                      {progreso === 100 ? '👁️ Ver Informe' : '✏️ Editar'}
+                    </button>
 
                     {progreso == 80 && (
                       <button

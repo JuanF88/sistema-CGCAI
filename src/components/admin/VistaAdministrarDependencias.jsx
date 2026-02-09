@@ -10,10 +10,10 @@ import styles from './CSS/VistaAdministrarDependencias.module.css'
 const GESTIONES = [
   { value: 'estrategica', label: 'Gestión Estratégica' },
   { value: 'academica', label: 'Gestión Académica' },
-  { value: 'investigacion', label: 'Gestión de la Investigación' },
+  { value: 'investigacion', label: 'Gestión de Investigación, Innovación e Interacción Social' },
   { value: 'administrativa', label: 'Gestión Administrativa' },
   { value: 'cultura', label: 'Gestión de Cultura y Bienestar' },
-  { value: 'control', label: 'Gestión de Control' },
+  { value: 'control', label: 'Gestión de Control y Mejoramiento Continuo' },
   { value: 'otras', label: 'Otras / sin clasificar' },
 ]
 

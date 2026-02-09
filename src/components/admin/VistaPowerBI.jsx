@@ -11,10 +11,10 @@ import styles from './CSS/VistaPowerBI.module.css'
 const GESTIONES_MAP = {
   'estrategica': 'Gestión Estratégica',
   'academica': 'Gestión Académica',
-  'investigacion': 'Gestión de la Investigación',
+  'investigacion': 'Gestión de Investigación, Innovación e Interacción Social',
   'administrativa': 'Gestión Administrativa',
   'cultura': 'Gestión de Cultura y Bienestar',
-  'control': 'Gestión de Control',
+  'control': 'Gestión de Control y Mejoramiento Continuo',
   'otras': 'Otras / sin clasificar'
 }
 
