@@ -132,6 +132,16 @@ export default function LoginPage() {
               autoComplete="current-password"
               style={{ paddingRight: '2.5rem' }} // espacio para el icono
             />
+                    
+        <div className={styles.footerLogo}>
+          <Image
+            src="/logosIcontec2.png"
+            alt="Logo Icontec"
+            width={120}
+            height={120}
+            className={styles.logoFooter}
+          />
+        </div>
             <button
               type="button"
               onClick={() => setMostrarPassword(v => !v)}
@@ -153,6 +163,7 @@ export default function LoginPage() {
             ENTRAR
           </button>
         </form>
+
       </div>
     </div>
   )

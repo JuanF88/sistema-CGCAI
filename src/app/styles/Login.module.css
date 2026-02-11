@@ -19,7 +19,7 @@
 .card {
   position: relative; /* 👈 para que el logo absoluto se posicione respecto a esta tarjeta */
   background: rgba(255, 255, 255, 0.95);
-  padding: 2rem 2rem 1rem 2rem; /* ajusta padding bottom si es necesario */
+  padding: 2rem 2rem 2.5rem 2rem; /* ajusta padding bottom para espacio del logo */
   border-radius: 1rem;
   max-width: 500px;
   width: 100%;
@@ -41,7 +41,7 @@
   border-radius: 1rem;
   max-width: 500px;
   width: 450px;
-  height: 355px;
+  height: 380px;
   text-align: center;
   box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
   animation: fade-in 0.7s ease-in-out;
@@ -165,4 +165,19 @@
 }
 .inputWrapper .input {
   padding-right: 2.5rem;       /* 👈 deja hueco al ojito */
+}
+
+.footerLogo {
+  position: absolute;
+  bottom: -100px;
+  left: 80%;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.logoFooter {
+  opacity: 0.9;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }

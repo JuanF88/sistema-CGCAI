@@ -136,7 +136,10 @@ export default function AdminDashboard() {
         </div>
 
         <div className={styles.sidebarFooter}>
-          <img src="/logoBlanco.png" alt="Logo Universidad" className={styles.logoBottom} />
+          <div className={styles.logosContainer}>
+            <img src="/logoBlanco.png" alt="Logo Universidad" className={styles.logoBottom} />
+            <img src="/logosIcontec.png" alt="Logo Icontec" className={styles.logoBottom} />
+          </div>
           <button onClick={cerrarSesion} className={styles.logout}>
             <LogOut size={16} /> Cerrar sesión
           </button>

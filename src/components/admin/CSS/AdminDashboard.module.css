@@ -109,8 +109,15 @@
   margin-top: 2rem;
 }
 
+.logosContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
 .logoBottom {
-  width: 100px;
+  width: 60px;
   filter: brightness(0) invert(1);
 }
 
