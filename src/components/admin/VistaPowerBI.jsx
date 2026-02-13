@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Download } from 'lucide-react'
+import { Download, Zap } from 'lucide-react'
 import { saveAs } from 'file-saver'
 import ExcelJS from 'exceljs'
 import { toast } from 'react-toastify'
@@ -247,7 +247,7 @@ export default function VistaPowerBI() {
       <div className={styles.modernHeader}>
         <div className={styles.headerContent}>
           <div className={styles.headerLeft}>
-            <div className={styles.headerIcon}>📊</div>
+            <div className={styles.headerIcon}><Zap size={48} /></div>
             <div className={styles.headerInfo}>
               <h1 className={styles.headerTitle}>Estadísticas Power BI</h1>
               <p className={styles.headerSubtitle}>Dashboard interactivo de análisis de auditorías</p>

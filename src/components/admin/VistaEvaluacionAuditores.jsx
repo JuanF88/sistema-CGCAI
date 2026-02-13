@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { 
   Upload, FileText, Calculator, Edit3, TrendingUp, 
   Calendar, Filter, Download, RefreshCw, CheckCircle,
-  AlertCircle, Eye, ChevronDown, X 
+  AlertCircle, Eye, ChevronDown, X, Award 
 } from 'lucide-react'
 import { toast } from 'react-toastify'
 import styles from './CSS/VistaEvaluacionAuditores.module.css'
@@ -39,6 +39,12 @@ export default function VistaEvaluacionAuditores() {
   const [evaluacionActual, setEvaluacionActual] = useState(null)
   const [calificaciones, setCalificaciones] = useState({})
   const [guardandoRubrica, setGuardandoRubrica] = useState(false)
+  
+  // Estado para modal de desglose de archivos
+  const [modalArchivosVisible, setModalArchivosVisible] = useState(false)
+  const [evaluacionSeleccionadaArchivos, setEvaluacionSeleccionadaArchivos] = useState(null)
+  const [archivosEditados, setArchivosEditados] = useState({})
+  const [guardandoFechas, setGuardandoFechas] = useState(false)
   
   // Años disponibles (últimos 5 años)
   const aniosDisponibles = Array.from({ length: 5 }, (_, i) => 2025 - i)
@@ -169,38 +175,105 @@ export default function VistaEvaluacionAuditores() {
   
   // Recalcular notas de archivos manualmente
   const recalcularNotasArchivos = async () => {
+    console.log('🔘 BOTÓN CLICKED - recalcularNotasArchivos')
+    
     if (!evaluaciones || evaluaciones.length === 0) {
+      console.log('⚠️ No hay evaluaciones')
       toast.warning('No hay evaluaciones para recalcular')
       return
     }
 
+    console.log(`📊 Evaluaciones disponibles: ${evaluaciones.length}`)
+    
     setActualizandoDatos(true)
+    console.log('🔄 Iniciando recálculo de archivos...')
     
     try {
       const periodo = `${anioSeleccionado}-${semestreSeleccionado}`
+      console.log(`📅 Periodo: ${periodo}`)
+      console.log(`📊 Evaluaciones a procesar: ${evaluaciones.length}`)
+      
+      let exitosos = 0
+      let errores = 0
       
       for (const ev of evaluaciones) {
-        await fetch('/api/evaluaciones-auditores/calcular-archivos', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            auditor_id: ev.auditor_id,
-            periodo: periodo,
-            dependencia_auditada: ev.auditor_dependencia_nombre || ev.dependencia_auditada
+        console.log(`\n🔍 Procesando evaluación de ${ev.auditor_nombre} ${ev.auditor_apellido}...`)
+        console.log(`   Auditor ID: ${ev.auditor_id}`)
+        console.log(`   Dependencia: ${ev.auditor_dependencia_nombre}`)
+        
+        try {
+          console.log('   📡 Enviando petición a /api/evaluaciones-auditores/calcular-archivos...')
+          
+          const res = await fetch('/api/evaluaciones-auditores/calcular-archivos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              auditor_id: ev.auditor_id,
+              periodo: periodo,
+              dependencia_auditada: ev.auditor_dependencia_nombre || ev.dependencia_auditada
+            })
           })
+          
+          console.log(`   📨 Respuesta recibida - Status: ${res.status}`)
+          
+          if (res.ok) {
+            const data = await res.json()
+            console.log(`   ✅ Éxito:`, data)
+            exitosos++
+          } else {
+            const errorText = await res.text()
+            console.error(`   ❌ Error (${res.status}):`, errorText)
+            try {
+              const errorData = JSON.parse(errorText)
+              console.error(`   Error parseado:`, errorData)
+            } catch (e) {
+              console.error(`   No se pudo parsear el error`)
+            }
+            errores++
+          }
+        } catch (fetchError) {
+          console.error(`   💥 Error en fetch:`, fetchError)
+          errores++
+        }
+      }
+      
+      console.log(`\n📈 Resumen: ${exitosos} exitosos, ${errores} errores`)
+      
+      if (exitosos > 0) {
+        toast.success(`Recálculo completado: ${exitosos} evaluaciones actualizadas`, {
+          autoClose: 3000
+        })
+      }
+      
+      if (errores > 0) {
+        toast.warning(`${errores} evaluaciones tuvieron errores. Revisa la consola.`, {
+          autoClose: 5000
         })
       }
       
       // Recargar evaluaciones
+      console.log('🔄 Recargando evaluaciones...')
       const res = await fetch(`/api/evaluaciones-auditores?periodo=${periodo}`)
+      console.log(`📨 Respuesta carga evaluaciones - Status: ${res.status}`)
+      
       if (res.ok) {
         const data = await res.json()
+        console.log('📦 Datos recibidos:', data)
         setEvaluaciones(data.evaluaciones || [])
+        console.log('✅ Evaluaciones recargadas:', data.evaluaciones?.length)
+      } else {
+        const errorText = await res.text()
+        console.error('❌ Error recargando evaluaciones:', errorText)
       }
     } catch (err) {
-      console.error('Error recalculando archivos:', err)
+      console.error('💥 Error fatal recalculando archivos:', err)
+      console.error('Stack:', err.stack)
+      toast.error(`Error al recalcular: ${err.message}`, {
+        autoClose: 5000
+      })
       setError('Error al recalcular notas de archivos')
     } finally {
+      console.log('✅ Finalizando proceso...')
       setActualizandoDatos(false)
     }
   }
@@ -346,6 +419,201 @@ export default function VistaEvaluacionAuditores() {
       autoClose: 3000
     })
   }
+  
+  // Abrir modalcondetalles de archivos
+  const mostrarDesgloseArchivos = (evaluacion) => {
+    console.log('👁️ Abriendo modal de desglose de archivos')
+    console.log('📦 Evaluación seleccionada:', evaluacion)
+    console.log('📂 detalle_archivos:', evaluacion.detalle_archivos)
+    
+    if (evaluacion.detalle_archivos) {
+      console.log('📋 Informes:', evaluacion.detalle_archivos.informes)
+      if (evaluacion.detalle_archivos.informes && evaluacion.detalle_archivos.informes.length > 0) {
+        console.log('📄 Primer informe:', evaluacion.detalle_archivos.informes[0])
+        if (evaluacion.detalle_archivos.informes[0].archivos) {
+          console.log('📎 Archivos del primer informe:', evaluacion.detalle_archivos.informes[0].archivos)
+        }
+      }
+    } else {
+      console.warn('⚠️ No hay detalle_archivos en esta evaluación')
+    }
+    
+    setEvaluacionSeleccionadaArchivos(evaluacion)
+    setModalArchivosVisible(true)
+  }
+  
+  // Cerrar modal de archivos
+  const cerrarModalArchivos = () => {
+    setModalArchivosVisible(false)
+    setEvaluacionSeleccionadaArchivos(null)
+    setArchivosEditados({})
+  }
+  
+  // Calcular puntos basado en fechas
+  const calcularPuntos = (fechaCarga, fechaLimite) => {
+    if (!fechaCarga) return 0
+    
+    const carga = new Date(fechaCarga + 'T00:00:00')
+    const limite = new Date(fechaLimite + 'T00:00:00')
+    
+    const diferenciaMs = carga - limite
+    const diasRetraso = Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24))
+    
+    if (diasRetraso <= 0) {
+      return 5
+    } else {
+      return 1
+    }
+  }
+  
+  // Calcular estado basado en fechas
+  const calcularEstado = (fechaCarga, fechaLimite) => {
+    if (!fechaCarga) return 'No entregado'
+    
+    const carga = new Date(fechaCarga + 'T00:00:00')
+    const limite = new Date(fechaLimite + 'T00:00:00')
+    
+    const diferenciaMs = carga - limite
+    const diasRetraso = Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24))
+    
+    if (diasRetraso < 0) {
+      return `Anticipado (${Math.abs(diasRetraso)} día${Math.abs(diasRetraso) !== 1 ? 's' : ''})`
+    } else if (diasRetraso === 0) {
+      return 'A tiempo'
+    } else {
+      return `Tarde (${diasRetraso} día${diasRetraso !== 1 ? 's' : ''})`
+    }
+  }
+  
+  // Manejar cambio de fecha de entrega
+  const handleFechaEntregaChange = (informeIdx, archivoIdx, nuevaFecha) => {
+    const key = `${informeIdx}-${archivoIdx}`
+    setArchivosEditados(prev => ({
+      ...prev,
+      [key]: {
+        informeIdx,
+        archivoIdx,
+        fechaCarga: nuevaFecha
+      }
+    }))
+  }
+  
+  // Guardar fechas editadas
+  const guardarFechasEditadas = async () => {
+    if (Object.keys(archivosEditados).length === 0) {
+      toast.info('No hay cambios para guardar')
+      return
+    }
+    
+    setGuardandoFechas(true)
+    
+    try {
+      // Crear una copia de los informes con las fechas actualizadas
+      const informesActualizados = evaluacionSeleccionadaArchivos.detalle_archivos.informes.map((informe, infIdx) => {
+        const archivosArray = Array.isArray(informe.archivos) 
+          ? informe.archivos 
+          : Object.values(informe.archivos || {})
+        
+        const archivosActualizados = archivosArray.map((archivo, archIdx) => {
+          const key = `${infIdx}-${archIdx}`
+          if (archivosEditados[key]) {
+            const nuevaFechaCarga = archivosEditados[key].fechaCarga
+            const nuevaFechaISO = nuevaFechaCarga ? new Date(nuevaFechaCarga + 'T00:00:00').toISOString() : null
+            
+            // Recalcular puntos y estado
+            const puntos = calcularPuntos(nuevaFechaCarga, archivo.fechaLimite?.split('T')[0])
+            const estado = calcularEstado(nuevaFechaCarga, archivo.fechaLimite?.split('T')[0])
+            
+            return {
+              ...archivo,
+              fechaCarga: nuevaFechaISO,
+              fechaCargaFormateada: nuevaFechaCarga ? formatearFechaLocal(nuevaFechaCarga) : null,
+              puntos: puntos,
+              estado: estado,
+              existe: !!nuevaFechaCarga
+            }
+          }
+          return archivo
+        })
+        
+        return {
+          ...informe,
+          archivos: archivosActualizados
+        }
+      })
+      
+      // Calcular nueva nota
+      let totalPuntos = 0
+      let totalEsperados = 0
+      let totalCargados = 0
+      
+      informesActualizados.forEach(informe => {
+        const archivosArray = Array.isArray(informe.archivos) 
+          ? informe.archivos 
+          : Object.values(informe.archivos || {})
+        
+        archivosArray.forEach(archivo => {
+          totalEsperados++
+          totalPuntos += archivo.puntos || 0
+          if (archivo.existe) totalCargados++
+        })
+      })
+      
+      const nuevaNota = totalEsperados > 0 ? Number((totalPuntos / totalEsperados).toFixed(2)) : 0
+      const porcentaje = totalEsperados > 0 ? Math.round((totalCargados / totalEsperados) * 100) : 0
+      
+      // Guardar en la base de datos
+      const res = await fetch('/api/evaluaciones-auditores/actualizar-fechas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          evaluacion_id: evaluacionSeleccionadaArchivos.id,
+          detalle_archivos: {
+            informes: informesActualizados,
+            total_esperados: totalEsperados,
+            total_cargados: totalCargados,
+            total_puntos: totalPuntos,
+            porcentaje: porcentaje
+          },
+          nota_archivos: nuevaNota,
+          archivos_cargados: totalCargados,
+          porcentaje_completitud: porcentaje
+        })
+      })
+      
+      if (!res.ok) {
+        throw new Error('Error al guardar las fechas')
+      }
+      
+      toast.success('Fechas actualizadas correctamente', { autoClose: 2000 })
+      
+      // Recargar evaluaciones
+      const periodo = `${anioSeleccionado}-${semestreSeleccionado}`
+      await cargarEvaluaciones()
+      
+      // Cerrar modal
+      cerrarModalArchivos()
+      
+    } catch (err) {
+      console.error('Error guardando fechas:', err)
+      toast.error(`Error al guardar: ${err.message}`)
+    } finally {
+      setGuardandoFechas(false)
+    }
+  }
+  
+  // Formatear fecha local
+  const formatearFechaLocal = (fecha) => {
+    try {
+      return new Intl.DateTimeFormat('es-CO', {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit'
+      }).format(new Date(fecha + 'T00:00:00'))
+    } catch {
+      return fecha
+    }
+  }
 
   // Handler para importar encuestas
   const handleImportarEncuestas = async (e) => {
@@ -415,37 +683,39 @@ export default function VistaEvaluacionAuditores() {
 
   return (
     <div className={styles.container}>
-      {/* Header */}
-      <div className={styles.header}>
-        <div className={styles.headerLeft}>
-          <div className={styles.headerIcon}>📊</div>
-          <div>
-            <h1 className={styles.title}>Evaluación de Auditores</h1>
-            <p className={styles.subtitle}>
-              Calificación integral basada en archivos, encuestas y rúbrica manual
-            </p>
-          </div>
-        </div>
-        <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
-          {actualizandoDatos && (
-            <div className={styles.actualizandoBanner}>
-              <div className={styles.spinnerSmall}></div>
-              <span>Actualizando notas...</span>
+      {/* HEADER MODERNO */}
+      <div className={styles.modernHeader}>
+        <div className={styles.headerContent}>
+          <div className={styles.headerLeft}>
+            <div className={styles.headerIcon}><Award size={48} /></div>
+            <div className={styles.headerInfo}>
+              <h1 className={styles.headerTitle}>Evaluación de Auditores</h1>
+              <p className={styles.headerSubtitle}>
+                Calificación integral basada en archivos, encuestas y rúbrica manual
+              </p>
             </div>
-          )}
-          <button 
-            className={styles.btnSecondary} 
-            onClick={recalcularNotasArchivos}
-            disabled={loading || actualizandoDatos || evaluaciones.length === 0}
-            title="Recalcular notas de archivos verificando los buckets de almacenamiento"
-          >
-            <Calculator size={18} />
-            Recalcular Archivos
-          </button>
-          <button className={styles.btnRefresh} onClick={cargarEvaluaciones}>
-            <RefreshCw size={18} />
-            Actualizar
-          </button>
+          </div>
+          <div className={styles.headerRight}>
+            {actualizandoDatos && (
+              <div className={styles.actualizandoBanner}>
+                <div className={styles.spinnerSmall}></div>
+                <span>Actualizando notas...</span>
+              </div>
+            )}
+            <button 
+              className={styles.modernBtnSecondary} 
+              onClick={recalcularNotasArchivos}
+              disabled={loading || actualizandoDatos || evaluaciones.length === 0}
+              title="Recalcular notas de archivos verificando los buckets de almacenamiento"
+            >
+              <Calculator size={18} />
+              <span>Recalcular Archivos</span>
+            </button>
+            <button className={styles.modernBtnRefresh} onClick={cargarEvaluaciones}>
+              <RefreshCw size={18} />
+              <span>Actualizar</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -547,12 +817,14 @@ export default function VistaEvaluacionAuditores() {
                     <h3>Notas de Archivos</h3>
                   </div>
                   <p>
-                    Las notas de archivos verifican la presencia de:
-                    Plan, Asistencia, Evaluación, Acta, Acta de Compromiso y Validación.
-                    La nota se calcula como: (Archivos Cargados / Archivos Esperados) × 5.0
+                    Las notas de archivos evalúan la entrega oportuna de: Plan, Asistencia, Evaluación, Acta, Acta de Compromiso y Validación.
+                    <br/>
+                    <strong>Sistema de puntuación:</strong> 5 puntos si se entregó a tiempo, 1 punto si se entregó tarde.
+                    <br/>
+                    La nota final es el promedio de todos los archivos.
                   </p>
                   <p style={{marginTop: '8px', fontSize: '13px', color: '#64748b'}}>
-                    💡 Usa el botón "Recalcular Archivos" si has subido nuevos documentos.
+                    💡 Haz clic en la nota de archivos para ver el desglose completo de entregas.
                   </p>
                 </div>
                 
@@ -563,7 +835,6 @@ export default function VistaEvaluacionAuditores() {
                       <th>Auditor</th>
                       <th>Dependencia</th>
                       <th>Fecha Auditoría</th>
-                      <th>Archivos</th>
                       <th>Nota Archivos</th>
                       <th>Nota Encuesta</th>
                       <th>Nota Rúbrica</th>
@@ -592,21 +863,28 @@ export default function VistaEvaluacionAuditores() {
                           </span>
                         </td>
                         <td>
-                          <span style={{fontSize: '0.85em', color: '#666'}}>
-                            {ev.archivos_cargados || 0}/{ev.archivos_esperados || 0}
-                            {ev.porcentaje_completitud !== null && (
-                              <span style={{marginLeft: '5px', color: ev.porcentaje_completitud === 100 ? '#22c55e' : '#f59e0b'}}>
-                                ({ev.porcentaje_completitud.toFixed(0)}%)
-                              </span>
-                            )}
-                          </span>
-                        </td>
-                        <td>
                           {ev.nota_archivos !== null ? (
-                            <span style={{fontWeight: '500', color: ev.nota_archivos >= 4 ? '#22c55e' : ev.nota_archivos >= 3 ? '#f59e0b' : '#ef4444'}}>
-                              {ev.nota_archivos.toFixed(2)}
-                            </span>
-                          ) : '-'}
+                            <button
+                              onClick={() => mostrarDesgloseArchivos(ev)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                transition: 'background 0.2s',
+                                fontWeight: '500',
+                                color: ev.nota_archivos >= 4 ? '#22c55e' : ev.nota_archivos >= 3 ? '#f59e0b' : '#ef4444'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                              title="Click para ver desglose de archivos"
+                            >
+                              {ev.nota_archivos.toFixed(2)} 👁️
+                            </button>
+                          ) : (
+                            '-'
+                          )}
                         </td>
                         <td>
                           {ev.nota_encuesta !== null ? (
@@ -972,6 +1250,267 @@ export default function VistaEvaluacionAuditores() {
 
 
       </div>
+
+      {/* Modal de Desglose de Archivos */}
+      {modalArchivosVisible && evaluacionSeleccionadaArchivos && (
+        <div className={styles.modalOverlay} onClick={cerrarModalArchivos}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <div>
+                <h2 className={styles.modalTitle}>
+                  📂 Desglose de Evaluación de Archivos
+                </h2>
+                <p className={styles.modalSubtitle}>
+                  {evaluacionSeleccionadaArchivos.auditor_nombre} {evaluacionSeleccionadaArchivos.auditor_apellido} - {evaluacionSeleccionadaArchivos.auditor_dependencia_nombre}
+                </p>
+              </div>
+              <button 
+                className={styles.modalClose}
+                onClick={cerrarModalArchivos}
+                title="Cerrar"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className={styles.modalBody}>
+              {evaluacionSeleccionadaArchivos.detalle_archivos?.informes?.length > 0 ? (
+                <>
+                  {evaluacionSeleccionadaArchivos.detalle_archivos.informes.map((informe, idx) => {
+                    // Convertir archivos a array si es un objeto (compatibilidad con formato antiguo)
+                    const archivosArray = Array.isArray(informe.archivos) 
+                      ? informe.archivos 
+                      : Object.values(informe.archivos || {})
+                    
+                    return (
+                    <div key={idx} className={styles.informeCard}>
+                      <div className={styles.informeHeader}>
+                        <h3>Informe #{informe.informe_id}</h3>
+                        <span className={styles.informeFecha}>
+                          Auditoría: {informe.fecha_auditoria}
+                        </span>
+                      </div>
+
+                      <table className={styles.tableArchivos}>
+                        <thead>
+                          <tr>
+                            <th>Documento</th>
+                            <th>Fecha Límite</th>
+                            <th>Fecha Entrega</th>
+                            <th>Estado</th>
+                            <th>Puntos</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {archivosArray.map((archivo, archIdx) => {
+                            const key = `${idx}-${archIdx}`
+                            const fechaEditada = archivosEditados[key]
+                            const fechaCargaActual = fechaEditada?.fechaCarga || archivo.fechaCarga?.split('T')[0]
+                            const fechaLimiteActual = archivo.fechaLimite?.split('T')[0]
+                            
+                            // Calcular puntos y estado con la fecha editada si existe
+                            const puntosActuales = fechaEditada 
+                              ? calcularPuntos(fechaCargaActual, fechaLimiteActual)
+                              : archivo.puntos
+                            const estadoActual = fechaEditada
+                              ? calcularEstado(fechaCargaActual, fechaLimiteActual)
+                              : archivo.estado
+                            
+                            return (
+                            <tr key={archIdx}>
+                              <td>
+                                <strong>{archivo.nombre}</strong>
+                              </td>
+                              <td>
+                                <span className={styles.fecha}>
+                                  {archivo.fechaLimiteFormateada || '-'}
+                                </span>
+                              </td>
+                              <td>
+                                {archivo.existe || fechaEditada ? (
+                                  <input
+                                    type="date"
+                                    value={fechaCargaActual || ''}
+                                    onChange={(e) => handleFechaEntregaChange(idx, archIdx, e.target.value)}
+                                    style={{
+                                      padding: '6px 10px',
+                                      border: fechaEditada ? '2px solid #667eea' : '1px solid #e2e8f0',
+                                      borderRadius: '6px',
+                                      fontSize: '13px',
+                                      fontFamily: 'monospace',
+                                      background: fechaEditada ? '#eff6ff' : 'white',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s'
+                                    }}
+                                    title="Haz clic para cambiar la fecha de entrega"
+                                  />
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      const hoy = new Date().toISOString().split('T')[0]
+                                      handleFechaEntregaChange(idx, archIdx, hoy)
+                                    }}
+                                    style={{
+                                      padding: '6px 12px',
+                                      background: '#22c55e',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      cursor: 'pointer',
+                                      fontWeight: '500'
+                                    }}
+                                  >
+                                    + Agregar fecha
+                                  </button>
+                                )}
+                              </td>
+                              <td>
+                                <span className={`${styles.badge} ${
+                                  puntosActuales === 5 
+                                    ? styles.badgeSuccess 
+                                    : puntosActuales === 1 
+                                    ? styles.badgeWarning 
+                                    : styles.badgeDanger
+                                }`}>
+                                  {estadoActual || 'No disponible'}
+                                  {fechaEditada && <span style={{marginLeft: '4px'}}>✏️</span>}
+                                </span>
+                              </td>
+                              <td>
+                                <span style={{
+                                  fontWeight: 'bold',
+                                  fontSize: '1.1em',
+                                  color: puntosActuales === 5 ? '#22c55e' : puntosActuales === 1 ? '#f59e0b' : '#ef4444'
+                                }}>
+                                  {puntosActuales !== undefined ? `${puntosActuales}/5` : '-'}
+                                </span>
+                              </td>
+                            </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    )
+                  })}
+
+                  <div className={styles.resumenFinal}>
+                    <div className={styles.resumenItem}>
+                      <span className={styles.resumenLabel}>Total archivos esperados:</span>
+                      <span className={styles.resumenValor}>
+                        {evaluacionSeleccionadaArchivos.detalle_archivos.total_esperados || 0}
+                      </span>
+                    </div>
+                    <div className={styles.resumenItem}>
+                      <span className={styles.resumenLabel}>Archivos entregados:</span>
+                      <span className={styles.resumenValor}>
+                        {evaluacionSeleccionadaArchivos.detalle_archivos.total_cargados || 0}
+                      </span>
+                    </div>
+                    <div className={styles.resumenItem}>
+                      <span className={styles.resumenLabel}>Puntos totales:</span>
+                      <span className={styles.resumenValor}>
+                        {evaluacionSeleccionadaArchivos.detalle_archivos.total_puntos || 0}
+                      </span>
+                    </div>
+                    <div className={styles.resumenItem} style={{borderTop: '2px solid #e2e8f0', paddingTop: '12px', marginTop: '12px'}}>
+                      <span className={styles.resumenLabel} style={{fontSize: '1.1em', fontWeight: 'bold'}}>
+                        Nota Final de Archivos:
+                      </span>
+                      <span className={styles.resumenValor} style={{
+                        fontSize: '1.5em',
+                        fontWeight: 'bold',
+                        color: evaluacionSeleccionadaArchivos.nota_archivos >= 4 
+                          ? '#22c55e' 
+                          : evaluacionSeleccionadaArchivos.nota_archivos >= 3 
+                          ? '#f59e0b' 
+                          : '#ef4444'
+                      }}>
+                        {evaluacionSeleccionadaArchivos.nota_archivos?.toFixed(2) || '0.00'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className={styles.infoMetodo}>
+                    <AlertCircle size={16} />
+                    <span>
+                      {evaluacionSeleccionadaArchivos.detalle_archivos.metodo_calculo || 
+                       'La nota se calcula como el promedio de puntos obtenidos en todos los archivos'}
+                    </span>
+                  </div>
+                  
+                  {/* Botón para guardar cambios */}
+                  {Object.keys(archivosEditados).length > 0 && (
+                    <div style={{
+                      marginTop: '20px',
+                      padding: '16px',
+                      background: '#eff6ff',
+                      border: '2px solid #3b82f6',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <div>
+                        <strong style={{color: '#1e40af'}}>
+                          ✏️ {Object.keys(archivosEditados).length} cambio(s) pendiente(s)
+                        </strong>
+                        <p style={{margin: '4px 0 0 0', fontSize: '13px', color: '#3b82f6'}}>
+                          Las fechas se actualizarán y se recalcularán los puntos automáticamente
+                        </p>
+                      </div>
+                      <div style={{display: 'flex', gap: '10px'}}>
+                        <button
+                          onClick={() => setArchivosEditados({})}
+                          disabled={guardandoFechas}
+                          style={{
+                            padding: '10px 20px',
+                            background: 'white',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            color: '#64748b'
+                          }}
+                        >
+                          Descartar
+                        </button>
+                        <button
+                          onClick={guardarFechasEditadas}
+                          disabled={guardandoFechas}
+                          style={{
+                            padding: '10px 24px',
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: guardandoFechas ? 'not-allowed' : 'pointer',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            color: 'white',
+                            opacity: guardandoFechas ? 0.6 : 1
+                          }}
+                        >
+                          {guardandoFechas ? '⏳ Guardando...' : '💾 Guardar Cambios'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className={styles.empty}>
+                  <AlertCircle size={48} />
+                  <p>No hay información de archivos disponible</p>
+                  <p className={styles.emptyHint}>
+                    Usa el botón "Recalcular Archivos" para generar el desglose
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error global */}
       {error && (

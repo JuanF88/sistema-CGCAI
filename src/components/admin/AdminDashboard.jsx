@@ -100,7 +100,7 @@ export default function AdminDashboard() {
               <Lightbulb className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}> Reporte de Hallazgos</span>
             </button>
 
-            {/* <button
+            <button
               onClick={() => {
                 setVista('evaluacionAuditores')
                 window.history.pushState({}, '', '/admin?vista=evaluacionAuditores')
@@ -108,7 +108,7 @@ export default function AdminDashboard() {
               className={`${styles.navButton} ${vista === 'evaluacionAuditores' ? styles.active : ''}`}
             >
               <Award className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Evaluación de Auditores</span>
-            </button> */}
+            </button>
 
             <button
               onClick={() => {

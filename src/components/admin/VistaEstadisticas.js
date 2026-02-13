@@ -7,7 +7,7 @@ import {
   AreaChart, Area, LineChart, Line, RadarChart, Radar, 
   PolarGrid, PolarAngleAxis, PolarRadiusAxis, ComposedChart
 } from 'recharts'
-import { Check, ChevronDown, Download, RefreshCw, TrendingUp, Calendar, Filter, X } from 'lucide-react'
+import { Check, ChevronDown, Download, RefreshCw, TrendingUp, Calendar, Filter, X, PieChart as PieIcon } from 'lucide-react'
 import * as SelectPrimitive from '@radix-ui/react-select'
 import styles from './VistaEstadisticas.module.css'
 import * as XLSX from 'xlsx'
@@ -434,7 +434,7 @@ export default function VistaEstadisticas() {
       <div className={styles.modernHeader}>
         <div className={styles.headerContent}>
           <div className={styles.headerLeft}>
-            <div className={styles.headerIcon}>📊</div>
+            <div className={styles.headerIcon}><PieIcon size={48} /></div>
             <div className={styles.headerInfo}>
               <h1 className={styles.headerTitle}>Estadísticas de Hallazgos</h1>
               <p className={styles.headerSubtitle}>Panel interactivo por gestión, año, dependencia, tipo e ISO</p>

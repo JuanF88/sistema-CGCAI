@@ -14,51 +14,99 @@ import {
 
 // Tipos de archivos esperados para cada auditoría
 const ARCHIVOS_ESPERADOS = [
-  { tipo: 'plan', bucket: BUCKETS.PLANES, nombre: 'Plan de Auditoría', buildPath: buildPlanPath },
-  { tipo: 'asistencia', bucket: BUCKETS.ASISTENCIAS, nombre: 'Asistencia', buildPath: buildAsistenciaPath },
-  { tipo: 'evaluacion', bucket: BUCKETS.EVALUACIONES, nombre: 'Evaluación', buildPath: buildEvaluacionPath },
-  { tipo: 'acta', bucket: BUCKETS.ACTAS, nombre: 'Acta', buildPath: buildActaPath },
-  { tipo: 'actaCompromiso', bucket: BUCKETS.ACTAS_COMPROMISO, nombre: 'Acta de Compromiso', buildPath: buildActaCompromisoPath },
-  { tipo: 'validacion', bucket: BUCKETS.VALIDACIONES, nombre: 'Validación', buildPath: buildValidationPath },
+  { tipo: 'plan', bucket: BUCKETS.PLANES, nombre: 'Plan de Auditoría', buildPath: buildPlanPath, diasLimite: -5 },
+  { tipo: 'asistencia', bucket: BUCKETS.ASISTENCIAS, nombre: 'Asistencia', buildPath: buildAsistenciaPath, diasLimite: 2 },
+  { tipo: 'evaluacion', bucket: BUCKETS.EVALUACIONES, nombre: 'Evaluación', buildPath: buildEvaluacionPath, diasLimite: 2 },
+  { tipo: 'acta', bucket: BUCKETS.ACTAS, nombre: 'Acta', buildPath: buildActaPath, diasLimite: 2 },
+  { tipo: 'actaCompromiso', bucket: BUCKETS.ACTAS_COMPROMISO, nombre: 'Acta de Compromiso', buildPath: buildActaCompromisoPath, diasLimite: 15 },
+  { tipo: 'validacion', bucket: BUCKETS.VALIDACIONES, nombre: 'Validación', buildPath: buildValidationPath, diasLimite: 10 },
 ]
 
-// Verifica si un archivo existe en el bucket (misma lógica que Centro de Control)
-async function fileExists(supabase, bucket, path) {
+// Calcula la fecha límite para un tipo de archivo
+function calcularFechaLimite(fechaAuditoria, diasLimite) {
+  const fecha = new Date(fechaAuditoria + 'T00:00:00')
+  fecha.setDate(fecha.getDate() + diasLimite)
+  return fecha
+}
+
+// Formatea una fecha al formato Colombia
+function formatearFecha(fecha) {
+  if (!fecha) return null
+  try {
+    return new Intl.DateTimeFormat('es-CO', {
+      timeZone: 'America/Bogota',
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit'
+    }).format(new Date(fecha))
+  } catch {
+    return new Date(fecha).toLocaleDateString()
+  }
+}
+
+// Verifica si un archivo existe en el bucket y obtiene su metadata
+async function getFileMetadata(supabase, bucket, path) {
   try {
     // Extraer directorio y nombre del archivo
     const lastSlash = path.lastIndexOf('/')
     const dir = lastSlash > 0 ? path.substring(0, lastSlash) : ''
     const fileName = lastSlash > 0 ? path.substring(lastSlash + 1) : path
     
-    // Listar archivos en el directorio
+    // Listar archivos en el directorio para obtener metadata completa
     const { data, error } = await supabase.storage
       .from(bucket)
-      .list(dir, { limit: 1000 })
+      .list(dir || undefined, { 
+        limit: 1000,
+        sortBy: { column: 'name', order: 'asc' }
+      })
     
     if (error) {
-      return false
+      console.error(`Error listing files in ${bucket}/${dir}:`, error)
+      return null
     }
     
-    const exists = data?.some(file => file.name === fileName) || false
+    // Buscar el archivo específico
+    const file = data?.find(f => f.name === fileName)
     
-    return exists
+    if (!file) {
+      return null
+    }
+    
+    // Retornar metadata completa (usar updated_at como fecha de carga)
+    return {
+      existe: true,
+      created_at: file.created_at,
+      updated_at: file.updated_at, // Esta es la última modificación
+      last_accessed_at: file.last_accessed_at,
+      size: file.metadata?.size || 0,
+      name: file.name
+    }
   } catch (err) {
-    return false
+    console.error(`Error getting metadata for ${bucket}/${path}:`, err)
+    return null
   }
 }
 
 // POST /api/evaluaciones-auditores/calcular-archivos
 // Calcula la nota de archivos para un auditor en un periodo/dependencia
 export async function POST(request) {
+  console.log('\n================================')
+  console.log('🚀 INICIO: Calcular archivos')
+  console.log('================================')
+  
   const { usuario, error } = await getAuthenticatedClient()
   
   if (error) {
+    console.error('❌ Error de autenticación:', error)
     return NextResponse.json({ error }, { status: 401 })
   }
 
   if (usuario?.rol !== 'admin') {
+    console.error('❌ Usuario no autorizado:', usuario?.rol)
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
   }
+
+  console.log('✅ Usuario autenticado:', usuario.email)
 
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -68,14 +116,22 @@ export async function POST(request) {
 
   try {
     const body = await request.json()
+    console.log('📦 Body recibido:', body)
+    
     const { auditor_id, periodo, dependencia_auditada } = body
 
     if (!auditor_id || !periodo || !dependencia_auditada) {
+      console.error('❌ Faltan parámetros:', { auditor_id, periodo, dependencia_auditada })
       return NextResponse.json(
         { error: 'Faltan parámetros requeridos: auditor_id, periodo, dependencia_auditada' },
         { status: 400 }
       )
     }
+
+    console.log('✅ Parámetros válidos')
+    console.log(`   Auditor ID: ${auditor_id}`)
+    console.log(`   Periodo: ${periodo}`)
+    console.log(`   Dependencia: ${dependencia_auditada}`)
 
     // Determinar rango de fechas del periodo
     const [anio, semestreStr] = periodo.split('-')
@@ -90,7 +146,12 @@ export async function POST(request) {
       fechaFin = `${anio}-12-31`
     }
 
+    console.log(`📅 Rango de fechas: ${fechaInicio} a ${fechaFin}`)
+
+    console.log(`📅 Rango de fechas: ${fechaInicio} a ${fechaFin}`)
+
     // Primero obtener el ID numérico del usuario desde la tabla usuarios
+    console.log('🔍 Buscando usuario en BD...')
     const { data: usuario, error: usuarioError } = await supabaseAdmin
       .from('usuarios')
       .select('usuario_id')
@@ -98,14 +159,15 @@ export async function POST(request) {
       .single()
 
     if (usuarioError || !usuario) {
-      console.error('Error obteniendo usuario:', usuarioError)
+      console.error('❌ Error obteniendo usuario:', usuarioError)
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
     }
 
     const usuarioId = usuario.usuario_id
+    console.log(`✅ Usuario encontrado - ID numérico: ${usuarioId}`)
 
     // Obtener todos los informes del auditor en el periodo
-    // usuario_id en informes_auditoria es el ID numérico (bigint)
+    console.log('🔍 Buscando informes...')
     const { data: informes, error: informesError } = await supabaseAdmin
       .from('informes_auditoria')
       .select(`
@@ -119,8 +181,15 @@ export async function POST(request) {
       .lte('fecha_auditoria', fechaFin)
 
     if (informesError) {
-      console.error('Error obteniendo informes:', informesError)
+      console.error('❌ Error obteniendo informes:', informesError)
       return NextResponse.json({ error: 'Error al obtener informes' }, { status: 500 })
+    }
+
+    console.log(`📋 Informes encontrados: ${informes?.length || 0}`)
+    if (informes && informes.length > 0) {
+      informes.forEach(inf => {
+        console.log(`   - Informe #${inf.id}: ${inf.dependencias?.nombre} (${inf.fecha_auditoria})`)
+      })
     }
 
     // Filtrar por dependencia (fuzzy match con el nombre guardado)
@@ -132,7 +201,17 @@ export async function POST(request) {
       return depNormalizada === buscadaNormalizada || depNombre === dependencia_auditada
     })
 
+    console.log(`🔍 Filtrado por dependencia "${dependencia_auditada}":`)
+    console.log(`   Informes después del filtro: ${informesFiltrados.length}`)
+    if (informesFiltrados.length > 0) {
+      informesFiltrados.forEach(inf => {
+        console.log(`   ✓ Informe #${inf.id}: ${inf.dependencias?.nombre}`)
+      })
+    }
+
     if (informesFiltrados.length === 0) {
+      console.log('⚠️ No hay informes para esta dependencia - Guardando evaluación con nota 0')
+      
       // No hay informes, marcar todo en 0
       const { data: evaluacionActualizada, error: updateError } = await supabaseAdmin
         .from('evaluaciones_auditores')
@@ -183,59 +262,109 @@ export async function POST(request) {
 
     // Verificar archivos para cada informe (usando misma lógica que Centro de Control)
     let totalEsperados = 0
-    let totalCargados = 0
+    let totalPuntos = 0
     const detalleInformes = []
+
+    console.log(`Procesando ${informesFiltrados.length} informes para auditor ${auditor_id}`)
 
     for (const informe of informesFiltrados) {
       const dependenciaNombre = informe.dependencias?.nombre || 'SIN_DEP'
+      const fechaAuditoria = informe.fecha_auditoria
+      
+      console.log(`Procesando informe #${informe.id} - Fecha auditoría: ${fechaAuditoria}`)
+      
       const informeDetalle = {
         informe_id: informe.id,
-        fecha_auditoria: informe.fecha_auditoria,
+        fecha_auditoria: fechaAuditoria,
         dependencia: dependenciaNombre,
-        archivos: {}
+        archivos: []
       }
 
-      // Verificar los 6 archivos en paralelo (como en Centro de Control)
-      const [hasPlan, hasAsis, hasEval, hasActa, hasActaComp, hasValid] = await Promise.all([
-        fileExists(supabaseAdmin, BUCKETS.PLANES, buildPlanPath(informe)),
-        fileExists(supabaseAdmin, BUCKETS.ASISTENCIAS, buildAsistenciaPath(informe)),
-        fileExists(supabaseAdmin, BUCKETS.EVALUACIONES, buildEvaluacionPath(informe)),
-        fileExists(supabaseAdmin, BUCKETS.ACTAS, buildActaPath(informe)),
-        fileExists(supabaseAdmin, BUCKETS.ACTAS_COMPROMISO, buildActaCompromisoPath(informe)),
-        fileExists(supabaseAdmin, BUCKETS.VALIDACIONES, buildValidationPath(informe)),
-      ])
+      // Verificar los 6 archivos en paralelo y obtener sus metadatos
+      const metadataResults = await Promise.all(
+        ARCHIVOS_ESPERADOS.map(async (archivoEsperado) => {
+          const path = archivoEsperado.buildPath(informe)
+          console.log(`Buscando archivo: ${archivoEsperado.nombre} en bucket ${archivoEsperado.bucket} - Path: ${path}`)
+          
+          const metadata = await getFileMetadata(supabaseAdmin, archivoEsperado.bucket, path)
+          
+          if (metadata) {
+            console.log(`✓ Archivo encontrado: ${archivoEsperado.nombre}`, {
+              updated_at: metadata.updated_at,
+              created_at: metadata.created_at,
+              size: metadata.size
+            })
+          } else {
+            console.log(`✗ Archivo NO encontrado: ${archivoEsperado.nombre}`)
+          }
+          
+          // Calcular fecha límite
+          const fechaLimite = calcularFechaLimite(fechaAuditoria, archivoEsperado.diasLimite)
+          console.log(`Fecha límite para ${archivoEsperado.nombre}: ${formatearFecha(fechaLimite)} (${archivoEsperado.diasLimite} días desde auditoría)`)
+          
+          let puntos = 0
+          let estado = 'No entregado'
+          let fechaCarga = null
+          let diasRetraso = null
+          
+          if (metadata && metadata.existe) {
+            // Usar updated_at (última modificación) como fecha de carga
+            fechaCarga = new Date(metadata.updated_at || metadata.created_at)
+            const diferenciaMs = fechaCarga - fechaLimite
+            diasRetraso = Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24))
+            
+            console.log(`Análisis de ${archivoEsperado.nombre}: Cargado el ${formatearFecha(fechaCarga)}, límite ${formatearFecha(fechaLimite)}, retraso: ${diasRetraso} días`)
+            
+            if (diasRetraso <= 0) {
+              // Entregado a tiempo o antes
+              puntos = 5
+              estado = diasRetraso === 0 ? 'A tiempo' : `Anticipado (${Math.abs(diasRetraso)} día${Math.abs(diasRetraso) !== 1 ? 's' : ''})`
+            } else {
+              // Entregado tarde
+              puntos = 1
+              estado = `Tarde (${diasRetraso} día${diasRetraso !== 1 ? 's' : ''})`
+            }
+          }
+          
+          return {
+            tipo: archivoEsperado.tipo,
+            nombre: archivoEsperado.nombre,
+            path: path,
+            existe: metadata ? metadata.existe : false,
+            fechaLimite: fechaLimite.toISOString(),
+            fechaLimiteFormateada: formatearFecha(fechaLimite),
+            fechaCarga: fechaCarga ? fechaCarga.toISOString() : null,
+            fechaCargaFormateada: fechaCarga ? formatearFecha(fechaCarga) : null,
+            diasRetraso: diasRetraso,
+            puntos: puntos,
+            estado: estado
+          }
+        })
+      )
 
-      const archivosStatus = [
-        { tipo: 'plan', existe: hasPlan, nombre: 'Plan de Auditoría', path: buildPlanPath(informe) },
-        { tipo: 'asistencia', existe: hasAsis, nombre: 'Asistencia', path: buildAsistenciaPath(informe) },
-        { tipo: 'evaluacion', existe: hasEval, nombre: 'Evaluación', path: buildEvaluacionPath(informe) },
-        { tipo: 'acta', existe: hasActa, nombre: 'Acta', path: buildActaPath(informe) },
-        { tipo: 'actaCompromiso', existe: hasActaComp, nombre: 'Acta de Compromiso', path: buildActaCompromisoPath(informe) },
-        { tipo: 'validacion', existe: hasValid, nombre: 'Validación', path: buildValidationPath(informe) },
-      ]
-
-      for (const archivo of archivosStatus) {
+      // Procesar resultados
+      for (const archivoInfo of metadataResults) {
         totalEsperados++
-        informeDetalle.archivos[archivo.tipo] = {
-          nombre: archivo.nombre,
-          path: archivo.path,
-          existe: archivo.existe
-        }
-        if (archivo.existe) {
-          totalCargados++
-        }
+        totalPuntos += archivoInfo.puntos
+        informeDetalle.archivos.push(archivoInfo)
       }
 
       detalleInformes.push(informeDetalle)
     }
 
-    // Calcular porcentaje y nota
-    const porcentaje = totalEsperados > 0 
-      ? Math.round((totalCargados / totalEsperados) * 100)
+    // Calcular nota promedio (promedio de puntos obtenidos)
+    const nota_archivos = totalEsperados > 0
+      ? Number((totalPuntos / totalEsperados).toFixed(2))
       : 0
     
-    const nota_archivos = totalEsperados > 0
-      ? Number(((totalCargados / totalEsperados) * 5).toFixed(2))
+    // Calcular archivos cargados (existe = true)
+    const totalCargados = detalleInformes.reduce((acc, inf) => {
+      return acc + inf.archivos.filter(a => a.existe).length
+    }, 0)
+    
+    // Calcular porcentaje de completitud
+    const porcentaje = totalEsperados > 0 
+      ? Math.round((totalCargados / totalEsperados) * 100)
       : 0
 
     // Si hay informes, vincular el primero (o el más reciente) como informe principal
@@ -256,7 +385,9 @@ export async function POST(request) {
           informes: detalleInformes,
           total_esperados: totalEsperados,
           total_cargados: totalCargados,
-          porcentaje: porcentaje
+          total_puntos: totalPuntos,
+          porcentaje: porcentaje,
+          metodo_calculo: 'Basado en fechas límite: 5 puntos si se entrega a tiempo, 1 punto si se entrega tarde'
         },
         updated_at: new Date().toISOString()
       })
@@ -282,21 +413,30 @@ export async function POST(request) {
       }
     }
 
+    console.log(`\n✅ PROCESO COMPLETADO`)
+    console.log(`   Nota final: ${nota_archivos}`)
+    console.log(`   Archivos: ${totalCargados}/${totalEsperados}`)
+    console.log(`   Puntos totales: ${totalPuntos}`)
+    console.log('================================\n')
+
     return NextResponse.json({
       success: true,
       nota_archivos: nota_archivos,
       archivos_esperados: totalEsperados,
       archivos_cargados: totalCargados,
+      total_puntos: totalPuntos,
       porcentaje_completitud: porcentaje,
       detalle: {
         informes: detalleInformes,
         total_esperados: totalEsperados,
-        total_cargados: totalCargados
+        total_cargados: totalCargados,
+        total_puntos: totalPuntos
       }
     })
 
   } catch (err) {
-    console.error('Error en calcular-archivos:', err)
+    console.error('💥 Error en calcular-archivos:', err)
+    console.error('Stack trace:', err.stack)
     return NextResponse.json(
       { error: err.message || 'Error interno del servidor' },
       { status: 500 }
