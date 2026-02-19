@@ -6,6 +6,7 @@ import styles from '@/components/admin/CSS/auditoriasTimeline.module.css'
 import { generarInformeAuditoria } from '@/components/auditor/Utilidades/generarInformeAuditoria.jsx'
 import { generarPlanMejora2 } from '@/components/auditor/Utilidades/generarPlanMejora2.xpp'
 import { toast } from 'react-toastify'
+import FormularioRegistro from '@/components/auditor/FormularioRegistro'
 
 // ✅ Importar utilidades compartidas desde el hook centralizado
 import {
@@ -183,6 +184,9 @@ export default function AuditoriasVerificacionAdmin({ usuario, soloLectura = fal
   const [validateModalOpen, setValidateModalOpen] = useState(false)
   const [validateFile, setValidateFile] = useState(null)
   const [uploadingValidation, setUploadingValidation] = useState(false)
+
+  // Modal de edición de auditoría (FormularioRegistro)
+  const [editModalOpen, setEditModalOpen] = useState(false)
 
   const [editingDate, setEditingDate] = useState(false)
   const [dateDraft, setDateDraft] = useState('')     // 'YYYY-MM-DD'
@@ -829,10 +833,10 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         subtitle: selected.plan?.enviado_at ? `Enviado el ${fmt(new Date(selected.plan.enviado_at))}` : 'Programar y enviar (5 días antes).',
         actions: selected.plan?.url
             ? [
-                { label: 'Ver plan', onClick: () => openInNewTab(selected.plan.url) },
-                ...(!soloLectura ? [{ label: 'Reemplazar plan', onClick: () => setPlanModalOpen(true) }] : []),
+                { label: 'Ver plan', onClick: () => openInNewTab(selected.plan.url), type: 'view' },
+                ...(!soloLectura ? [{ label: 'Reemplazar plan', onClick: () => setPlanModalOpen(true), type: 'replace' }] : []),
               ]
-          : (!soloLectura ? [{ label: 'Subir plan', onClick: () => setPlanModalOpen(true) }] : [])
+          : (!soloLectura ? [{ label: 'Subir plan', onClick: () => setPlanModalOpen(true), type: 'replace' }] : [])
       },
             {
         key: 'acta_compromiso',
@@ -843,10 +847,10 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         subtitle: selected.acta_compromiso?.url ? 'Cargada.' : 'Subir PDF del acta de compromiso.',
         actions: selected.acta_compromiso?.url
             ? [
-                { label: 'Ver acta compromiso', onClick: () => openInNewTab(selected.acta_compromiso.url) },
-                ...(!soloLectura ? [{ label: 'Reemplazar acta compromiso', onClick: () => setActaCompModalOpen(true) }] : []),
+                { label: 'Ver acta compromiso', onClick: () => openInNewTab(selected.acta_compromiso.url), type: 'view' },
+                ...(!soloLectura ? [{ label: 'Reemplazar acta compromiso', onClick: () => setActaCompModalOpen(true), type: 'replace' }] : []),
               ]
-          : (!soloLectura ? [{ label: 'Subir acta compromiso', onClick: () => setActaCompModalOpen(true) }] : [])
+          : (!soloLectura ? [{ label: 'Subir acta compromiso', onClick: () => setActaCompModalOpen(true), type: 'replace' }] : [])
       },
       {
         key: 'asistencia',
@@ -857,10 +861,10 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         subtitle: selected.asistencia?.url ? 'Cargado.' : 'Subir PDF del listado de asistencia.',
         actions: selected.asistencia?.url
             ? [
-                { label: 'Ver asistencia', onClick: () => openInNewTab(selected.asistencia.url) },
-                ...(!soloLectura ? [{ label: 'Reemplazar asistencia', onClick: () => setAsistenciaModalOpen(true) }] : []),
+                { label: 'Ver asistencia', onClick: () => openInNewTab(selected.asistencia.url), type: 'view' },
+                ...(!soloLectura ? [{ label: 'Reemplazar asistencia', onClick: () => setAsistenciaModalOpen(true), type: 'replace' }] : []),
               ]
-          : (!soloLectura ? [{ label: 'Subir asistencia', onClick: () => setAsistenciaModalOpen(true) }] : [])
+          : (!soloLectura ? [{ label: 'Subir asistencia', onClick: () => setAsistenciaModalOpen(true), type: 'replace' }] : [])
       },
       {
         key: 'evaluacion',
@@ -871,10 +875,10 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         subtitle: selected.evaluacion?.url ? 'Cargada.' : 'Subir PDF de evaluación.',
         actions: selected.evaluacion?.url
             ? [
-                { label: 'Ver evaluación', onClick: () => openInNewTab(selected.evaluacion.url) },
-                ...(!soloLectura ? [{ label: 'Reemplazar evaluación', onClick: () => setEvaluacionModalOpen(true) }] : []),
+                { label: 'Ver evaluación', onClick: () => openInNewTab(selected.evaluacion.url), type: 'view' },
+                ...(!soloLectura ? [{ label: 'Reemplazar evaluación', onClick: () => setEvaluacionModalOpen(true), type: 'replace' }] : []),
               ]
-          : (!soloLectura ? [{ label: 'Subir evaluación', onClick: () => setEvaluacionModalOpen(true) }] : [])
+          : (!soloLectura ? [{ label: 'Subir evaluación', onClick: () => setEvaluacionModalOpen(true), type: 'replace' }] : [])
       },
       {
         key: 'acta',
@@ -885,10 +889,10 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         subtitle: selected.acta?.url ? 'Cargada.' : 'Subir PDF del acta de reunión.',
         actions: selected.acta?.url
             ? [
-                { label: 'Ver acta', onClick: () => openInNewTab(selected.acta.url) },
-                ...(!soloLectura ? [{ label: 'Reemplazar acta', onClick: () => setActaModalOpen(true) }] : []),
+                { label: 'Ver acta', onClick: () => openInNewTab(selected.acta.url), type: 'view' },
+                ...(!soloLectura ? [{ label: 'Reemplazar acta', onClick: () => setActaModalOpen(true), type: 'replace' }] : []),
               ]
-          : (!soloLectura ? [{ label: 'Subir acta', onClick: () => setActaModalOpen(true) }] : [])
+          : (!soloLectura ? [{ label: 'Subir acta', onClick: () => setActaModalOpen(true), type: 'replace' }] : [])
       },
       {
         key: 'informe',
@@ -903,10 +907,13 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
               : (hasValidated ? 'Informe validado.' : 'Campos e hallazgos listos: descarga y valida.')),
             actions: hasValidated
               ? [
+                  { label: '✏️ Editar informe', onClick: () => setEditModalOpen(true), type: 'edit' },
+                  { label: '📄 Descargar informe', onClick: () => handleDescargarInforme(selected), type: 'download' },
                   validatedHref
-                    ? { label: 'Ver informe validado', onClick: () => openInNewTab(validatedHref) }
+                    ? { label: '👁️ Ver validado', onClick: () => openInNewTab(validatedHref), type: 'view' }
                     : {
-                        label: 'Abrir validado',
+                        label: '👁️ Abrir validado',
+                        type: 'view',
                         onClick: async () => {
                           const path = buildValidationPath(selected)
                           const { data } = await supabase.storage.from(BUCKETS.VALIDACIONES).createSignedUrl(path, 3600)
@@ -914,13 +921,14 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
                           else toast.error('No se encontró el PDF validado en almacenamiento.')
                         }
                       },
-                  { label: 'Reemplazar validado', onClick: () => setValidateModalOpen(true) },
+                  { label: '🔄 Reemplazar validado', onClick: () => setValidateModalOpen(true), type: 'replace' },
                 ]
               : (!isFilled || !hasHallazgos
-                  ? [{ label: isFilled ? 'Editar/Llenar (auditor)' : 'Llenar (auditor)', onClick: () => toast.info('Edición desde vista del auditor'), ghost: true }]
+                  ? [{ label: isFilled ? '✏️ Editar informe' : '📝 Llenar informe', onClick: () => setEditModalOpen(true), type: 'edit' }]
                   : [
-                      { label: '📄 Descargar informe', onClick: () => handleDescargarInforme(selected) },
-                      { label: '✅ Subir validado', onClick: () => setValidateModalOpen(true) }
+                      { label: '✏️ Editar informe', onClick: () => setEditModalOpen(true), type: 'edit' },
+                      { label: '📄 Descargar informe', onClick: () => handleDescargarInforme(selected), type: 'download' },
+                      { label: '✅ Subir validado', onClick: () => setValidateModalOpen(true), type: 'replace' }
                     ])
 
       },
@@ -931,7 +939,7 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         days: diffInDays(hoy, pmLimit),
         explicitDone: false,
         subtitle: 'Plan de Mejoramiento (10 días después de entregar el informe).',
-        actions: hasValidated ? [{ label: '📥 Descargar formato PM', onClick: () => handleDownloadPM(selected) }] : []
+        actions: hasValidated ? [{ label: '📥 Descargar formato PM', onClick: () => handleDownloadPM(selected), type: 'download' }] : []
       }
     ]
   }, [selected])
@@ -1268,15 +1276,25 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
 
                       {step.actions?.length > 0 && (
                         <div className={styles.actions}>
-                          {step.actions.map((act, i) => (
-                            <button
-                              key={i}
-                              className={`${styles.btn} ${act.ghost ? styles.btnGhost : ''}`}
-                              onClick={(e) => { e.stopPropagation(); act.onClick?.(e) }}
-                            >
-                              {act.label}
-                            </button>
-                          ))}
+                          {step.actions.map((act, i) => {
+                            // Determinar clase según el tipo de acción
+                            let btnClass = styles.btn
+                            if (act.ghost) btnClass += ` ${styles.btnGhost}`
+                            if (act.type === 'edit') btnClass += ` ${styles.btnEdit}`
+                            if (act.type === 'download') btnClass += ` ${styles.btnDownload}`
+                            if (act.type === 'view') btnClass += ` ${styles.btnView}`
+                            if (act.type === 'replace') btnClass += ` ${styles.btnReplace}`
+                            
+                            return (
+                              <button
+                                key={i}
+                                className={btnClass}
+                                onClick={(e) => { e.stopPropagation(); act.onClick?.(e) }}
+                              >
+                                {act.label}
+                              </button>
+                            )
+                          })}
                         </div>
                       )}
                     </div>
@@ -1786,6 +1804,32 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
                 {uploadingValidation ? 'Subiendo…' : (selected?.validated?.url ? 'Reemplazar validado' : 'Subir y validar')}
               </button>
               <button className={styles.botonCancelar} onClick={() => { setValidateModalOpen(false); setValidateFile(null) }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de edición de informe */}
+      {editModalOpen && selected && (
+        <div className={styles.modalOverlay} onClick={(e) => { if (e.target === e.currentTarget) setEditModalOpen(false) }}>
+          <div className={styles.modalContenido} style={{ maxWidth: '95vw', width: '1200px', maxHeight: '90vh', overflow: 'auto' }}>
+            <button className={styles.modalCerrar} onClick={() => setEditModalOpen(false)}>✖</button>
+            <h3 className={styles.modalTitulo}>Editar/Llenar Informe de Auditoría</h3>
+            <FormularioRegistro 
+              usuario={usuario} 
+              auditoria={selected}
+              onSuccess={() => {
+                setEditModalOpen(false)
+                loadData()
+              }}
+            />
+            <div className={styles.modalBotones} style={{ marginTop: '20px' }}>
+              <button 
+                className={styles.botonCancelar} 
+                onClick={() => setEditModalOpen(false)}
+              >
+                Cerrar sin guardar
+              </button>
             </div>
           </div>
         </div>

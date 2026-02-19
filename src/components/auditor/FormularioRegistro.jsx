@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabaseClient'
 import styles from './formulario.module.css'
 import { useRef } from 'react'
 
-export default function FormularioRegistro({ usuario, auditoria }) {
+export default function FormularioRegistro({ usuario, auditoria, onSuccess }) {
   const [form, setForm] = useState({
     fecha_auditoria: '',
     asistencia_tipo: 'Digital',
@@ -351,8 +351,14 @@ const handleNoConformidadBlur = (index, field, value) => {
       }
 
       toast.success('Informe y hallazgos guardados correctamente')
-      localStorage.setItem('vistaAuditor', 'bienvenida')
-      router.push('/auditor?vista=bienvenida')
+      
+      // Si se proporciona onSuccess, llamarlo en lugar de redirigir
+      if (onSuccess) {
+        onSuccess()
+      } else {
+        localStorage.setItem('vistaAuditor', 'bienvenida')
+        router.push('/auditor?vista=bienvenida')
+      }
 
     } catch (err) {
       console.error('❌ Error al guardar:', err)

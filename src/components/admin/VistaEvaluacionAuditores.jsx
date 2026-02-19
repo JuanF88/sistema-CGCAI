@@ -11,12 +11,13 @@ import styles from './CSS/VistaEvaluacionAuditores.module.css'
 
 export default function VistaEvaluacionAuditores() {
   // Estado de filtros principales
-  const currentYear = new Date().getFullYear()
-  const currentMonth = new Date().getMonth() + 1
-  const currentSemestre = currentMonth <= 6 ? 'S1' : 'S2'
+  const [anioSeleccionado, setAnioSeleccionado] = useState(null)
+  const [semestreSeleccionado, setSemestreSeleccionado] = useState(null)
   
-  const [anioSeleccionado, setAnioSeleccionado] = useState(2025) // Año fijo 2025
-  const [semestreSeleccionado, setSemestreSeleccionado] = useState('S2') // Semestre fijo S2
+  // Años y semestres disponibles (dinámicos desde la BD)
+  const [aniosDisponibles, setAniosDisponibles] = useState([])
+  const [semestresDisponibles, setSemestresDisponibles] = useState(['S1', 'S2'])
+  const [cargandoPeriodos, setCargandoPeriodos] = useState(true)
   
   // Tabs del módulo
   const [tabActiva, setTabActiva] = useState('resumen')
@@ -45,9 +46,6 @@ export default function VistaEvaluacionAuditores() {
   const [evaluacionSeleccionadaArchivos, setEvaluacionSeleccionadaArchivos] = useState(null)
   const [archivosEditados, setArchivosEditados] = useState({})
   const [guardandoFechas, setGuardandoFechas] = useState(false)
-  
-  // Años disponibles (últimos 5 años)
-  const aniosDisponibles = Array.from({ length: 5 }, (_, i) => 2025 - i)
   
   // Estructura de la rúbrica (basada en Rubrica.xlsx)
   const RUBRICA_CRITERIOS = [
@@ -143,12 +141,61 @@ export default function VistaEvaluacionAuditores() {
     }
   ]
   
-  // Cargar evaluaciones cuando cambian los filtros
+  // Cargar periodos disponibles al montar el componente
   useEffect(() => {
-    cargarEvaluaciones()
+    cargarPeriodosDisponibles()
+  }, [])
+
+  const cargarPeriodosDisponibles = async () => {
+    setCargandoPeriodos(true)
+    try {
+      const res = await fetch('/api/evaluaciones-auditores/periodos-disponibles')
+      
+      if (!res.ok) {
+        throw new Error('Error al cargar periodos disponibles')
+      }
+      
+      const data = await res.json()
+      
+      setAniosDisponibles(data.anios || [])
+      setSemestresDisponibles(data.semestres || ['S1', 'S2'])
+      
+      // Establecer el periodo más reciente por defecto
+      if (data.masReciente) {
+        const [anio, semestre] = data.masReciente.split('-')
+        setAnioSeleccionado(parseInt(anio))
+        setSemestreSeleccionado(semestre)
+      } else if (data.anios.length > 0) {
+        // Si no hay periodo más reciente, usar el primer año y S1
+        setAnioSeleccionado(data.anios[0])
+        setSemestreSeleccionado('S2')
+      }
+    } catch (err) {
+      console.error('Error cargando periodos disponibles:', err)
+      toast.error('No se pudieron cargar los periodos disponibles')
+      // Valores por defecto en caso de error
+      const currentYear = new Date().getFullYear()
+      setAniosDisponibles([currentYear, currentYear - 1])
+      setAnioSeleccionado(currentYear)
+      setSemestreSeleccionado('S2')
+    } finally {
+      setCargandoPeriodos(false)
+    }
+  }
+  
+  // Cargar evaluaciones cuando cambian los filtros (solo si ya se cargaron los periodos)
+  useEffect(() => {
+    if (anioSeleccionado !== null && semestreSeleccionado !== null) {
+      cargarEvaluaciones()
+    }
   }, [anioSeleccionado, semestreSeleccionado])
   
   const cargarEvaluaciones = async () => {
+    // Evitar cargar si aún no se han establecido los filtros
+    if (anioSeleccionado === null || semestreSeleccionado === null) {
+      return
+    }
+    
     setLoading(true)
     setError('')
     try {
@@ -176,6 +223,11 @@ export default function VistaEvaluacionAuditores() {
   // Recalcular notas de archivos manualmente
   const recalcularNotasArchivos = async () => {
     console.log('🔘 BOTÓN CLICKED - recalcularNotasArchivos')
+    
+    if (anioSeleccionado === null || semestreSeleccionado === null) {
+      toast.warning('Selecciona un periodo válido')
+      return
+    }
     
     if (!evaluaciones || evaluaciones.length === 0) {
       console.log('⚠️ No hay evaluaciones')
@@ -624,6 +676,11 @@ export default function VistaEvaluacionAuditores() {
       return
     }
 
+    if (anioSeleccionado === null || semestreSeleccionado === null) {
+      toast.warning('Selecciona un periodo válido')
+      return
+    }
+
     setLoading(true)
     setProgreso({ mensaje: 'Procesando archivo...', porcentaje: 0 })
 
@@ -733,17 +790,18 @@ export default function VistaEvaluacionAuditores() {
               Año
             </label>
             <select 
-              value={anioSeleccionado}
+              value={anioSeleccionado || ''}
               onChange={(e) => setAnioSeleccionado(Number(e.target.value))}
               className={styles.select}
-              disabled={aniosDisponibles.length === 0}
+              disabled={cargandoPeriodos || aniosDisponibles.length === 0}
             >
+              {cargandoPeriodos && <option value="">Cargando...</option>}
+              {!cargandoPeriodos && aniosDisponibles.length === 0 && (
+                <option value="">No hay datos</option>
+              )}
               {aniosDisponibles.map(anio => (
                 <option key={anio} value={anio}>{anio}</option>
               ))}
-              {aniosDisponibles.length === 0 && (
-                <option value="">No hay datos</option>
-              )}
             </select>
           </div>
 
@@ -754,21 +812,28 @@ export default function VistaEvaluacionAuditores() {
               Semestre
             </label>
             <select
-              value={semestreSeleccionado}
+              value={semestreSeleccionado || ''}
               onChange={(e) => setSemestreSeleccionado(e.target.value)}
               className={styles.select}
+              disabled={cargandoPeriodos || semestresDisponibles.length === 0}
             >
-              <option value="S1">Semestre 1</option>
-              <option value="S2">Semestre 2</option>
+              {cargandoPeriodos && <option value="">Cargando...</option>}
+              {semestresDisponibles.map(sem => (
+                <option key={sem} value={sem}>
+                  {sem === 'S1' ? 'Semestre 1' : 'Semestre 2'}
+                </option>
+              ))}
             </select>
           </div>
 
           {/* Badge del periodo actual */}
-          <div className={styles.periodoBadge}>
-            <span className={styles.periodoTexto}>
-              Periodo: {anioSeleccionado}-{semestreSeleccionado}
-            </span>
-          </div>
+          {anioSeleccionado && semestreSeleccionado && (
+            <div className={styles.periodoBadge}>
+              <span className={styles.periodoTexto}>
+                Periodo: {anioSeleccionado}-{semestreSeleccionado}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
