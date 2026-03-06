@@ -9,24 +9,29 @@ import {
   buildActaPath,
   buildActaCompromisoPath,
   buildValidationPath,
+  addBusinessDays,
   BUCKETS
 } from '@/hooks/useAuditTimeline'
 
-// Tipos de archivos esperados para cada auditoría
+// Tipos de archivos esperados para cada auditoría (en orden cronológico)
 const ARCHIVOS_ESPERADOS = [
-  { tipo: 'plan', bucket: BUCKETS.PLANES, nombre: 'Plan de Auditoría', buildPath: buildPlanPath, diasLimite: -5 },
-  { tipo: 'asistencia', bucket: BUCKETS.ASISTENCIAS, nombre: 'Asistencia', buildPath: buildAsistenciaPath, diasLimite: 2 },
-  { tipo: 'evaluacion', bucket: BUCKETS.EVALUACIONES, nombre: 'Evaluación', buildPath: buildEvaluacionPath, diasLimite: 2 },
-  { tipo: 'acta', bucket: BUCKETS.ACTAS, nombre: 'Acta', buildPath: buildActaPath, diasLimite: 2 },
-  { tipo: 'actaCompromiso', bucket: BUCKETS.ACTAS_COMPROMISO, nombre: 'Acta de Compromiso', buildPath: buildActaCompromisoPath, diasLimite: 15 },
-  { tipo: 'validacion', bucket: BUCKETS.VALIDACIONES, nombre: 'Validación', buildPath: buildValidationPath, diasLimite: 10 },
+  { tipo: 'actaCompromiso', bucket: BUCKETS.ACTAS_COMPROMISO, nombre: 'Carta de Compromiso', buildPath: buildActaCompromisoPath, diasLimite: -5, usarDiasHabiles: true },
+  { tipo: 'plan', bucket: BUCKETS.PLANES, nombre: 'Plan de Auditoría', buildPath: buildPlanPath, diasLimite: -5, usarDiasHabiles: true },
+  { tipo: 'asistencia', bucket: BUCKETS.ASISTENCIAS, nombre: 'Asistencia', buildPath: buildAsistenciaPath, diasLimite: 0, usarDiasHabiles: false },
+  { tipo: 'evaluacion', bucket: BUCKETS.EVALUACIONES, nombre: 'Evaluación', buildPath: buildEvaluacionPath, diasLimite: 0, usarDiasHabiles: false },
+  { tipo: 'acta', bucket: BUCKETS.ACTAS, nombre: 'Acta', buildPath: buildActaPath, diasLimite: 10, usarDiasHabiles: true },
+  { tipo: 'validacion', bucket: BUCKETS.VALIDACIONES, nombre: 'Validación', buildPath: buildValidationPath, diasLimite: 10, usarDiasHabiles: true },
 ]
 
 // Calcula la fecha límite para un tipo de archivo
-function calcularFechaLimite(fechaAuditoria, diasLimite) {
+function calcularFechaLimite(fechaAuditoria, diasLimite, usarDiasHabiles = false) {
   const fecha = new Date(fechaAuditoria + 'T00:00:00')
-  fecha.setDate(fecha.getDate() + diasLimite)
-  return fecha
+  if (usarDiasHabiles) {
+    return addBusinessDays(fecha, diasLimite)
+  } else {
+    fecha.setDate(fecha.getDate() + diasLimite)
+    return fecha
+  }
 }
 
 // Formatea una fecha al formato Colombia
@@ -166,6 +171,28 @@ export async function POST(request) {
     const usuarioId = usuario.usuario_id
     console.log(`✅ Usuario encontrado - ID numérico: ${usuarioId}`)
 
+    // Obtener la evaluación existente para preservar archivos editados manualmente
+    console.log('🔍 Buscando evaluación existente...')
+    const { data: evaluacionExistente } = await supabaseAdmin
+      .from('evaluaciones_auditores')
+      .select('detalle_archivos')
+      .eq('auditor_id', auditor_id)
+      .eq('periodo', periodo)
+      .eq('dependencia_auditada', dependencia_auditada)
+      .single()
+    
+    const detalleArchivosExistente = evaluacionExistente?.detalle_archivos || { informes: [] }
+    console.log(`✅ Evaluación existente obtenida`)
+
+    // Función auxiliar para encontrar un archivo editado manualmente
+    const encontrarArchivoManual = (informeId, tipoArchivo) => {
+      const informe = detalleArchivosExistente.informes?.find(i => i.informe_id === informeId)
+      if (!informe) return null
+      
+      const archivos = Array.isArray(informe.archivos) ? informe.archivos : Object.values(informe.archivos || {})
+      return archivos.find(a => a.tipo === tipoArchivo && a.editado_manualmente === true)
+    }
+
     // Obtener todos los informes del auditor en el periodo
     console.log('🔍 Buscando informes...')
     const { data: informes, error: informesError } = await supabaseAdmin
@@ -283,6 +310,17 @@ export async function POST(request) {
       // Verificar los 6 archivos en paralelo y obtener sus metadatos
       const metadataResults = await Promise.all(
         ARCHIVOS_ESPERADOS.map(async (archivoEsperado) => {
+          // Verificar si este archivo fue editado manualmente anteriormente
+          const archivoManual = encontrarArchivoManual(informe.id, archivoEsperado.tipo)
+          
+          if (archivoManual) {
+            console.log(`📌 Preservando archivo editado manualmente: ${archivoEsperado.nombre}`)
+            return {
+              ...archivoManual,
+              editado_manualmente: true
+            }
+          }
+
           const path = archivoEsperado.buildPath(informe)
           console.log(`Buscando archivo: ${archivoEsperado.nombre} en bucket ${archivoEsperado.bucket} - Path: ${path}`)
           
@@ -299,7 +337,7 @@ export async function POST(request) {
           }
           
           // Calcular fecha límite
-          const fechaLimite = calcularFechaLimite(fechaAuditoria, archivoEsperado.diasLimite)
+          const fechaLimite = calcularFechaLimite(fechaAuditoria, archivoEsperado.diasLimite, archivoEsperado.usarDiasHabiles)
           console.log(`Fecha límite para ${archivoEsperado.nombre}: ${formatearFecha(fechaLimite)} (${archivoEsperado.diasLimite} días desde auditoría)`)
           
           let puntos = 0
@@ -337,7 +375,8 @@ export async function POST(request) {
             fechaCargaFormateada: fechaCarga ? formatearFecha(fechaCarga) : null,
             diasRetraso: diasRetraso,
             puntos: puntos,
-            estado: estado
+            estado: estado,
+            editado_manualmente: false
           }
         })
       )

@@ -12,8 +12,10 @@ import FormularioRegistro from '@/components/auditor/FormularioRegistro'
 import {
   parseYMD,
   addDays,
+  addBusinessDays,
   startOfDay,
   diffInDays,
+  diffInBusinessDays,
   fmt,
   badgeFor as badgeForBase,
   toSlugUpper,
@@ -616,10 +618,10 @@ const handleDateKeyDown = useCallback((e) => {
 
       setActaCompModalOpen(false)
       setActaCompFile(null)
-      toast.success('Acta de compromiso cargada.')
+      toast.success('Carta de compromiso cargada.')
     } catch (e) {
-      console.error('Acta de compromiso error:', e)
-      toast.error('No se pudo subir el acta de compromiso.')
+      console.error('Carta de compromiso error:', e)
+      toast.error('No se pudo subir la carta de compromiso.')
     } finally {
       setUploadingActaComp(false)
     }
@@ -735,9 +737,9 @@ const handleDateKeyDown = useCallback((e) => {
   const computeFlags = (a) => {
     const fa = a.fecha_auditoria ? parseYMD(a.fecha_auditoria) : null
     const hoy = startOfDay(new Date())
-    const planDate = fa ? addDays(fa, -5) : null
-    const informeLimit = fa ? addDays(fa, 10) : null
-    const pmLimit = fa ? addDays(fa, 20) : null
+    const planDate = fa ? addBusinessDays(fa, -5) : null
+    const informeLimit = fa ? addBusinessDays(fa, 10) : null
+    const pmLimit = fa ? addBusinessDays(fa, 20) : null
 
     const isFilled = Boolean(a.objetivo?.trim()) && Boolean(a.criterios?.trim()) && Boolean(a.conclusiones?.trim()) && Boolean(a.recomendaciones?.trim())
     const hallCount = (a.fortalezas?.length || 0) + (a.oportunidades_mejora?.length || 0) + (a.no_conformidades?.length || 0)
@@ -747,9 +749,9 @@ const handleDateKeyDown = useCallback((e) => {
 
     return {
       tienePlan: Boolean(a.plan?.url || a.plan?.enviado_at),
-      planDays: planDate ? diffInDays(hoy, planDate) : null,
-      informeDays: informeLimit ? diffInDays(hoy, informeLimit) : null,
-      pmDays: pmLimit ? diffInDays(hoy, pmLimit) : null,
+      planDays: planDate ? diffInBusinessDays(hoy, planDate) : null,
+      informeDays: informeLimit ? diffInBusinessDays(hoy, informeLimit) : null,
+      pmDays: pmLimit ? diffInBusinessDays(hoy, pmLimit) : null,
       informeCompleto: isFilled,
       validado,
       asistenciaOK: Boolean(a.asistencia?.url),
@@ -813,9 +815,11 @@ const handleDateKeyDown = useCallback((e) => {
     if (!selected?.fecha_auditoria) return []
     const hoy = startOfDay(new Date())
     const fa = parseYMD(selected.fecha_auditoria); if (!fa) return []
-    const planDate = addDays(fa, -5)
-    const informeLimit = addDays(fa, 10)
-    const pmLimit = addDays(fa, 20)
+    const planDate = addBusinessDays(fa, -5)
+    const informeLimit = addBusinessDays(fa, 10)
+    const pmLimit = addBusinessDays(fa, 20)
+    const actaLimit = addBusinessDays(fa, 10)
+    const cartaCompromisoDate = addBusinessDays(fa, -5)
 
     const isFilled = Boolean(selected.objetivo?.trim()) && Boolean(selected.criterios?.trim()) && Boolean(selected.conclusiones?.trim()) && Boolean(selected.recomendaciones?.trim())
     const hallCount = (selected.fortalezas?.length || 0) + (selected.oportunidades_mejora?.length || 0) + (selected.no_conformidades?.length || 0)
@@ -825,32 +829,32 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
 
     return [
       {
+        key: 'acta_compromiso',
+        title: 'Carta de compromiso',
+        when: cartaCompromisoDate,
+        days: diffInBusinessDays(hoy, cartaCompromisoDate),
+        explicitDone: Boolean(selected.acta_compromiso?.url),
+        subtitle: selected.acta_compromiso?.url ? 'Cargada.' : 'Subir PDF de la carta de compromiso.',
+        actions: selected.acta_compromiso?.url
+            ? [
+                { label: 'Ver carta de compromiso', onClick: () => openInNewTab(selected.acta_compromiso.url), type: 'view' },
+                ...(!soloLectura ? [{ label: 'Reemplazar carta de compromiso', onClick: () => setActaCompModalOpen(true), type: 'replace' }] : []),
+              ]
+          : (!soloLectura ? [{ label: 'Subir carta de compromiso', onClick: () => setActaCompModalOpen(true), type: 'replace' }] : [])
+      },
+      {
         key: 'plan',
         title: 'Plan de auditoría',
         when: planDate,
-        days: diffInDays(hoy, planDate),
+        days: diffInBusinessDays(hoy, planDate),
         explicitDone: Boolean(selected.plan?.url || selected.plan?.enviado_at),
-        subtitle: selected.plan?.enviado_at ? `Enviado el ${fmt(new Date(selected.plan.enviado_at))}` : 'Programar y enviar (5 días antes).',
+        subtitle: selected.plan?.enviado_at ? `Enviado el ${fmt(new Date(selected.plan.enviado_at))}` : 'Programar y enviar (5 días hábiles antes).',
         actions: selected.plan?.url
             ? [
                 { label: 'Ver plan', onClick: () => openInNewTab(selected.plan.url), type: 'view' },
                 ...(!soloLectura ? [{ label: 'Reemplazar plan', onClick: () => setPlanModalOpen(true), type: 'replace' }] : []),
               ]
           : (!soloLectura ? [{ label: 'Subir plan', onClick: () => setPlanModalOpen(true), type: 'replace' }] : [])
-      },
-            {
-        key: 'acta_compromiso',
-        title: 'Acta de compromiso',
-        when: addDays(fa, 15), // ajusta si quieres otro límite
-        days: diffInDays(hoy, addDays(fa, 15)),
-        explicitDone: Boolean(selected.acta_compromiso?.url),
-        subtitle: selected.acta_compromiso?.url ? 'Cargada.' : 'Subir PDF del acta de compromiso.',
-        actions: selected.acta_compromiso?.url
-            ? [
-                { label: 'Ver acta compromiso', onClick: () => openInNewTab(selected.acta_compromiso.url), type: 'view' },
-                ...(!soloLectura ? [{ label: 'Reemplazar acta compromiso', onClick: () => setActaCompModalOpen(true), type: 'replace' }] : []),
-              ]
-          : (!soloLectura ? [{ label: 'Subir acta compromiso', onClick: () => setActaCompModalOpen(true), type: 'replace' }] : [])
       },
       {
         key: 'asistencia',
@@ -883,10 +887,10 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
       {
         key: 'acta',
         title: 'Acta de reunión',
-        when: fa,
-        days: diffInDays(hoy, fa),
+        when: actaLimit,
+        days: diffInBusinessDays(hoy, actaLimit),
         explicitDone: Boolean(selected.acta?.url),
-        subtitle: selected.acta?.url ? 'Cargada.' : 'Subir PDF del acta de reunión.',
+        subtitle: selected.acta?.url ? 'Cargada.' : 'Subir PDF del acta de reunión (10 días hábiles).',
         actions: selected.acta?.url
             ? [
                 { label: 'Ver acta', onClick: () => openInNewTab(selected.acta.url), type: 'view' },
@@ -898,10 +902,10 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         key: 'informe',
         title: 'Informe de auditoría',
         when: informeLimit,
-        days: diffInDays(hoy, informeLimit),
+        days: diffInBusinessDays(hoy, informeLimit),
         explicitDone: hasValidated,
         subtitle: !isFilled
-          ? 'Completar objetivo, criterios, conclusiones y recomendaciones (plazo +10 días).'
+          ? 'Completar objetivo, criterios, conclusiones y recomendaciones (plazo +10 días hábiles).'
           : (!hasHallazgos
               ? 'Campos listos. Asignar hallazgos.'
               : (hasValidated ? 'Informe validado.' : 'Campos e hallazgos listos: descarga y valida.')),
@@ -936,9 +940,9 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         key: 'pm',
         title: 'Levantamiento del PM',
         when: pmLimit,
-        days: diffInDays(hoy, pmLimit),
+        days: diffInBusinessDays(hoy, pmLimit),
         explicitDone: false,
-        subtitle: 'Plan de Mejoramiento (10 días después de entregar el informe).',
+        subtitle: 'Plan de Mejoramiento (20 días hábiles después de entregar el informe).',
         actions: hasValidated ? [{ label: '📥 Descargar formato PM', onClick: () => handleDownloadPM(selected), type: 'download' }] : []
       }
     ]
@@ -1049,7 +1053,7 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
             <option value="informe_completo">Informe completo</option>
             <option value="validado">Validado</option>
             <option value="no_validado">No validado</option>
-            <option value="acta_compromiso_cargada">Acta compromiso cargada</option>
+            <option value="acta_compromiso_cargada">Carta de compromiso cargada</option>
             <option value="asistencia_cargada">Asistencia cargada</option>
             <option value="evaluacion_cargada">Evaluación cargada</option>
             <option value="acta_cargada">Acta cargada</option>
@@ -1062,7 +1066,7 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
         <div className={styles.quickFilters}>
           <label className={styles.filterCheckbox}>
             <input type="checkbox" checked={onlyActaComp} onChange={e => setOnlyActaComp(e.target.checked)} />
-            <span>Acta compromiso</span>
+            <span>Carta compromiso</span>
           </label>
           <label className={styles.filterCheckbox}>
             <input type="checkbox" checked={onlyAsistencia} onChange={e => setOnlyAsistencia(e.target.checked)} />
@@ -1331,7 +1335,7 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
               <div className={styles.detailCol}><strong>Criterios:</strong><br />{selected.criterios || '—'}</div>
               <div className={styles.detailCol}><strong>Conclusiones:</strong><br />{selected.conclusiones || '—'}</div>
               <div className={styles.detailCol}><strong>Recomendaciones:</strong><br />{selected.recomendaciones || '—'}</div>
-              <div><strong>Acta de compromiso:</strong> {selected.acta_compromiso?.url ? <a href={selected.acta_compromiso.url} onClick={(e) => { e.preventDefault(); openInNewTab(selected.acta_compromiso.url) }} className={styles.linkLike}>Ver</a>: '—'}</div>
+              <div><strong>Carta de compromiso:</strong> {selected.acta_compromiso?.url ? <a href={selected.acta_compromiso.url} onClick={(e) => { e.preventDefault(); openInNewTab(selected.acta_compromiso.url) }} className={styles.linkLike}>Ver</a>: '—'}</div>
               <div><strong>Plan:</strong> {selected.plan?.url ? <a href={selected.plan.url} onClick={(e) => { e.preventDefault(); openInNewTab(selected.plan.url) }} className={styles.linkLike}>Abrir</a> : 'Sin plan'}</div>
               <div><strong>Informe validado:</strong> {selected.validated?.url ? <a href={selected.validated.url} onClick={(e) => { e.preventDefault(); openInNewTab(selected.validated.url) }} className={styles.linkLike}>Descargar</a> : 'No disponible'}</div>
               <div><strong>Asistencia:</strong> {selected.asistencia?.url ? <a href={selected.asistencia.url} onClick={(e) => { e.preventDefault(); openInNewTab(selected.asistencia.url) }} className={styles.linkLike}>Ver</a> : '—'}</div>
@@ -1555,7 +1559,7 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
           <div className={styles.modalContenido}>
             <button className={styles.modalCerrar} onClick={() => { setActaCompModalOpen(false); setActaCompFile(null) }}>✖</button>
             <h3 className={styles.modalTitulo}>
-              {selected?.acta_compromiso?.url ? 'Reemplazar acta de compromiso' : 'Acta de compromiso — Subir PDF'}
+              {selected?.acta_compromiso?.url ? 'Reemplazar carta de compromiso' : 'Carta de compromiso — Subir PDF'}
             </h3>
 
             {selected?.acta_compromiso?.url && (
@@ -1566,7 +1570,7 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
                 className={styles.btnVerActual}
                 onClick={(e)=>{e.preventDefault(); openInNewTab(selected.acta_compromiso.url)}}
               >
-                👀 Ver acta de compromiso actual
+                👀 Ver carta de compromiso actual
               </a>
             )}
 

@@ -54,11 +54,30 @@ export async function POST(request) {
     console.log(`   Nueva nota: ${nota_archivos}`)
     console.log(`   Archivos cargados: ${archivos_cargados}`)
 
+    // Marcar archivos como editados manualmente (solo los que fueron editados en esta sesión)
+    const detalle_archivos_marcado = {
+      ...detalle_archivos,
+      informes: detalle_archivos.informes?.map(informe => ({
+        ...informe,
+        archivos: (Array.isArray(informe.archivos) ? informe.archivos : Object.values(informe.archivos || {})).map(archivo => {
+          // Si fue editado en esta sesión, marcar como editado manualmente
+          // Si ya estaba marcado de antes, mantener el flag
+          const esNuevoManual = archivo.fue_editado_en_sesion_actual === true
+          
+          return {
+            ...archivo,
+            editado_manualmente: esNuevoManual || archivo.editado_manualmente === true,
+            fue_editado_en_sesion_actual: undefined // Limpiar flag temporal del frontend
+          }
+        })
+      })) || []
+    }
+
     // Actualizar evaluación con las fechas modificadas manualmente
     const { data: evaluacionActualizada, error: updateError } = await supabaseAdmin
       .from('evaluaciones_auditores')
       .update({
-        detalle_archivos: detalle_archivos,
+        detalle_archivos: detalle_archivos_marcado,
         nota_archivos: nota_archivos,
         archivos_cargados: archivos_cargados,
         porcentaje_completitud: porcentaje_completitud,

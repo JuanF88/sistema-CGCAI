@@ -11,8 +11,10 @@ import { generarPlanMejora2 } from '@/components/auditor/Utilidades/generarPlanM
 import {
     parseYMD,
     addDays,
+    addBusinessDays,
     startOfDay,
     diffInDays,
+    diffInBusinessDays,
     fmt,
     badgeFor as badgeForBase,
     toSlugUpper,
@@ -322,8 +324,8 @@ export default function AuditoriasTimeline({ usuario }) {
             setActaCompModalOpen(false)
             setActaCompFile(null)
         } catch (e) {
-            console.error('Error subiendo acta de compromiso:', e)
-            alert('No se pudo subir el acta de compromiso.')
+            console.error('Error subiendo carta de compromiso:', e)
+            alert('No se pudo subir la carta de compromiso.')
         } finally {
             setUploadingActaComp(false)
         }
@@ -453,9 +455,11 @@ export default function AuditoriasTimeline({ usuario }) {
         if (!fa) return { steps: [], progressPct: 0, currentStep: null, allDone: false }
 
         // Reglas de fechas (ajústalas si cambian):
-        const planDate = addDays(fa, -5)
-        const informeLimit = addDays(fa, 10)
-        const pmLimit = addDays(fa, 20)
+        const planDate = addBusinessDays(fa, -5)
+        const informeLimit = addBusinessDays(fa, 10)
+        const pmLimit = addBusinessDays(fa, 20)
+        const actaLimit = addBusinessDays(fa, 10)
+        const cartaCompromisoDate = addBusinessDays(fa, -5)
 
         // Campos base completos:
         const isFilled =
@@ -480,28 +484,27 @@ export default function AuditoriasTimeline({ usuario }) {
                 key: 'plan',
                 title: 'Plan de auditoría',
                 when: planDate,
-                days: diffInDays(hoy, planDate),
+                days: diffInBusinessDays(hoy, planDate),
                 explicitDone: Boolean(selected.plan?.enviado_at),
                 subtitle: selected.plan?.enviado_at
                     ? `Enviado el ${fmt(new Date(selected.plan.enviado_at))}`
-                    : 'Programar y enviar (5 días antes).',
+                    : 'Programar y enviar (5 días hábiles antes).',
                 actions: selected.plan?.url
                     ? [{ label: 'Ver plan enviado', href: selected.plan.url, btnClass: styles.btn }]
                     : [{ label: 'Subir plan de auditoría', onClick: () => setPlanModalOpen(true), btnClass: styles.btnSubir }]
             },
             {
                 key: 'acta_compromiso',
-                title: 'Acta de compromiso',
-                // la fijamos entre informe(+10) y PM(+20): ~+15 días post auditoría
-                when: addDays(fa, 15),
-                days: diffInDays(hoy, addDays(fa, 15)),
+                title: 'Carta de compromiso',
+                when: cartaCompromisoDate,
+                days: diffInBusinessDays(hoy, cartaCompromisoDate),
                 explicitDone: Boolean(selected.acta_compromiso?.url),
                 subtitle: selected.acta_compromiso?.url
                     ? 'Cargada.'
-                    : 'Subir PDF del acta de compromiso.',
+                    : 'Subir PDF de la carta de compromiso.',
                 actions: selected.acta_compromiso?.url
-                    ? [{ label: 'Ver acta de compromiso', href: selected.acta_compromiso.url, btnClass: styles.btn }]
-                    : [{ label: 'Subir acta de compromiso', onClick: () => setActaCompModalOpen(true), btnClass: styles.btnSubir }]
+                    ? [{ label: 'Ver carta de compromiso', href: selected.acta_compromiso.url, btnClass: styles.btn }]
+                    : [{ label: 'Subir carta de compromiso', onClick: () => setActaCompModalOpen(true), btnClass: styles.btnSubir }]
             },
 
             // ✅ NUEVOS 3 PASOS ANTES DE LLENAR INFORME
@@ -530,10 +533,10 @@ export default function AuditoriasTimeline({ usuario }) {
             {
                 key: 'acta',
                 title: 'Acta de reunión',
-                when: fa,
-                days: diffInDays(hoy, fa),
+                when: actaLimit,
+                days: diffInBusinessDays(hoy, actaLimit),
                 explicitDone: Boolean(selected.acta?.url),
-                subtitle: selected.acta?.url ? 'Cargada.' : 'Subir PDF del acta de reunión.',
+                subtitle: selected.acta?.url ? 'Cargada.' : 'Subir PDF del acta de reunión (10 días hábiles).',
                 actions: selected.acta?.url
                     ? [{ label: 'Ver acta', href: selected.acta.url, btnClass: styles.btn }]
                     : [{ label: 'Subir acta', onClick: () => setActaModalOpen(true), btnClass: styles.btnSubir }]
@@ -543,11 +546,11 @@ export default function AuditoriasTimeline({ usuario }) {
                 key: 'informe',
                 title: 'Informe de auditoría',
                 when: informeLimit,
-                days: diffInDays(hoy, informeLimit),
+                days: diffInBusinessDays(hoy, informeLimit),
                 // Se considera completado cuando está VALIDADO
                 explicitDone: hasValidated,
                 subtitle: !isFilled
-                    ? 'Completar objetivo, criterios, conclusiones y recomendaciones (plazo +10 días).'
+                    ? 'Completar objetivo, criterios, conclusiones y recomendaciones (plazo +10 días hábiles).'
                     : (!hasHallazgos
                         ? 'Campos listos. Asignar hallazgos.'
                         : (hasValidated ? 'Informe validado.' : 'Campos e hallazgos listos: descarga y valida.')),
@@ -567,9 +570,9 @@ export default function AuditoriasTimeline({ usuario }) {
                 key: 'pm',
                 title: 'Levantamiento del PM',
                 when: pmLimit,
-                days: diffInDays(hoy, pmLimit),
+                days: diffInBusinessDays(hoy, pmLimit),
                 explicitDone: false,
-                subtitle: 'Plan de Mejoramiento (10 días después de entregar el informe).',
+                subtitle: 'Plan de Mejoramiento (20 días hábiles después de entregar el informe).',
                 actions: hasValidated ? [{ label: '📥 Descargar Formato PM', onClick: () => handleDownloadPM(selected), btnClass: styles.btn }] : []
             }
         ]
@@ -997,7 +1000,7 @@ export default function AuditoriasTimeline({ usuario }) {
                                         ✖
                                     </button>
 
-                                    <h3 className={styles.modalTitulo}>Subir acta de compromiso (PDF)</h3>
+                                    <h3 className={styles.modalTitulo}>Subir carta de compromiso (PDF)</h3>
 
                                     <label htmlFor="actaCompFile" className={styles.dropArea}>
                                         <input

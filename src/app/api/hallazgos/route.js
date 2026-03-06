@@ -27,6 +27,7 @@ export async function GET() {
     .select(`
       id,
       descripcion,
+      razon,
       informe_id,
       iso:iso_id ( iso ),
       capitulos:capitulo_id ( capitulo ),
@@ -52,6 +53,7 @@ export async function GET() {
     .select(`
       id,
       descripcion,
+      para_que,
       informe_id,
       iso:iso_id ( iso ),
       capitulos:capitulo_id ( capitulo ),
@@ -77,6 +79,7 @@ export async function GET() {
     .select(`
       id,
       descripcion,
+      evidencia,
       informe_id,
       iso:iso_id ( iso ),
       capitulos:capitulo_id ( capitulo ),

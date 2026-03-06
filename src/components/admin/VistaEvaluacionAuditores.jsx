@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { 
   Upload, FileText, Calculator, Edit3, TrendingUp, 
   Calendar, Filter, Download, RefreshCw, CheckCircle,
-  AlertCircle, Eye, ChevronDown, X, Award 
+  AlertCircle, Eye, ChevronDown, X, Award, Info
 } from 'lucide-react'
 import { toast } from 'react-toastify'
 import styles from './CSS/VistaEvaluacionAuditores.module.css'
@@ -36,10 +36,11 @@ export default function VistaEvaluacionAuditores() {
   const [progreso, setProgreso] = useState(null)
   
   // Estados de evaluación manual
-  const [auditorSeleccionado, setAuditorSeleccionado] = useState(null)
-  const [evaluacionActual, setEvaluacionActual] = useState(null)
-  const [calificaciones, setCalificaciones] = useState({})
-  const [guardandoRubrica, setGuardandoRubrica] = useState(false)
+  const [calificacionesMatriz, setCalificacionesMatriz] = useState({}) // { evaluacion_id: { c1: 4, c2: 3.5, ... } }
+  const [guardandoRubricas, setGuardandoRubricas] = useState(false)
+  const [leyendaVisible, setLeyendaVisible] = useState(false)
+  const [criterioLeyenda, setCriterioLeyenda] = useState(null)
+  const hoverTimerRef = useRef(null) // Para mostrar leyenda de un criterio específico
   
   // Estado para modal de desglose de archivos
   const [modalArchivosVisible, setModalArchivosVisible] = useState(false)
@@ -212,6 +213,17 @@ export default function VistaEvaluacionAuditores() {
       
       setEvaluaciones(data.evaluaciones || [])
       setAuditores(data.auditores || [])
+      
+      // Inicializar matriz de calificaciones con las notas existentes
+      const matrizInicial = {}
+      data.evaluaciones?.forEach(ev => {
+        if (ev.rubrica_respuestas) {
+          matrizInicial[ev.id] = ev.rubrica_respuestas
+        } else {
+          matrizInicial[ev.id] = {} // Inicializar vacío si no tiene calificaciones
+        }
+      })
+      setCalificacionesMatriz(matrizInicial)
     } catch (err) {
       console.error('Error cargando evaluaciones:', err)
       setError(err.message)
@@ -457,6 +469,91 @@ export default function VistaEvaluacionAuditores() {
     setCalificaciones({})
   }
 
+  // Guardar todas las rúbricas (matriz)
+  const guardarTodasRubricas = async () => {
+    // Validar que haya calificaciones para guardar
+    const evaluacionesConCalif = Object.entries(calificacionesMatriz).filter(([evId, calif]) => {
+      return Object.keys(calif).length > 0
+    })
+
+    if (evaluacionesConCalif.length === 0) {
+      toast.warning('No hay calificaciones para guardar')
+      return
+    }
+
+    setGuardandoRubricas(true)
+
+    let exitosas = 0
+    let fallidas = 0
+    const errores = []
+
+    try {
+      for (const [evaluacionId, calificaciones] of evaluacionesConCalif) {
+        try {
+          // Calcular nota de rúbrica (promedio de criterios calificados)
+          const criteriosCalificados = RUBRICA_CRITERIOS.filter(crit => calificaciones[crit.id]).length
+          const promedioEscala4 = criteriosCalificados > 0
+            ? RUBRICA_CRITERIOS.reduce((acc, crit) => {
+                const valor = calificaciones[crit.id]
+                return valor ? acc + parseFloat(valor) : acc
+              }, 0) / criteriosCalificados
+            : 0
+          // Convertir de escala 1-4 a escala 1-5
+          const notaRubrica = promedioEscala4 > 0 ? 1 + (promedioEscala4 - 1) * (4/3) : 0
+
+          const res = await fetch('/api/evaluaciones-auditores/guardar-rubrica', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              evaluacion_id: evaluacionId,
+              rubrica_respuestas: calificaciones,
+              nota_rubrica: notaRubrica
+            })
+          })
+
+          if (!res.ok) {
+            const error = await res.json()
+            throw new Error(error.error || 'Error al guardar')
+          }
+
+          exitosas++
+        } catch (err) {
+          fallidas++
+          errores.push(`Evaluación ${evaluacionId}: ${err.message}`)
+          console.error(`Error guardando evaluación ${evaluacionId}:`, err)
+        }
+      }
+
+      // Mostrar resultados
+      if (exitosas > 0) {
+        toast.success(`✅ ${exitosas} evaluación(es) guardada(s) exitosamente`, {
+          position: 'top-right',
+          autoClose: 3000
+        })
+      }
+
+      if (fallidas > 0) {
+        toast.error(`❌ ${fallidas} evaluación(es) fallaron. Revisa la consola para detalles.`, {
+          position: 'top-right',
+          autoClose: 5000
+        })
+        console.error('Errores al guardar:', errores)
+      }
+
+      // Recargar evaluaciones
+      await cargarEvaluaciones()
+
+    } catch (err) {
+      console.error('Error general guardando evaluaciones:', err)
+      toast.error(`Error al guardar: ${err.message}`, {
+        position: 'top-right',
+        autoClose: 5000
+      })
+    } finally {
+      setGuardandoRubricas(false)
+    }
+  }
+
   // Descargar plantilla de ejemplo
   const descargarPlantilla = () => {
     // Descargar el archivo Excel desde public/plantillas
@@ -582,7 +679,8 @@ export default function VistaEvaluacionAuditores() {
               fechaCargaFormateada: nuevaFechaCarga ? formatearFechaLocal(nuevaFechaCarga) : null,
               puntos: puntos,
               estado: estado,
-              existe: !!nuevaFechaCarga
+              existe: !!nuevaFechaCarga,
+              fue_editado_en_sesion_actual: true
             }
           }
           return archivo
@@ -882,7 +980,9 @@ export default function VistaEvaluacionAuditores() {
                     <h3>Notas de Archivos</h3>
                   </div>
                   <p>
-                    Las notas de archivos evalúan la entrega oportuna de: Plan, Asistencia, Evaluación, Acta, Acta de Compromiso y Validación.
+                    Las notas de archivos evalúan la entrega oportuna de: Carta de Compromiso, Plan, Asistencia, Evaluación, Acta y Validación.
+                    <br/>
+                    <strong>Plazos:</strong> Carta de Compromiso y Plan (5 días hábiles antes), Asistencia y Evaluación (mismo día), Acta y Validación (10 días hábiles después).
                     <br/>
                     <strong>Sistema de puntuación:</strong> 5 puntos si se entregó a tiempo, 1 punto si se entregó tarde.
                     <br/>
@@ -890,6 +990,9 @@ export default function VistaEvaluacionAuditores() {
                   </p>
                   <p style={{marginTop: '8px', fontSize: '13px', color: '#64748b'}}>
                     💡 Haz clic en la nota de archivos para ver el desglose completo de entregas.
+                  </p>
+                  <p style={{marginTop: '8px', fontSize: '13px', color: '#f59e0b', fontWeight: '500'}}>
+                    ⚠️ Si acabas de actualizar los plazos, haz clic en "Recalcular Archivos" para actualizar todas las notas.
                   </p>
                 </div>
                 
@@ -988,202 +1091,336 @@ export default function VistaEvaluacionAuditores() {
           <div className={styles.tabContent}>
             <h2 className={styles.tabTitle}>✍️ Evaluación Manual con Rúbrica</h2>
             <p className={styles.tabSubtitle}>
-              Calificación individual de auditores según criterios establecidos
+              Matriz de evaluación: Califica todos los auditores de forma rápida y visual
             </p>
 
             {loading ? (
               <div className={styles.loading}>Cargando evaluaciones...</div>
-            ) : !auditorSeleccionado ? (
-              /* Vista de selección de auditor */
+            ) : evaluaciones.length === 0 ? (
+              <div className={styles.empty}>
+                <AlertCircle size={48} />
+                <p>No hay evaluaciones registradas para este periodo</p>
+                <p className={styles.emptyHint}>
+                  Las evaluaciones se crean automáticamente al importar encuestas
+                </p>
+              </div>
+            ) : (
               <div>
+                {/* Instrucciones y leyenda */}
                 <div className={styles.infoBox} style={{marginBottom: '20px'}}>
                   <div className={styles.infoHeader}>
                     <Edit3 size={20} />
                     <h3>Instrucciones de Evaluación</h3>
                   </div>
                   <p>
-                    Selecciona un auditor de la lista para iniciar su evaluación manual.
-                    La rúbrica evalúa 6 criterios con una escala de 1 a 4 puntos.
+                    Califica cada criterio para todos los auditores usando la escala de 1 a 4. 
+                    Haz clic en el ícono <Info size={14} style={{display: 'inline', verticalAlign: 'middle'}} /> junto a cada criterio para ver la descripción completa de las calificaciones.
                   </p>
                   <p style={{marginTop: '8px', fontSize: '13px', color: '#64748b'}}>
-                    💡 La nota de rúbrica se calcula como el promedio de los 6 criterios evaluados.
+                    💡 La nota final (escala de 1 a 5) se calcula automáticamente como el promedio escalado de los criterios calificados. No es necesario calificar todos los criterios.
                   </p>
                 </div>
 
-                {evaluaciones.length === 0 ? (
-                  <div className={styles.empty}>
-                    <AlertCircle size={48} />
-                    <p>No hay evaluaciones registradas para este periodo</p>
-                    <p className={styles.emptyHint}>
-                      Las evaluaciones se crean automáticamente al importar encuestas
-                    </p>
-                  </div>
-                ) : (
-                  <div className={styles.tableContainer}>
-                    <table className={styles.table}>
-                      <thead>
-                        <tr>
-                          <th>ID Informe</th>
-                          <th>Auditor</th>
-                          <th>Dependencia</th>
-                          <th>Fecha</th>
-                          <th>Nota Rúbrica</th>
-                          <th>Estado Evaluación</th>
-                          <th>Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {evaluaciones.map(ev => (
-                          <tr key={ev.id}>
-                            <td>
-                              <span style={{fontFamily: 'monospace', fontSize: '0.9em', color: '#0066cc'}}>
-                                {ev.informe_auditoria_id || '-'}
-                              </span>
-                            </td>
-                            <td>
-                              <div style={{fontWeight: '500'}}>
+                {/* Tabla matriz de evaluación */}
+                <div className={styles.matrizContainer} style={{overflowX: 'auto', marginBottom: '20px'}}>
+                  <table className={styles.matrizRubrica} style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    fontSize: '13px',
+                    backgroundColor: 'white',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    borderRadius: '8px',
+                    overflow: 'hidden'
+                  }}>
+                    <thead>
+                      <tr style={{backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0'}}>
+                        <th style={{
+                          padding: '12px 16px',
+                          textAlign: 'left',
+                          fontWeight: '600',
+                          color: '#334155',
+                          position: 'sticky',
+                          left: 0,
+                          backgroundColor: '#f8fafc',
+                          zIndex: 10,
+                          minWidth: '200px',
+                          borderRight: '2px solid #e2e8f0'
+                        }}>
+                          Auditor / Auditoría
+                        </th>
+                        {RUBRICA_CRITERIOS.map(criterio => (
+                          <th key={criterio.id} style={{
+                            padding: '12px 8px',
+                            textAlign: 'center',
+                            fontWeight: '600',
+                            color: '#334155',
+                            minWidth: '180px'
+                          }}>
+                            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexDirection: 'column'}}>
+                              <span style={{fontSize: '12px', lineHeight: '1.4'}}>{criterio.nombre}</span>
+                              <button
+                                onMouseEnter={() => {
+                                  if (hoverTimerRef.current) {
+                                    clearTimeout(hoverTimerRef.current)
+                                    hoverTimerRef.current = null
+                                  }
+                                  setCriterioLeyenda(criterio)
+                                  setLeyendaVisible(true)
+                                }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  padding: '2px',
+                                  display: 'flex',
+                                  color: '#0066cc',
+                                  transition: 'color 0.2s'
+                                }}
+                                title="Ver descripción"
+                              >
+                                <Info size={16} />
+                              </button>
+                            </div>
+                          </th>
+                        ))}
+                        <th style={{
+                          padding: '12px 8px',
+                          textAlign: 'center',
+                          fontWeight: '600',
+                          color: '#334155',
+                          minWidth: '80px',
+                          backgroundColor: '#fef3c7',
+                          borderLeft: '2px solid #e2e8f0'
+                        }}>
+                          Nota Final (1-5)
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {evaluaciones.map(ev => {
+                        const calificacionesEv = calificacionesMatriz[ev.id] || {}
+                        const criteriosCalificados = RUBRICA_CRITERIOS.filter(crit => calificacionesEv[crit.id]).length
+                        const promedioEscala4 = criteriosCalificados > 0
+                          ? RUBRICA_CRITERIOS.reduce((acc, crit) => {
+                              const valor = calificacionesEv[crit.id]
+                              return valor ? acc + parseFloat(valor) : acc
+                            }, 0) / criteriosCalificados
+                          : 0
+                        // Convertir de escala 1-4 a escala 1-5
+                        const notaFinal = promedioEscala4 > 0 ? 1 + (promedioEscala4 - 1) * (4/3) : 0
+
+                        return (
+                          <tr key={ev.id} style={{borderBottom: '1px solid #e2e8f0'}}>
+                            <td style={{
+                              padding: '10px 16px',
+                              backgroundColor: '#f8fafc',
+                              position: 'sticky',
+                              left: 0,
+                              zIndex: 5,
+                              borderRight: '2px solid #e2e8f0'
+                            }}>
+                              <div style={{fontWeight: '500', color: '#1e293b', marginBottom: '2px'}}>
                                 {ev.auditor_nombre} {ev.auditor_apellido}
                               </div>
-                            </td>
-                            <td>
-                              <span style={{fontSize: '0.9em', color: '#666'}}>
+                              <div style={{fontSize: '11px', color: '#64748b'}}>
                                 {ev.auditor_dependencia_nombre || '-'}
-                              </span>
+                              </div>
+                              <div style={{fontSize: '11px', color: '#94a3b8', marginTop: '2px'}}>
+                                ID: {ev.informe_auditoria_id} | {ev.fecha_auditoria || '-'}
+                              </div>
                             </td>
-                            <td>
-                              <span style={{fontSize: '0.85em', color: '#666'}}>
-                                {ev.fecha_auditoria || '-'}
-                              </span>
-                            </td>
-                            <td>
-                              {ev.nota_rubrica !== null ? (
-                                <span style={{fontWeight: '500', color: '#22c55e'}}>
-                                  {ev.nota_rubrica.toFixed(2)}
-                                </span>
-                              ) : (
-                                <span style={{color: '#94a3b8'}}>Sin evaluar</span>
-                              )}
-                            </td>
-                            <td>
-                              {ev.nota_rubrica !== null ? (
-                                <span className={styles.badge} style={{background: '#22c55e20', color: '#22c55e'}}>
-                                  <CheckCircle size={14} /> Evaluado
-                                </span>
-                              ) : (
-                                <span className={styles.badge} style={{background: '#f59e0b20', color: '#f59e0b'}}>
-                                  <AlertCircle size={14} /> Pendiente
-                                </span>
-                              )}
-                            </td>
-                            <td>
-                              <button 
-                                className={styles.btnPrimary}
-                                onClick={() => seleccionarAuditor(ev)}
-                                style={{padding: '6px 12px', fontSize: '13px'}}
-                              >
-                                <Edit3 size={14} />
-                                {ev.nota_rubrica !== null ? 'Editar' : 'Evaluar'}
-                              </button>
+                            {RUBRICA_CRITERIOS.map(criterio => (
+                              <td key={criterio.id} style={{
+                                padding: '8px',
+                                textAlign: 'center',
+                                backgroundColor: calificacionesEv[criterio.id] ? '#f0fdf4' : 'white'
+                              }}>
+                                <select
+                                  value={calificacionesEv[criterio.id] || ''}
+                                  onChange={(e) => {
+                                    const nuevasCalif = {...calificacionesMatriz}
+                                    if (!nuevasCalif[ev.id]) nuevasCalif[ev.id] = {}
+                                    
+                                    if (e.target.value === '') {
+                                      delete nuevasCalif[ev.id][criterio.id]
+                                    } else {
+                                      nuevasCalif[ev.id][criterio.id] = parseFloat(e.target.value)
+                                    }
+                                    
+                                    setCalificacionesMatriz(nuevasCalif)
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '6px 8px',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '4px',
+                                    fontSize: '13px',
+                                    cursor: 'pointer',
+                                    backgroundColor: calificacionesEv[criterio.id] ? '#dcfce7' : 'white',
+                                    fontWeight: calificacionesEv[criterio.id] ? '600' : '400',
+                                    color: calificacionesEv[criterio.id] ? '#166534' : '#64748b',
+                                    outline: 'none',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  onFocus={(e) => {
+                                    e.target.style.borderColor = '#0066cc'
+                                    e.target.style.boxShadow = '0 0 0 3px rgba(0, 102, 204, 0.1)'
+                                  }}
+                                  onBlur={(e) => {
+                                    e.target.style.borderColor = '#cbd5e1'
+                                    e.target.style.boxShadow = 'none'
+                                  }}
+                                >
+                                  <option value="">-</option>
+                                  {Object.keys(criterio.niveles).sort((a, b) => b - a).map(nivel => (
+                                    <option key={nivel} value={nivel}>
+                                      {nivel}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                            ))}
+                            <td style={{
+                              padding: '8px',
+                              textAlign: 'center',
+                              fontWeight: '700',
+                              fontSize: '14px',
+                              color: notaFinal >= 3.5 ? '#16a34a' : notaFinal >= 3 ? '#eab308' : '#dc2626',
+                              backgroundColor: '#fef3c7',
+                              borderLeft: '2px solid #e2e8f0'
+                            }}>
+                              {notaFinal > 0 ? notaFinal.toFixed(2) : '-'}
                             </td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Vista de evaluación del auditor seleccionado */
-              <div className={styles.evaluacionForm}>
-                {/* Header de evaluación */}
-                <div className={styles.evaluacionHeader}>
-                  <div>
-                    <h3 className={styles.evaluacionTitulo}>
-                      Evaluando a: {auditorSeleccionado.auditor_nombre} {auditorSeleccionado.auditor_apellido}
-                    </h3>
-                    <p className={styles.evaluacionSubtitulo}>
-                      Dependencia: {auditorSeleccionado.auditor_dependencia_nombre} | 
-                      Informe ID: {auditorSeleccionado.informe_auditoria_id} | 
-                      Fecha: {auditorSeleccionado.fecha_auditoria || 'N/A'}
-                    </p>
-                  </div>
-                  <button 
-                    className={styles.btnClose}
-                    onClick={cancelarEvaluacion}
-                    title="Cancelar evaluación"
-                  >
-                    <X size={20} />
-                  </button>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
 
-                {/* Nota calculada en tiempo real */}
-                <div className={styles.notaPreview}>
-                  <div className={styles.notaLabel}>Nota de Rúbrica (calculada):</div>
-                  <div className={styles.notaValor}>
-                    {calcularNotaRubrica().toFixed(2)}
-                  </div>
-                  <div className={styles.notaEscala}>/ 5.00</div>
-                </div>
-
-                {/* Formulario de criterios */}
-                <div className={styles.criteriosGrid}>
-                  {RUBRICA_CRITERIOS.map((criterio, idx) => (
-                    <div key={criterio.id} className={styles.criterioCard}>
-                      <div className={styles.criterioHeader}>
-                        <h4 className={styles.criterioNombre}>{criterio.nombre}</h4>
-                        <p className={styles.criterioDescripcion}>{criterio.descripcion}</p>
-                      </div>
-
-                      {/* Opciones de calificación */}
-                      <div className={styles.nivelesContainer}>
-                        {Object.keys(criterio.niveles).sort((a, b) => b - a).map(nivel => (
-                          <label 
-                            key={nivel}
-                            className={`${styles.nivelOpcion} ${calificaciones[criterio.id] == nivel ? styles.nivelSeleccionado : ''}`}
-                          >
-                            <input
-                              type="radio"
-                              name={criterio.id}
-                              value={nivel}
-                              checked={calificaciones[criterio.id] == nivel}
-                              onChange={(e) => actualizarCalificacion(criterio.id, parseFloat(e.target.value))}
-                              className={styles.radioInput}
-                            />
-                            <div className={styles.nivelContenido}>
-                              <div className={styles.nivelPuntos}>{nivel} pts</div>
-                              <div className={styles.nivelDescripcion}>
-                                {criterio.niveles[nivel]}
-                              </div>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-
-                      {/* Indicador de selección */}
-                      {calificaciones[criterio.id] !== null && calificaciones[criterio.id] !== undefined && (
-                        <div className={styles.criterioSeleccionado}>
-                          ✓ Seleccionado: {calificaciones[criterio.id]} puntos
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Botones de acción */}
-                <div className={styles.evaluacionAcciones}>
-                  <button 
-                    className={styles.btnSecondary}
-                    onClick={cancelarEvaluacion}
-                  >
-                    Cancelar
-                  </button>
+                {/* Botón de guardar */}
+                <div style={{display: 'flex', justifyContent: 'flex-end', gap: '12px'}}>
                   <button 
                     className={styles.btnPrimary}
-                    onClick={guardarEvaluacionRubrica}
-                    disabled={guardandoRubrica}
+                    onClick={guardarTodasRubricas}
+                    disabled={guardandoRubricas}
+                    style={{padding: '12px 24px', fontSize: '14px', fontWeight: '600'}}
                   >
-                    {guardandoRubrica ? 'Guardando...' : '💾 Guardar Evaluación'}
+                    {guardandoRubricas ? '💾 Guardando...' : '💾 Guardar Todas las Evaluaciones'}
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Modal de leyenda/descripción de criterios */}
+            {leyendaVisible && criterioLeyenda && (
+              <div 
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(0,0,0,0.5)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 1000,
+                  padding: '20px',
+                  animation: 'fadeIn 0.2s ease-out'
+                }}
+                onClick={() => setLeyendaVisible(false)}
+              >
+                <div 
+                  style={{
+                    backgroundColor: 'white',
+                    borderRadius: '12px',
+                    padding: '24px',
+                    maxWidth: '600px',
+                    width: '100%',
+                    maxHeight: '80vh',
+                    overflowY: 'auto',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                    animation: 'slideIn 0.2s ease-out'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseEnter={() => {
+                    if (hoverTimerRef.current) {
+                      clearTimeout(hoverTimerRef.current)
+                      hoverTimerRef.current = null
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    hoverTimerRef.current = setTimeout(() => {
+                      setLeyendaVisible(false)
+                    }, 300)
+                  }}
+                >
+                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px'}}>
+                    <div>
+                      <h3 style={{margin: 0, fontSize: '18px', fontWeight: '700', color: '#1e293b'}}>
+                        {criterioLeyenda.nombre}
+                      </h3>
+                      <p style={{margin: '4px 0 0', fontSize: '14px', color: '#64748b'}}>
+                        {criterioLeyenda.descripcion}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setLeyendaVisible(false)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        color: '#64748b',
+                        display: 'flex'
+                      }}
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  <div style={{marginTop: '20px'}}>
+                    <h4 style={{fontSize: '14px', fontWeight: '600', color: '#475569', marginBottom: '12px'}}>
+                      Escala de Calificación:
+                    </h4>
+                    <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                      {Object.keys(criterioLeyenda.niveles).sort((a, b) => b - a).map(nivel => (
+                        <div 
+                          key={nivel}
+                          style={{
+                            padding: '12px 16px',
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '6px',
+                            border: '1px solid #e2e8f0',
+                            display: 'flex',
+                            gap: '12px',
+                            alignItems: 'start'
+                          }}
+                        >
+                          <div style={{
+                            minWidth: '40px',
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: '#0066cc',
+                            color: 'white',
+                            borderRadius: '4px',
+                            fontWeight: '700',
+                            fontSize: '14px'
+                          }}>
+                            {nivel}
+                          </div>
+                          <div style={{flex: 1}}>
+                            <p style={{margin: 0, fontSize: '13px', color: '#334155', lineHeight: '1.5'}}>
+                              {criterioLeyenda.niveles[nivel]}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1339,6 +1576,19 @@ export default function VistaEvaluacionAuditores() {
             </div>
 
             <div className={styles.modalBody}>
+              <div style={{
+                background: '#f0fdf4',
+                border: '1px solid #86efac',
+                borderRadius: '8px',
+                padding: '12px 14px',
+                marginBottom: '16px',
+                fontSize: '13px',
+                color: '#166534',
+                lineHeight: '1.5'
+              }}>
+                <strong>ℹ️ Fechas preservadas:</strong> Las fechas marcadas con 🔒 fueron editadas manualmente y se preservarán automáticamente cuando se recalcule. Las demás fechas se recalcularán según el almacenamiento.
+              </div>
+
               {evaluacionSeleccionadaArchivos.detalle_archivos?.informes?.length > 0 ? (
                 <>
                   {evaluacionSeleccionadaArchivos.detalle_archivos.informes.map((informe, idx) => {
@@ -1372,6 +1622,7 @@ export default function VistaEvaluacionAuditores() {
                             const fechaEditada = archivosEditados[key]
                             const fechaCargaActual = fechaEditada?.fechaCarga || archivo.fechaCarga?.split('T')[0]
                             const fechaLimiteActual = archivo.fechaLimite?.split('T')[0]
+                            const esEditadoManualmente = archivo.editado_manualmente === true
                             
                             // Calcular puntos y estado con la fecha editada si existe
                             const puntosActuales = fechaEditada 
@@ -1382,9 +1633,14 @@ export default function VistaEvaluacionAuditores() {
                               : archivo.estado
                             
                             return (
-                            <tr key={archIdx}>
+                            <tr key={archIdx} style={{background: esEditadoManualmente && !fechaEditada ? '#f0fdf4' : 'transparent'}}>
                               <td>
                                 <strong>{archivo.nombre}</strong>
+                                {esEditadoManualmente && !fechaEditada && (
+                                  <span style={{marginLeft: '8px', fontSize: '12px', color: '#16a34a', fontWeight: '500'}}>
+                                    🔒 Manual
+                                  </span>
+                                )}
                               </td>
                               <td>
                                 <span className={styles.fecha}>
@@ -1399,15 +1655,15 @@ export default function VistaEvaluacionAuditores() {
                                     onChange={(e) => handleFechaEntregaChange(idx, archIdx, e.target.value)}
                                     style={{
                                       padding: '6px 10px',
-                                      border: fechaEditada ? '2px solid #667eea' : '1px solid #e2e8f0',
+                                      border: fechaEditada ? '2px solid #667eea' : esEditadoManualmente ? '2px solid #16a34a' : '1px solid #e2e8f0',
                                       borderRadius: '6px',
                                       fontSize: '13px',
                                       fontFamily: 'monospace',
-                                      background: fechaEditada ? '#eff6ff' : 'white',
+                                      background: fechaEditada ? '#eff6ff' : esEditadoManualmente ? '#f0fdf4' : 'white',
                                       cursor: 'pointer',
                                       transition: 'all 0.2s'
                                     }}
-                                    title="Haz clic para cambiar la fecha de entrega"
+                                    title={esEditadoManualmente ? 'Fecha editada manualmente (preservada en recálculos)' : 'Haz clic para cambiar la fecha de entrega'}
                                   />
                                 ) : (
                                   <button
@@ -1440,6 +1696,7 @@ export default function VistaEvaluacionAuditores() {
                                 }`}>
                                   {estadoActual || 'No disponible'}
                                   {fechaEditada && <span style={{marginLeft: '4px'}}>✏️</span>}
+                                  {esEditadoManualmente && !fechaEditada && <span style={{marginLeft: '4px'}}>🔒</span>}
                                 </span>
                               </td>
                               <td>

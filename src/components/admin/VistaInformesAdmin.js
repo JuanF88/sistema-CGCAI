@@ -239,7 +239,7 @@ export default function AuditoriasMallaControl({ soloLectura = false }) {
     { key: 'asistencia', title: 'Asistencia' },
     { key: 'evaluacion', title: 'Evaluación' },
     { key: 'acta',       title: 'Acta' },
-    { key: 'actaComp',   title: 'Acta Comp.' },
+    { key: 'actaComp',   title: 'Carta Comp.' },
     { key: 'informeOk',  title: 'Informe OK' },
     { key: 'validado',   title: 'Validado' },
   ]
@@ -351,7 +351,7 @@ export default function AuditoriasMallaControl({ soloLectura = false }) {
               <div className={styles.gridHead}>
                 <span className={styles.columnIcon}>📈</span> Avance
               </div>
-              {['📋 Plan','✓ Asistencia','📝 Evaluación','📄 Acta','📑 Acta Comp.','✅ Informe','🎯 Validado'].map(h => (
+              {['📋 Plan','✓ Asistencia','📝 Evaluación','📄 Acta','📑 Carta Comp.','✅ Informe','🎯 Validado'].map(h => (
                 <div key={h} className={styles.gridHead}>{h}</div>
               ))}
             </div>
@@ -506,7 +506,7 @@ function DetailModal({ onClose, items }) {
     { key: 'asistencia', title: 'Asistencia' },
     { key: 'evaluacion', title: 'Evaluación' },
     { key: 'acta',       title: 'Acta' },
-    { key: 'actaComp',   title: 'Acta Comp.' },
+    { key: 'actaComp',   title: 'Carta Comp.' },
     { key: 'informeOk',  title: 'Informe OK' },
     { key: 'validado',   title: 'Validado' },
   ]

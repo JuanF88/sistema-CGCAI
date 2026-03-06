@@ -28,6 +28,50 @@ export function diffInDays(from, to) {
   return Math.round(ms / 86400000)
 }
 
+/**
+ * Suma días hábiles (lunes-viernes) a una fecha
+ * Excluye fines de semana
+ */
+export function addBusinessDays(date, n) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const step = n >= 0 ? 1 : -1
+  let count = 0
+  
+  while (count < Math.abs(n)) {
+    d.setDate(d.getDate() + step)
+    const dayOfWeek = d.getDay()
+    // dayOfWeek: 0=domingo, 1-5=lunes-viernes, 6=sábado
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+      count++
+    }
+  }
+  
+  return d
+}
+
+/**
+ * Calcula diferencia en días hábiles (lunes-viernes)
+ * Excluye fines de semana
+ */
+export function diffInBusinessDays(from, to) {
+  const start = startOfDay(from)
+  const end = startOfDay(to)
+  const step = end >= start ? 1 : -1
+  let current = new Date(start)
+  let count = 0
+  
+  while ((step > 0 && current < end) || (step < 0 && current > end)) {
+    current.setDate(current.getDate() + step)
+    const dayOfWeek = current.getDay()
+    // dayOfWeek: 0=domingo, 1-5=lunes-viernes, 6=sábado
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+      count += step
+    }
+  }
+  
+  return count
+}
+
 export function fmt(date) {
   try {
     return new Intl.DateTimeFormat('es-CO', {

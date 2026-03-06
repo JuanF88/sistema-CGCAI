@@ -116,6 +116,7 @@ export const exportarExcel = async (hallazgos) => {
     { header: 'Capítulo', key: 'capitulo', width: 15 },
     { header: 'Numeral', key: 'numeral', width: 12 },
     { header: 'Descripción', key: 'descripcion', width: 50 },
+    { header: 'Para Qué', key: 'para_que', width: 50 },
     { header: 'Recomendaciones', key: 'recomendaciones', width: 50 },
     { header: 'Conclusiones', key: 'conclusiones', width: 50 }
   ]
@@ -143,6 +144,17 @@ export const exportarExcel = async (hallazgos) => {
     const capitulo = getCapituloLabel(hallazgo)
     const numeral = getNumeralLabel(hallazgo)
     const descripcion = hallazgo.descripcion || ''
+    
+    // Obtener el valor "Para Qué" según el tipo de hallazgo
+    let paraQue = ''
+    if (tipo === 'No Conformidad' || tipo === 'No Conformidades') {
+      paraQue = hallazgo.evidencia || ''
+    } else if (tipo === 'Oportunidad de Mejora' || tipo === 'Oportunidades de Mejora') {
+      paraQue = hallazgo.para_que || ''
+    } else if (tipo === 'Fortaleza' || tipo === 'Fortalezas') {
+      paraQue = hallazgo.razon || ''
+    }
+    
     const recomendaciones = informe?.recomendaciones || ''
     const conclusiones = informe?.conclusiones || ''
 
@@ -157,6 +169,7 @@ export const exportarExcel = async (hallazgos) => {
       capitulo,
       numeral,
       descripcion,
+      para_que: paraQue,
       recomendaciones,
       conclusiones
     })
