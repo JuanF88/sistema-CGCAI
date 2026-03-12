@@ -1,0 +1,584 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 100vh;
+  padding: 2rem;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+
+/* ===== MODERN HEADER ===== */
+.modernHeader {
+  background: linear-gradient(135deg, #667eea 0%, #4b54a2 100%);
+  border-radius: 20px;
+  padding: 32px 40px;
+  box-shadow: 0 10px 40px rgba(102, 126, 234, 0.25);
+  margin-bottom: 24px;
+  animation: slideDown 0.5s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.headerContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+}
+
+.headerIcon {
+  font-size: 3rem;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+}
+.headerInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.headerTitle {
+  font-size: 32px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  letter-spacing: -0.5px;
+}
+
+.headerSubtitle {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+  font-weight: 500;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modernAddBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.modernAddBtn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.addIcon {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.modernRefreshBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modernRefreshBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.modernRefreshBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.refreshIcon {
+  display: inline-block;
+  font-size: 14px;
+}
+
+.filtersBar {
+  display: flex;
+  gap: 16px;
+  padding: 18px 20px;
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1.5;
+  padding: 0 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.searchBox input {
+  width: 100%;
+  height: 40px;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.selectCompact {
+  height: 42px;
+  padding: 0 12px;
+  min-width: 200px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.selectCompact:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.errorBox,
+.loadingBox {
+  padding: 14px 16px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.errorBox {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.loadingBox {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+/* Perfil compacto - mejorado y expandido */
+.profileBarCompact {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 2px solid #e0e7ff;
+  border-radius: 20px;
+  padding: 32px 36px;
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.12);
+  margin-bottom: 8px;
+}
+
+.profilePhotoSection {
+  flex-shrink: 0;
+}
+
+.profileAvatarImgLarge {
+  width: 120px;
+  height: 120px;
+  min-width: 120px;
+  border-radius: 20px;
+  object-fit: cover;
+  border: 4px solid #fff;
+  box-shadow: 0 6px 16px rgba(29, 78, 216, 0.25);
+  background: #f1f5f9;
+}
+
+.profileInfoSection {
+  flex: 1;
+  min-width: 0;
+}
+
+.profileLeft {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex: 1;
+}
+
+.profileAvatar {
+  width: 80px;
+  height: 80px;
+  min-width: 80px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1d4ed8;
+}
+
+.profileAvatarImg {
+  width: 80px;
+  height: 80px;
+  min-width: 80px;
+  border-radius: 18px;
+  object-fit: cover;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.2);
+  background: #f1f5f9;
+}
+
+.profileInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.profileNameCompact {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.3;
+  letter-spacing: -0.3px;
+}
+
+.profileMeta {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.5;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-weight: 500;
+}
+
+/* Sección de KPI dentro del perfil */
+.profileKpiSection {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding-left: 24px;
+  border-left: 2px solid #e0e7ff;
+}
+
+.kpiInline {
+  background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 12px 10px;
+  text-align: center;
+  min-width: 90px;
+}
+
+.kpiLabelInline {
+  display: block;
+  color: #1d4ed8;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.kpiValueInline {
+  display: block;
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1;
+}
+
+/* KPI Compacto */
+.kpiRowCompact {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.kpiCardSmall {
+  background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+  border: 2px solid #dbeafe;
+  border-radius: 16px;
+  padding: 20px 16px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+  transition: all 0.3s ease;
+}
+
+.kpiCardSmall:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
+  border-color: #3b82f6;
+}
+
+.kpiLabelSmall {
+  display: block;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
+.kpiValueSmall {
+  display: block;
+  font-size: 28px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+/* Gráficos compactos */
+.chartsRowCompact {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.chartCardSmall {
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+.cardHeaderSmall {
+  margin-bottom: 16px;
+}
+
+.cardHeaderSmall h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.cardHeaderSmall h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1;
+}
+
+.chartWrapSmall {
+  width: 100%;
+  height: 200px;
+}
+
+/* Tabla compacta */
+.tableCardCompact {
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+.tableCardCompact > h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border-radius: 8px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th,
+.table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.table th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #475569;
+  background: #f8fafc;
+  font-weight: 700;
+}
+
+.table td {
+  color: #1e293b;
+}
+
+.finalNote {
+  font-weight: 800;
+  color: #047857;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.emptyRow {
+  text-align: center;
+  color: #64748b;
+  padding: 20px 12px !important;
+  font-size: 13px;
+}
+
+.customTooltip {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+}
+
+.tooltipLabel {
+  margin: 0;
+  font-weight: 800;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.tooltipDependencia {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #64748b;
+  max-width: 200px;
+  word-wrap: break-word;
+}
+
+.tooltipNota {
+  margin: 4px 0 0;
+  font-weight: 700;
+  font-size: 12px;
+  color: #047857;
+}
+
+@media (max-width: 1200px) {
+  .chartsRowCompact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpiRowCompact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filtersBar {
+    flex-wrap: wrap;
+  }
+
+  .selectCompact {
+    min-width: 160px;
+  }
+}
+
+@media (max-width: 768px) {
+  .chartsRowCompact {
+    grid-template-columns: 1fr;
+  }
+
+  .kpiRowCompact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .profileBarCompact {
+    flex-direction: column;
+    text-align: center;
+    padding: 24px 20px;
+    gap: 20px;
+  }
+
+  .profilePhotoSection {
+    flex-shrink: 0;
+  }
+
+  .profileInfoSection {
+    width: 100%;
+  }
+
+  .profileKpiSection {
+    width: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding: 0;
+    border: none;
+    border-top: 2px solid #e0e7ff;
+    padding-top: 16px;
+  }
+
+  .profileLeft {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .profileMeta {
+    justify-content: center;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .filtersBar {
+    flex-direction: column;
+  }
+
+  .headerLeft {
+    flex-direction: column;
+  }
+
+  .headerTitle {
+    font-size: 20px;
+  }
+}
