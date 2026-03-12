@@ -84,6 +84,8 @@ export default function AuditoriasVerificacionAdmin({ usuario, soloLectura = fal
   const [q, setQ] = useState('')
   const [depFilter, setDepFilter] = useState('')
   const [audFilter, setAudFilter] = useState('')
+  const [audFilterSearch, setAudFilterSearch] = useState('')
+  const [auditorTextFilter, setAuditorTextFilter] = useState('')
   const [anioFilter, setAnioFilter] = useState('')
   const [semFilter, setSemFilter] = useState('')
   const [estadoFilter, setEstadoFilter] = useState('')
@@ -161,6 +163,9 @@ export default function AuditoriasVerificacionAdmin({ usuario, soloLectura = fal
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
   const [nuevoInforme, setNuevoInforme] = useState({ dependencia_id: '', usuario_id: '', fecha_auditoria: '' })
+  const [dependenciaSearch, setDependenciaSearch] = useState('')
+  const [dependenciaDropdownOpen, setDependenciaDropdownOpen] = useState(false)
+  const [auditorSearch, setAuditorSearch] = useState('')
 
   // listas para selects del modal crear
   const [dependenciasAll, setDependenciasAll] = useState([])
@@ -696,7 +701,7 @@ const handleDateKeyDown = useCallback((e) => {
       try {
         const [{ data: deps }, { data: auds }] = await Promise.all([
           supabase.from('dependencias').select('dependencia_id, nombre').order('nombre', { ascending: true }),
-          supabase.from('usuarios').select('usuario_id, nombre, apellido, rol')
+          supabase.from('usuarios').select('usuario_id, nombre, apellido, email, celular, rol, estado, tipo_personal, estudios, tipo_estudio, dependencia_id, dependencias:dependencia_id ( nombre )')
             .or('rol.eq.auditor,rol.eq.AUDITOR')
             .order('nombre', { ascending: true }),
         ])
@@ -717,6 +722,40 @@ const handleDateKeyDown = useCallback((e) => {
     })()
   }, [auditorias])
 
+  const auditorSeleccionadoCrear = useMemo(
+    () => auditoresAll.find((auditor) => String(auditor.usuario_id) === String(nuevoInforme.usuario_id)) || null,
+    [auditoresAll, nuevoInforme.usuario_id]
+  )
+
+  const auditoresFiltradosCrear = useMemo(() => {
+    const q = (auditorSearch || '').trim().toLowerCase()
+    if (!q) return auditoresAll
+
+    return auditoresAll.filter((auditor) => {
+      const contenido = [
+        auditor.nombre,
+        auditor.apellido,
+        auditor.email,
+        auditor.celular,
+        auditor.tipo_personal,
+        auditor.tipo_estudio,
+        auditor.estudios,
+        auditor.dependencias?.nombre,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+      return contenido.includes(q)
+    })
+  }, [auditoresAll, auditorSearch])
+
+  const dependenciasFiltradasCrear = useMemo(() => {
+    const term = (dependenciaSearch || '').trim().toLowerCase()
+    if (!term) return dependenciasAll
+    return dependenciasAll.filter((dep) => (dep.nombre || '').toLowerCase().includes(term))
+  }, [dependenciasAll, dependenciaSearch])
+
   /* colecciones para filtros (derivadas) */
   const dependencias = useMemo(() => {
     const map = new Map()
@@ -728,6 +767,12 @@ const handleDateKeyDown = useCallback((e) => {
     auditorias.forEach(a => { if (a.usuario_id && (a.usuarios?.nombre || a.usuarios?.apellido)) map.set(a.usuario_id, `${a.usuarios?.nombre || ''} ${a.usuarios?.apellido || ''}`.trim()) })
     return Array.from(map, ([id, nombre]) => ({ id, nombre })).sort((x, y) => x.nombre.localeCompare(y.nombre))
   }, [auditorias])
+
+  const auditoresFiltradosSelect = useMemo(() => {
+    const term = (audFilterSearch || '').trim().toLowerCase()
+    if (!term) return auditores
+    return auditores.filter((a) => (a.nombre || '').toLowerCase().includes(term))
+  }, [auditores, audFilterSearch])
   const anios = useMemo(() => {
     const s = new Set(); auditorias.forEach(a => { const y = a.fecha_auditoria ? new Date(a.fecha_auditoria).getFullYear() : null; if (y) s.add(y) })
     return Array.from(s).sort((a, b) => a - b)
@@ -766,12 +811,14 @@ const handleDateKeyDown = useCallback((e) => {
   const filtradas = useMemo(() => auditorias.filter(a => {
     const fa = a.fecha_auditoria ? parseYMD(a.fecha_auditoria) : null
     const flags = computeFlags(a)
+    const auditorNombre = `${a.usuarios?.nombre || ''} ${a.usuarios?.apellido || ''}`.trim().toLowerCase()
 
     const qok = !q ||
       (a.dependencias?.nombre?.toLowerCase().includes(q.toLowerCase())) ||
-      (`${a.usuarios?.nombre || ''} ${a.usuarios?.apellido || ''}`.toLowerCase().includes(q.toLowerCase())) ||
+      (auditorNombre.includes(q.toLowerCase())) ||
       (String(a.id).includes(q))
     if (!qok) return false
+    if (auditorTextFilter && !auditorNombre.includes(auditorTextFilter.toLowerCase())) return false
     if (depFilter && Number(depFilter) !== a.dependencia_id) return false
     if (audFilter && Number(audFilter) !== a.usuario_id) return false
     if (anioFilter) { const y = fa ? fa.getFullYear() : null; if (String(y) !== String(anioFilter)) return false }
@@ -801,7 +848,7 @@ const handleDateKeyDown = useCallback((e) => {
     if (onlyActa && !flags.actaOK) return false
 
     return true
-  }), [auditorias, q, depFilter, audFilter, anioFilter, semFilter, estadoFilter, desde, onlyAsistencia, onlyEvaluacion, onlyActa, onlyActaComp])
+  }), [auditorias, q, auditorTextFilter, depFilter, audFilter, anioFilter, semFilter, estadoFilter, desde, onlyAsistencia, onlyEvaluacion, onlyActa, onlyActaComp])
 
   // mantener selección coherente
   useEffect(() => {
@@ -966,6 +1013,28 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
     setNuevoInforme(prev => ({ ...prev, [name]: value }))
   }
 
+  const handleDependenciaChange = (value) => {
+    setDependenciaSearch(value)
+    setDependenciaDropdownOpen(true)
+    const normalized = (value || '').trim().toLowerCase()
+    const selectedDep = dependenciasAll.find(
+      (dep) => (dep.nombre || '').trim().toLowerCase() === normalized
+    )
+    setNuevoInforme((prev) => ({
+      ...prev,
+      dependencia_id: selectedDep ? String(selectedDep.dependencia_id) : '',
+    }))
+  }
+
+  const handleSelectDependencia = (dep) => {
+    setDependenciaSearch(dep?.nombre || '')
+    setNuevoInforme((prev) => ({
+      ...prev,
+      dependencia_id: dep ? String(dep.dependencia_id) : '',
+    }))
+    setDependenciaDropdownOpen(false)
+  }
+
   const crearInforme = async () => {
     if (!nuevoInforme.usuario_id || !nuevoInforme.dependencia_id || !nuevoInforme.fecha_auditoria) {
       toast.error('Seleccione auditor, dependencia y fecha de auditoría')
@@ -991,6 +1060,9 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
       await loadData()
       if (item?.id) setSelectedId(item.id)
       setNuevoInforme({ dependencia_id: '', usuario_id: '', fecha_auditoria: '' })
+      setDependenciaSearch('')
+      setDependenciaDropdownOpen(false)
+      setAuditorSearch('')
       setShowCreate(false)
       toast.success('Auditoría creada')
     } catch (e) {
@@ -1029,13 +1101,25 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
       <div className={styles.toolbar}>
         <div className={styles.toolbarGrid}>
           <input className={`${styles.inputBase} ${styles.toolbarSearch}`} placeholder="Buscar (dependencia, auditor, ID)" value={q} onChange={e => setQ(e.target.value)} />
+          <input
+            className={styles.inputBase}
+            placeholder="Filtrar por nombre de auditor"
+            value={auditorTextFilter}
+            onChange={e => setAuditorTextFilter(e.target.value)}
+          />
+          <input
+            className={styles.inputBase}
+            placeholder="Escribir para buscar en el desplegable de auditores"
+            value={audFilterSearch}
+            onChange={e => setAudFilterSearch(e.target.value)}
+          />
           <select className={styles.inputBase} value={depFilter} onChange={e => setDepFilter(e.target.value)}>
             <option value="">Todas las dependencias</option>
             {dependencias.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
           </select>
           <select className={styles.inputBase} value={audFilter} onChange={e => setAudFilter(e.target.value)}>
             <option value="">Todos los auditores</option>
-            {auditores.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+            {auditoresFiltradosSelect.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
           </select>
           <select className={styles.inputBase} value={anioFilter} onChange={e => setAnioFilter(e.target.value)}>
             <option value="">Todos los años</option>
@@ -1463,25 +1547,112 @@ const hasValidated = Boolean(validatedHref) || selected.validado === true
       {/* ====== MODAL CREAR AUDITORÍA ====== */}
       {showCreate && (
         <div className={styles.modalOverlay} onClick={(e) => { if (e.target === e.currentTarget) setShowCreate(false) }}>
-          <div className={styles.modalContenido}>
+          <div className={`${styles.modalContenido} ${styles.modalContenidoCrear}`}>
             <button className={styles.modalCerrar} onClick={() => setShowCreate(false)} title="Cerrar">✖</button>
             <h3 className={styles.modalTitulo}>Nueva Auditoría</h3>
 
             <div className={styles.formRow}>
               <label className={styles.formLabel}>Dependencia</label>
-              <select name="dependencia_id" value={nuevoInforme.dependencia_id} onChange={handleChangeNuevo} className={styles.inputBase}>
-                <option value="">Seleccione una dependencia</option>
-                {dependenciasAll.map(dep => (<option key={dep.dependencia_id} value={dep.dependencia_id}>{dep.nombre}</option>))}
-              </select>
+              <div className={styles.comboBoxWrap}>
+                <input
+                  type="text"
+                  value={dependenciaSearch}
+                  onChange={(e) => handleDependenciaChange(e.target.value)}
+                  onFocus={() => setDependenciaDropdownOpen(true)}
+                  onBlur={() => setTimeout(() => setDependenciaDropdownOpen(false), 120)}
+                  className={styles.inputBase}
+                  placeholder="Escribe o selecciona una dependencia"
+                />
+                {dependenciaDropdownOpen && (
+                  <div className={styles.comboBoxOptions}>
+                    {dependenciasFiltradasCrear.length > 0 ? (
+                      dependenciasFiltradasCrear.map((dep) => (
+                        <button
+                          key={dep.dependencia_id}
+                          type="button"
+                          className={styles.comboBoxOption}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            handleSelectDependencia(dep)
+                          }}
+                        >
+                          {dep.nombre}
+                        </button>
+                      ))
+                    ) : (
+                      <div className={styles.comboBoxEmpty}>No se encontraron dependencias con ese criterio.</div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className={styles.formRow}>
               <label className={styles.formLabel}>Auditor responsable</label>
-              <select name="usuario_id" value={nuevoInforme.usuario_id} onChange={handleChangeNuevo} className={styles.inputBase}>
-                <option value="">Seleccione un auditor</option>
-                {auditoresAll.map(a => (<option key={a.usuario_id} value={a.usuario_id}>{a.etiqueta || `${a.nombre || ''} ${a.apellido || ''}`}</option>))}
-              </select>
+              <input
+                type="text"
+                value={auditorSearch}
+                onChange={(e) => setAuditorSearch(e.target.value)}
+                className={styles.inputBase}
+                placeholder="Buscar por nombre, correo, área o perfil"
+              />
+              <div className={styles.auditorPickerGrid}>
+                {auditoresFiltradosCrear.map((a) => {
+                  const isSelected = String(nuevoInforme.usuario_id) === String(a.usuario_id)
+                  return (
+                    <button
+                      key={a.usuario_id}
+                      type="button"
+                      onClick={() => setNuevoInforme((prev) => ({ ...prev, usuario_id: String(a.usuario_id) }))}
+                      className={`${styles.auditorOptionCard} ${isSelected ? styles.auditorOptionCardActive : ''}`}
+                    >
+                      <div className={styles.auditorOptionTop}>
+                        <strong>{a.etiqueta || `${a.nombre || ''} ${a.apellido || ''}`}</strong>
+                        <span className={styles.auditorOptionBadge}>{a.tipo_personal || 'Sin tipo'}</span>
+                      </div>
+                      <div className={styles.auditorOptionMeta}>{a.email || 'Sin correo'}</div>
+                      <div className={styles.auditorOptionMeta}>{a.dependencias?.nombre || 'Sin área asignada'}</div>
+                      <div className={styles.auditorOptionMeta}>{a.tipo_estudio || 'Sin tipo de estudio'}</div>
+                    </button>
+                  )
+                })}
+                {auditoresFiltradosCrear.length === 0 && (
+                  <div className={styles.auditorEmptyState}>No se encontraron auditores con ese criterio.</div>
+                )}
+              </div>
             </div>
+
+            {auditorSeleccionadoCrear && (
+              <div className={styles.auditorPreviewCard}>
+                <div className={styles.auditorPreviewHeader}>
+                  <div>
+                    <div className={styles.auditorPreviewEyebrow}>Auditor seleccionado</div>
+                    <h4 className={styles.auditorPreviewName}>
+                      {auditorSeleccionadoCrear.nombre || ''} {auditorSeleccionadoCrear.apellido || ''}
+                    </h4>
+                  </div>
+                  <span className={styles.auditorPreviewTag}>
+                    {auditorSeleccionadoCrear.tipo_personal || 'Sin tipo'}
+                  </span>
+                </div>
+
+                <div className={styles.auditorPreviewGrid}>
+                  <div className={styles.auditorPreviewBlock}>
+                    <span className={styles.auditorPreviewLabel}>Información personal</span>
+                    <div className={styles.auditorPreviewItem}><strong>Correo:</strong> {auditorSeleccionadoCrear.email || 'No registrado'}</div>
+                    <div className={styles.auditorPreviewItem}><strong>Celular:</strong> {auditorSeleccionadoCrear.celular || 'No registrado'}</div>
+                    <div className={styles.auditorPreviewItem}><strong>Estado:</strong> {auditorSeleccionadoCrear.estado || 'No definido'}</div>
+                  </div>
+
+                  <div className={styles.auditorPreviewBlock}>
+                    <span className={styles.auditorPreviewLabel}>Perfil profesional</span>
+                    <div className={styles.auditorPreviewItem}><strong>Área:</strong> {auditorSeleccionadoCrear.dependencias?.nombre || 'Sin área asignada'}</div>
+                    <div className={styles.auditorPreviewItem}><strong>Tipo de estudio:</strong> {auditorSeleccionadoCrear.tipo_estudio || 'No registrado'}</div>
+                    <div className={styles.auditorPreviewItem}><strong>Estudios:</strong> {auditorSeleccionadoCrear.estudios || 'No registrados'}</div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className={styles.formRow}>
               <label className={styles.formLabel}>Fecha de auditoría</label>

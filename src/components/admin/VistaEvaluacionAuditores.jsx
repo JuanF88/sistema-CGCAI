@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
+import { saveAs } from 'file-saver'
+import ExcelJS from 'exceljs'
 import { 
   Upload, FileText, Calculator, Edit3, TrendingUp, 
   Calendar, Filter, Download, RefreshCw, CheckCircle,
@@ -38,9 +40,7 @@ export default function VistaEvaluacionAuditores() {
   // Estados de evaluación manual
   const [calificacionesMatriz, setCalificacionesMatriz] = useState({}) // { evaluacion_id: { c1: 4, c2: 3.5, ... } }
   const [guardandoRubricas, setGuardandoRubricas] = useState(false)
-  const [leyendaVisible, setLeyendaVisible] = useState(false)
-  const [criterioLeyenda, setCriterioLeyenda] = useState(null)
-  const hoverTimerRef = useRef(null) // Para mostrar leyenda de un criterio específico
+  const [selectTooltip, setSelectTooltip] = useState(null) // { criterio, x, y }
   
   // Estado para modal de desglose de archivos
   const [modalArchivosVisible, setModalArchivosVisible] = useState(false)
@@ -568,6 +568,242 @@ export default function VistaEvaluacionAuditores() {
       autoClose: 3000
     })
   }
+
+  const exportarResumenGeneralExcel = async () => {
+    if (!evaluaciones.length) {
+      toast.warning('No hay evaluaciones para exportar')
+      return
+    }
+
+    try {
+      const workbook = new ExcelJS.Workbook()
+      const worksheet = workbook.addWorksheet('Resumen General')
+      const periodoLabel = anioSeleccionado && semestreSeleccionado
+        ? `${anioSeleccionado}-${semestreSeleccionado}`
+        : 'Sin periodo'
+
+      worksheet.mergeCells('A1:H1')
+      worksheet.getCell('A1').value = 'Resumen General de Evaluaciones de Auditores'
+      worksheet.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } }
+      worksheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' }
+      worksheet.getCell('A1').fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF667EEA' },
+      }
+      worksheet.getRow(1).height = 24
+
+      worksheet.mergeCells('A2:H2')
+      worksheet.getCell('A2').value = `Periodo: ${periodoLabel}`
+      worksheet.getCell('A2').font = { italic: true, color: { argb: 'FF475569' } }
+      worksheet.getCell('A2').alignment = { horizontal: 'left', vertical: 'middle' }
+
+      worksheet.columns = [
+        { header: 'ID Informe', key: 'informeId', width: 16 },
+        { header: 'Auditor', key: 'auditor', width: 28 },
+        { header: 'Dependencia', key: 'dependencia', width: 30 },
+        { header: 'Fecha Auditoría', key: 'fechaAuditoria', width: 18 },
+        { header: 'Nota Archivos', key: 'notaArchivos', width: 14 },
+        { header: 'Nota Encuesta', key: 'notaEncuesta', width: 14 },
+        { header: 'Nota Rúbrica', key: 'notaRubrica', width: 14 },
+        { header: 'Nota Final', key: 'notaFinal', width: 12 },
+      ]
+
+      const headerRow = worksheet.getRow(4)
+      headerRow.values = worksheet.columns.map((column) => column.header)
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+      headerRow.alignment = { horizontal: 'center', vertical: 'middle' }
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF1E40AF' },
+      }
+      headerRow.height = 22
+
+      evaluaciones.forEach((ev) => {
+        worksheet.addRow({
+          informeId: ev.informe_auditoria_id || '-',
+          auditor: `${ev.auditor_nombre || ''} ${ev.auditor_apellido || ''}`.trim() || '-',
+          dependencia: ev.auditor_dependencia_nombre || '-',
+          fechaAuditoria: ev.fecha_auditoria || '-',
+          notaArchivos: ev.nota_archivos !== null ? Number(ev.nota_archivos) : null,
+          notaEncuesta: ev.nota_encuesta !== null ? Number(ev.nota_encuesta) : null,
+          notaRubrica: ev.nota_rubrica !== null ? Number(ev.nota_rubrica) : null,
+          notaFinal: ev.nota_final !== null && ev.nota_final !== undefined ? Number(ev.nota_final) : null,
+        })
+      })
+
+      worksheet.autoFilter = {
+        from: 'A4',
+        to: 'H4',
+      }
+      worksheet.views = [{ state: 'frozen', ySplit: 4 }]
+
+      for (let rowNumber = 5; rowNumber <= worksheet.rowCount; rowNumber++) {
+        const row = worksheet.getRow(rowNumber)
+        row.alignment = { vertical: 'middle' }
+        ;[5, 6, 7, 8].forEach((columnNumber) => {
+          const cell = row.getCell(columnNumber)
+          if (typeof cell.value === 'number') {
+            cell.numFmt = '0.00'
+          }
+        })
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          }
+        })
+      }
+
+      headerRow.eachCell((cell) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FF1E40AF' } },
+          left: { style: 'thin', color: { argb: 'FF1E40AF' } },
+          bottom: { style: 'thin', color: { argb: 'FF1E40AF' } },
+          right: { style: 'thin', color: { argb: 'FF1E40AF' } },
+        }
+      })
+
+      const buffer = await workbook.xlsx.writeBuffer()
+      const blob = new Blob([
+        buffer,
+      ], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+
+      saveAs(blob, `resumen_evaluacion_auditores_${periodoLabel}.xlsx`)
+      toast.success('Resumen general exportado en Excel')
+    } catch (err) {
+      console.error('Error exportando resumen general:', err)
+      toast.error('No se pudo exportar el resumen general')
+    }
+  }
+
+  const exportarEvaluacionManualExcel = async () => {
+    if (!evaluaciones.length) {
+      toast.warning('No hay evaluaciones manuales para exportar')
+      return
+    }
+
+    try {
+      const workbook = new ExcelJS.Workbook()
+      const worksheet = workbook.addWorksheet('Evaluación Manual')
+      const periodoLabel = anioSeleccionado && semestreSeleccionado
+        ? `${anioSeleccionado}-${semestreSeleccionado}`
+        : 'Sin periodo'
+
+      worksheet.mergeCells(1, 1, 1, RUBRICA_CRITERIOS.length + 5)
+      worksheet.getCell(1, 1).value = 'Evaluación Manual de Auditores'
+      worksheet.getCell(1, 1).font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } }
+      worksheet.getCell(1, 1).alignment = { horizontal: 'center', vertical: 'middle' }
+      worksheet.getCell(1, 1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF667EEA' },
+      }
+      worksheet.getRow(1).height = 24
+
+      worksheet.mergeCells(2, 1, 2, RUBRICA_CRITERIOS.length + 5)
+      worksheet.getCell(2, 1).value = `Periodo: ${periodoLabel}`
+      worksheet.getCell(2, 1).font = { italic: true, color: { argb: 'FF475569' } }
+
+      worksheet.columns = [
+        { header: 'ID Informe', key: 'informeId', width: 14 },
+        { header: 'Auditor', key: 'auditor', width: 28 },
+        { header: 'Dependencia', key: 'dependencia', width: 28 },
+        { header: 'Fecha Auditoría', key: 'fechaAuditoria', width: 18 },
+        ...RUBRICA_CRITERIOS.map((criterio) => ({
+          header: criterio.nombre,
+          key: criterio.id,
+          width: 22,
+        })),
+        { header: 'Nota Final (1-5)', key: 'notaFinal', width: 16 },
+      ]
+
+      const headerRow = worksheet.getRow(4)
+      headerRow.values = worksheet.columns.map((column) => column.header)
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+      headerRow.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF1E40AF' },
+      }
+      headerRow.height = 42
+
+      evaluaciones.forEach((ev) => {
+        const calificacionesEv = calificacionesMatriz[ev.id] || {}
+        const criteriosCalificados = RUBRICA_CRITERIOS.filter((crit) => calificacionesEv[crit.id]).length
+        const promedioEscala4 = criteriosCalificados > 0
+          ? RUBRICA_CRITERIOS.reduce((acc, crit) => {
+              const valor = calificacionesEv[crit.id]
+              return valor ? acc + parseFloat(valor) : acc
+            }, 0) / criteriosCalificados
+          : 0
+        const notaFinal = promedioEscala4 > 0 ? 1 + (promedioEscala4 - 1) * (4 / 3) : null
+
+        const rowData = {
+          informeId: ev.informe_auditoria_id || '-',
+          auditor: `${ev.auditor_nombre || ''} ${ev.auditor_apellido || ''}`.trim() || '-',
+          dependencia: ev.auditor_dependencia_nombre || '-',
+          fechaAuditoria: ev.fecha_auditoria || '-',
+          notaFinal,
+        }
+
+        RUBRICA_CRITERIOS.forEach((criterio) => {
+          rowData[criterio.id] = calificacionesEv[criterio.id] ?? null
+        })
+
+        worksheet.addRow(rowData)
+      })
+
+      worksheet.autoFilter = {
+        from: { row: 4, column: 1 },
+        to: { row: 4, column: worksheet.columnCount },
+      }
+      worksheet.views = [{ state: 'frozen', ySplit: 4, xSplit: 4 }]
+
+      for (let rowNumber = 5; rowNumber <= worksheet.rowCount; rowNumber++) {
+        const row = worksheet.getRow(rowNumber)
+        row.alignment = { vertical: 'middle', wrapText: true }
+        for (let columnNumber = 5; columnNumber <= worksheet.columnCount; columnNumber++) {
+          const cell = row.getCell(columnNumber)
+          if (typeof cell.value === 'number') {
+            cell.numFmt = '0.00'
+          }
+        }
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          }
+        })
+      }
+
+      headerRow.eachCell((cell) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FF1E40AF' } },
+          left: { style: 'thin', color: { argb: 'FF1E40AF' } },
+          bottom: { style: 'thin', color: { argb: 'FF1E40AF' } },
+          right: { style: 'thin', color: { argb: 'FF1E40AF' } },
+        }
+      })
+
+      const buffer = await workbook.xlsx.writeBuffer()
+      const blob = new Blob([
+        buffer,
+      ], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+
+      saveAs(blob, `evaluacion_manual_auditores_${periodoLabel}.xlsx`)
+      toast.success('Evaluación manual exportada en Excel')
+    } catch (err) {
+      console.error('Error exportando evaluación manual:', err)
+      toast.error('No se pudo exportar la evaluación manual')
+    }
+  }
   
   // Abrir modalcondetalles de archivos
   const mostrarDesgloseArchivos = (evaluacion) => {
@@ -842,7 +1078,7 @@ export default function VistaEvaluacionAuditores() {
       <div className={styles.modernHeader}>
         <div className={styles.headerContent}>
           <div className={styles.headerLeft}>
-            <div className={styles.headerIcon}><Award size={48} /></div>
+            <div className={styles.headerIcon}>🧐</div>
             <div className={styles.headerInfo}>
               <h1 className={styles.headerTitle}>Evaluación de Auditores</h1>
               <p className={styles.headerSubtitle}>
@@ -961,6 +1197,19 @@ export default function VistaEvaluacionAuditores() {
             <p className={styles.tabSubtitle}>
               Vista consolidada de todas las evaluaciones del periodo {anioSeleccionado}-{semestreSeleccionado}
             </p>
+
+            {!loading && evaluaciones.length > 0 && (
+              <div className={styles.summaryActions}>
+                <button
+                  type="button"
+                  className={styles.exportSummaryBtn}
+                  onClick={exportarResumenGeneralExcel}
+                >
+                  <Download size={18} />
+                  <span>Descargar Excel del Resumen</span>
+                </button>
+              </div>
+            )}
 
             {loading ? (
               <div className={styles.loading}>Cargando evaluaciones...</div>
@@ -1094,6 +1343,19 @@ export default function VistaEvaluacionAuditores() {
               Matriz de evaluación: Califica todos los auditores de forma rápida y visual
             </p>
 
+            {!loading && evaluaciones.length > 0 && (
+              <div className={styles.summaryActions}>
+                <button
+                  type="button"
+                  className={styles.exportSummaryBtn}
+                  onClick={exportarEvaluacionManualExcel}
+                >
+                  <Download size={18} />
+                  <span>Descargar Excel de Evaluación Manual</span>
+                </button>
+              </div>
+            )}
+
             {loading ? (
               <div className={styles.loading}>Cargando evaluaciones...</div>
             ) : evaluaciones.length === 0 ? (
@@ -1122,15 +1384,12 @@ export default function VistaEvaluacionAuditores() {
                 </div>
 
                 {/* Tabla matriz de evaluación */}
-                <div className={styles.matrizContainer} style={{overflowX: 'auto', marginBottom: '20px'}}>
+                <div className={styles.matrizContainer} style={{overflowX: 'auto', overflowY: 'auto', maxHeight: '65vh', marginBottom: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', borderRadius: '8px'}}>
                   <table className={styles.matrizRubrica} style={{
                     width: '100%',
                     borderCollapse: 'collapse',
                     fontSize: '13px',
-                    backgroundColor: 'white',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    borderRadius: '8px',
-                    overflow: 'hidden'
+                    backgroundColor: 'white'
                   }}>
                     <thead>
                       <tr style={{backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0'}}>
@@ -1141,8 +1400,9 @@ export default function VistaEvaluacionAuditores() {
                           color: '#334155',
                           position: 'sticky',
                           left: 0,
+                          top: 0,
                           backgroundColor: '#f8fafc',
-                          zIndex: 10,
+                          zIndex: 20,
                           minWidth: '200px',
                           borderRight: '2px solid #e2e8f0'
                         }}>
@@ -1154,33 +1414,13 @@ export default function VistaEvaluacionAuditores() {
                             textAlign: 'center',
                             fontWeight: '600',
                             color: '#334155',
-                            minWidth: '180px'
+                            minWidth: '180px',
+                            position: 'sticky',
+                            top: 0,
+                            backgroundColor: '#f8fafc',
+                            zIndex: 15
                           }}>
-                            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexDirection: 'column'}}>
-                              <span style={{fontSize: '12px', lineHeight: '1.4'}}>{criterio.nombre}</span>
-                              <button
-                                onMouseEnter={() => {
-                                  if (hoverTimerRef.current) {
-                                    clearTimeout(hoverTimerRef.current)
-                                    hoverTimerRef.current = null
-                                  }
-                                  setCriterioLeyenda(criterio)
-                                  setLeyendaVisible(true)
-                                }}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  padding: '2px',
-                                  display: 'flex',
-                                  color: '#0066cc',
-                                  transition: 'color 0.2s'
-                                }}
-                                title="Ver descripción"
-                              >
-                                <Info size={16} />
-                              </button>
-                            </div>
+                            <span style={{fontSize: '12px', lineHeight: '1.4'}}>{criterio.nombre}</span>
                           </th>
                         ))}
                         <th style={{
@@ -1190,7 +1430,10 @@ export default function VistaEvaluacionAuditores() {
                           color: '#334155',
                           minWidth: '80px',
                           backgroundColor: '#fef3c7',
-                          borderLeft: '2px solid #e2e8f0'
+                          borderLeft: '2px solid #e2e8f0',
+                          position: 'sticky',
+                          top: 0,
+                          zIndex: 15
                         }}>
                           Nota Final (1-5)
                         </th>
@@ -1230,11 +1473,19 @@ export default function VistaEvaluacionAuditores() {
                               </div>
                             </td>
                             {RUBRICA_CRITERIOS.map(criterio => (
-                              <td key={criterio.id} style={{
-                                padding: '8px',
-                                textAlign: 'center',
-                                backgroundColor: calificacionesEv[criterio.id] ? '#f0fdf4' : 'white'
-                              }}>
+                              <td
+                                key={criterio.id}
+                                onMouseEnter={(e) => {
+                                  const rect = e.currentTarget.getBoundingClientRect()
+                                  setSelectTooltip({ criterio, x: rect.right + 8, y: rect.top })
+                                }}
+                                onMouseLeave={() => setSelectTooltip(null)}
+                                style={{
+                                  padding: '8px',
+                                  textAlign: 'center',
+                                  backgroundColor: calificacionesEv[criterio.id] ? '#f0fdf4' : 'white'
+                                }}
+                              >
                                 <select
                                   value={calificacionesEv[criterio.id] || ''}
                                   onChange={(e) => {
@@ -1312,115 +1563,44 @@ export default function VistaEvaluacionAuditores() {
               </div>
             )}
 
-            {/* Modal de leyenda/descripción de criterios */}
-            {leyendaVisible && criterioLeyenda && (
-              <div 
+            {/* Tooltip flotante de criterio (al pasar el cursor sobre la celda del selector) */}
+            {selectTooltip && (
+              <div
                 style={{
                   position: 'fixed',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: 'rgba(0,0,0,0.5)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 1000,
-                  padding: '20px',
-                  animation: 'fadeIn 0.2s ease-out'
+                  left: Math.min(selectTooltip.x, window.innerWidth - 328),
+                  // Flip upward when there is more space above the row than below
+                  ...(selectTooltip.y - 8 > window.innerHeight - selectTooltip.y - 8
+                    ? { bottom: window.innerHeight - selectTooltip.y, maxHeight: Math.min(500, selectTooltip.y - 8) }
+                    : { top: selectTooltip.y, maxHeight: Math.min(500, window.innerHeight - selectTooltip.y - 8) }
+                  ),
+                  width: 310,
+                  overflowY: 'hidden',
+                  backgroundColor: 'white',
+                  border: '1px solid #dbeafe',
+                  borderRadius: 12,
+                  boxShadow: '0 8px 28px rgba(15,23,42,0.18)',
+                  zIndex: 9999,
+                  padding: '14px 16px',
+                  pointerEvents: 'none'
                 }}
-                onClick={() => setLeyendaVisible(false)}
               >
-                <div 
-                  style={{
-                    backgroundColor: 'white',
-                    borderRadius: '12px',
-                    padding: '24px',
-                    maxWidth: '600px',
-                    width: '100%',
-                    maxHeight: '80vh',
-                    overflowY: 'auto',
-                    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-                    animation: 'slideIn 0.2s ease-out'
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseEnter={() => {
-                    if (hoverTimerRef.current) {
-                      clearTimeout(hoverTimerRef.current)
-                      hoverTimerRef.current = null
-                    }
-                  }}
-                  onMouseLeave={() => {
-                    hoverTimerRef.current = setTimeout(() => {
-                      setLeyendaVisible(false)
-                    }, 300)
-                  }}
-                >
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px'}}>
-                    <div>
-                      <h3 style={{margin: 0, fontSize: '18px', fontWeight: '700', color: '#1e293b'}}>
-                        {criterioLeyenda.nombre}
-                      </h3>
-                      <p style={{margin: '4px 0 0', fontSize: '14px', color: '#64748b'}}>
-                        {criterioLeyenda.descripcion}
-                      </p>
+                <div style={{fontWeight: '700', fontSize: '13px', color: '#1e293b', marginBottom: 10, borderBottom: '1px solid #e2e8f0', paddingBottom: 8}}>
+                  {selectTooltip.criterio.nombre}
+                </div>
+                <div style={{display: 'flex', flexDirection: 'column', gap: 6}}>
+                  {Object.keys(selectTooltip.criterio.niveles).sort((a, b) => b - a).map(nivel => (
+                    <div key={nivel} style={{display: 'flex', gap: 8, alignItems: 'flex-start'}}>
+                      <span style={{
+                        minWidth: 36, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: '#0066cc', color: 'white', borderRadius: 4,
+                        fontWeight: '700', fontSize: '12px', flexShrink: 0
+                      }}>{nivel}</span>
+                      <span style={{fontSize: '12px', color: '#334155', lineHeight: '1.4'}}>
+                        {selectTooltip.criterio.niveles[nivel]}
+                      </span>
                     </div>
-                    <button
-                      onClick={() => setLeyendaVisible(false)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: '4px',
-                        color: '#64748b',
-                        display: 'flex'
-                      }}
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
-
-                  <div style={{marginTop: '20px'}}>
-                    <h4 style={{fontSize: '14px', fontWeight: '600', color: '#475569', marginBottom: '12px'}}>
-                      Escala de Calificación:
-                    </h4>
-                    <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                      {Object.keys(criterioLeyenda.niveles).sort((a, b) => b - a).map(nivel => (
-                        <div 
-                          key={nivel}
-                          style={{
-                            padding: '12px 16px',
-                            backgroundColor: '#f8fafc',
-                            borderRadius: '6px',
-                            border: '1px solid #e2e8f0',
-                            display: 'flex',
-                            gap: '12px',
-                            alignItems: 'start'
-                          }}
-                        >
-                          <div style={{
-                            minWidth: '40px',
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: '#0066cc',
-                            color: 'white',
-                            borderRadius: '4px',
-                            fontWeight: '700',
-                            fontSize: '14px'
-                          }}>
-                            {nivel}
-                          </div>
-                          <div style={{flex: 1}}>
-                            <p style={{margin: 0, fontSize: '13px', color: '#334155', lineHeight: '1.5'}}>
-                              {criterioLeyenda.niveles[nivel]}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             )}

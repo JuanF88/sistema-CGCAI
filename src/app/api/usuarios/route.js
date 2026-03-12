@@ -26,7 +26,7 @@ export async function GET(request) {
 
   let query = supabase
     .from('usuarios')
-    .select('usuario_id, nombre, apellido, email, rol, password, estado, auth_user_id')
+    .select('usuario_id, nombre, apellido, email, rol, password, estado, auth_user_id, tipo_personal, dependencia_id, estudios, tipo_estudio, celular')
 
   if (rol) {
     query = query.eq('rol', rol)
@@ -64,7 +64,19 @@ export async function POST(req) {
 
   try {
     const body = await req.json()
-    const { nombre, apellido, email, password, rol, estado = 'activo' } = body
+    const {
+      nombre,
+      apellido,
+      email,
+      password,
+      rol,
+      estado = 'activo',
+      tipo_personal = null,
+      dependencia_id = null,
+      estudios = null,
+      tipo_estudio = null,
+      celular = null,
+    } = body
 
     if (!email || !rol || !password) {
       return NextResponse.json({ error: 'Email, rol y contraseña son obligatorios.' }, { status: 400 })
@@ -95,9 +107,14 @@ export async function POST(req) {
         password, 
         rol, 
         estado,
+        tipo_personal,
+        dependencia_id: dependencia_id || null,
+        estudios,
+        tipo_estudio,
+        celular,
         auth_user_id: authUser.user.id // ← CLAVE: vincular con Supabase Auth
       })
-      .select('usuario_id, nombre, apellido, email, rol, estado, auth_user_id')
+      .select('usuario_id, nombre, apellido, email, rol, estado, auth_user_id, tipo_personal, dependencia_id, estudios, tipo_estudio, celular')
       .single()
 
     if (dbError) {
@@ -158,9 +175,13 @@ export async function PUT(req) {
 
   // Solo permitimos actualizar campos existentes
   const update = {}
-  ;['nombre', 'apellido', 'email', 'password', 'rol', 'estado'].forEach((k) => {
+  ;['nombre', 'apellido', 'email', 'password', 'rol', 'estado', 'tipo_personal', 'dependencia_id', 'estudios', 'tipo_estudio', 'celular'].forEach((k) => {
     if (k in body && body[k] !== undefined) update[k] = body[k]
   })
+
+  if ('dependencia_id' in update) {
+    update.dependencia_id = update.dependencia_id || null
+  }
 
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: 'No hay campos para actualizar.' }, { status: 400 })
@@ -170,7 +191,7 @@ export async function PUT(req) {
     .from('usuarios')
     .update(update)
     .eq('usuario_id', id)
-    .select('usuario_id, nombre, apellido, email, rol, estado')
+    .select('usuario_id, nombre, apellido, email, rol, estado, auth_user_id, tipo_personal, dependencia_id, estudios, tipo_estudio, celular')
     .single()
 
   if (error) {

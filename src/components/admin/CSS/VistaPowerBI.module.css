@@ -1,11 +1,12 @@
 /* Contenedor principal */
 .container {
   min-height: 100vh;
+  padding: 1rem;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  padding: 0;
 }
 
-/* Header modernizado */
+
+/* ===================== MODERN HEADER ===================== */
 .modernHeader {
   background: linear-gradient(135deg, #667eea 0%, #4b54a2 100%);
   border-radius: 16px;
@@ -14,7 +15,6 @@
   margin-bottom: 2rem;
   animation: slideDown 0.5s ease-out;
 }
-
 
 @keyframes slideDown {
   from {
@@ -28,44 +28,93 @@
 }
 
 .headerContent {
-  max-width: 1400px;
-  margin: 0 auto;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 1.5rem;
 }
 
 .headerLeft {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 1.5rem;
 }
 
 .headerIcon {
-  font-size: 40px;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  font-size: 3rem;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
 }
 
 .headerInfo {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0.5rem;
 }
 
 .headerTitle {
-  font-size: 28px;
+  font-size: 2rem;
   font-weight: 700;
-  color: #ffffff;
+  color: white;
   margin: 0;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .headerSubtitle {
-  font-size: 14px;
+  font-size: 1rem;
   color: rgba(255, 255, 255, 0.9);
   margin: 0;
-  font-weight: 500;
 }
+
+.headerRight {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.modernBtnRefresh,
+.modernBtnSecondary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.modernBtnRefresh {
+  background: white;
+  color: #667eea;
+}
+
+.modernBtnRefresh:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.modernBtnSecondary {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.modernBtnSecondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.modernBtnRefresh:disabled,
+.modernBtnSecondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 
 /* Botón de exportar */
 .exportBtn {

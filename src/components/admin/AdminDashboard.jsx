@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, FileText, UserPlus, Home, TrendingUp, Award} from 'lucide-react'
+import { LogOut, FileText, UserPlus, Home, TrendingUp, Award, UserRound} from 'lucide-react'
 import { Lightbulb } from 'lucide-react'
 import { Building } from 'lucide-react'   
 import { BarChart } from 'lucide-react'
@@ -19,6 +19,7 @@ import VistaAdministrarHallazgos from '@/components/admin/VistaAdministrarHallaz
 import VistaEstadisticas from '@/components/admin/VistaEstadisticasNew'
 import VistaPowerBI from '@/components/admin/VistaPowerBI'
 import VistaEvaluacionAuditores from '@/components/admin/VistaEvaluacionAuditores'
+import VistaDashboardAuditores from '@/components/admin/VistaDashboardAuditores'
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -112,6 +113,16 @@ export default function AdminDashboard() {
 
             <button
               onClick={() => {
+                setVista('dashboardAuditores')
+                window.history.pushState({}, '', '/admin?vista=dashboardAuditores')
+              }}
+              className={`${styles.navButton} ${vista === 'dashboardAuditores' ? styles.active : ''}`}
+            >
+              <UserRound className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Dashboard de Auditores</span>
+            </button>
+
+            <button
+              onClick={() => {
                 setVista('estadisticas')
                 window.history.pushState({}, '', '/admin?vista=estadisticas')
               }}
@@ -154,6 +165,7 @@ export default function AdminDashboard() {
   {vista === 'adminDependencia' && <VistaAdministrarDependencias />}
   {vista === 'administrarHallazgos' && <VistaAdministrarHallazgos />}
   {vista === 'evaluacionAuditores' && <VistaEvaluacionAuditores />}
+  {vista === 'dashboardAuditores' && <VistaDashboardAuditores />}
   {vista === 'estadisticas' && <VistaEstadisticas />}
   {vista === 'powerbi' && <VistaPowerBI />}
   {vista === 'gestionarUsuarios' && (
