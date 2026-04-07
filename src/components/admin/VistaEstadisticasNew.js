@@ -189,7 +189,7 @@ function ChartCard({ title, subtitle, children, downloadName, className = '' }) 
   )
 }
 
-export default function VistaEstadisticasNew() {
+export default function VistaEstadisticasNew({ headerExtra = null, hideMainHeader = false }) {
   const [detalle, setDetalle] = useState([])
   const [dataResumen, setDataResumen] = useState([])
   const [porTipo, setPorTipo] = useState([])
@@ -490,25 +490,28 @@ export default function VistaEstadisticasNew() {
 
   return (
     <div className={styles.page}>
-      {/* MODERN HEADER */}
-      <div className={styles.modernHeader}>
-        <div className={styles.headerContent}>
-          <div className={styles.headerLeft}>
-            <div className={styles.headerIcon}>📈</div>
-            <div className={styles.headerInfo}>
-              <h1 className={styles.headerTitle}>Estadísticas Avanzadas</h1>
-              <p className={styles.headerSubtitle}>
-                Panel interactivo de análisis con visualizaciones personalizables
-              </p>
+      {!hideMainHeader && (
+        <div className={styles.modernHeader}>
+          <div className={styles.headerContent}>
+            <div className={styles.headerLeft}>
+              <div className={styles.headerIcon}>📈</div>
+              <div className={styles.headerInfo}>
+                <h1 className={styles.headerTitle}>Estadísticas Avanzadas</h1>
+                <p className={styles.headerSubtitle}>
+                  Panel interactivo de análisis con visualizaciones personalizables
+                </p>
+              </div>
+            </div>
+            <div className={styles.headerActions}>
+              <Button variant="outline" onClick={() => location.reload()} icon={RefreshCw}>
+                Actualizar
+              </Button>
             </div>
           </div>
-          <div className={styles.headerActions}>
-            <Button variant="outline" onClick={() => location.reload()} icon={RefreshCw}>
-              Actualizar
-            </Button>
-          </div>
         </div>
-      </div>
+      )}
+
+      {headerExtra && <div className={styles.headerExtra}>{headerExtra}</div>}
 
       {/* TABS DE VISTA */}
       <div className={styles.viewTabs}>

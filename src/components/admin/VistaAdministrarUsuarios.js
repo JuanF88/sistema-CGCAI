@@ -9,6 +9,7 @@ import {
   Edit2,
   Trash2,
   Send,
+  Search,
   UserRound,
   ShieldCheck,
   Building2,
@@ -81,6 +82,7 @@ export default function VistaAdministrarUsuarios() {
   const [credPassword, setCredPassword] = useState('')
   const [credBody, setCredBody] = useState('')
   const [credSubject, setCredSubject] = useState('')
+  const [enviandoCredenciales, setEnviandoCredenciales] = useState(false)
 
   const [eliminandoId, setEliminandoId] = useState(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -124,16 +126,12 @@ export default function VistaAdministrarUsuarios() {
   }
 
   const plantillaCredenciales = ({ nombre, apellido, email, password }) => {
-    return `Buen día ${nombre} ${apellido},
+    return `Se ha creado tu cuenta en el Sistema de Auditoría Interna CGCAI. A continuación encontraras tus credenciales de acceso para ingresar al aplicativo:
 
-    Te comparto tus credenciales de acceso:
+Usuario: ${email}
+Contraseña: ${password}
 
-    Usuario: ${email}
-    Contraseña: ${password}
-
-    Puedes ingresar aquí: https://sistema-cgcai.vercel.app/
-
-    Saludos.`
+Puedes ingresar aquí: https://sistema-cgcai.vercel.app/`
   }
 
   const abrirCredenciales = (usuario) => {
@@ -182,6 +180,51 @@ export default function VistaAdministrarUsuarios() {
     const bo = encodeURIComponent(credBody)
     const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${su}&body=${bo}`
     window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  const enviarCredencialesAhora = async () => {
+    if (!credUsuario?.email) {
+      toast.error('Falta el correo del usuario.')
+      return
+    }
+
+    if (!credSubject.trim() || !credBody.trim()) {
+      toast.error('Asunto y cuerpo son obligatorios para enviar.')
+      return
+    }
+
+    try {
+      setEnviandoCredenciales(true)
+
+      const res = await fetch('/api/usuarios/send-credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: credUsuario.email,
+          subject: credSubject.trim(),
+          email: credUsuario.email,
+          password: credPassword,
+          nombre: credUsuario.nombre || '',
+          apellido: credUsuario.apellido || '',
+          nombreCompleto: `${credUsuario.nombre || ''} ${credUsuario.apellido || ''}`.trim(),
+        }),
+      })
+
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok || !data?.ok) {
+        const msg = data?.notification?.message || data?.error || 'No se pudo enviar el correo.'
+        toast.error(msg)
+        return
+      }
+
+      toast.success('Credenciales enviadas por correo.')
+      cerrarCredenciales()
+    } catch (error) {
+      toast.error(error?.message || 'Error enviando credenciales.')
+    } finally {
+      setEnviandoCredenciales(false)
+    }
   }
 
   const handleChange = (e) => {
@@ -374,41 +417,70 @@ export default function VistaAdministrarUsuarios() {
   const columnas = [
     {
       name: 'ID',
-      selector: (row) => row.usuario_id,
+      selector: (row) => Number(row.usuario_id || 0),
+      cell: (row) => <span className={styles.idPill}>#{row.usuario_id}</span>,
       sortable: true,
       width: '80px',
     },
     {
       name: 'Nombre',
-      selector: (row) => `${row.nombre} ${row.apellido}`,
+      selector: (row) => `${row.nombre || ''} ${row.apellido || ''}`.trim(),
+      sortFunction: (a, b) => {
+        const aValue = normalize(`${a.nombre || ''} ${a.apellido || ''}`.trim())
+        const bValue = normalize(`${b.nombre || ''} ${b.apellido || ''}`.trim())
+        return aValue.localeCompare(bValue)
+      },
+      cell: (row) => (
+        <div className={styles.primaryCell}>
+          <strong className={styles.primaryLine}>{`${row.nombre || ''} ${row.apellido || ''}`.trim() || 'Sin nombre'}</strong>
+        </div>
+      ),
       sortable: true,
       grow: 1.4,
     },
     {
       name: 'Email',
-      selector: (row) => row.email,
+      selector: (row) => row.email || '',
+      sortFunction: (a, b) => normalize(a.email).localeCompare(normalize(b.email)),
+      cell: (row) => <span className={styles.emailText}>{row.email || 'Sin correo'}</span>,
       sortable: true,
       grow: 1.4,
     },
     {
       name: 'Rol',
-      selector: (row) => row.rol,
+      selector: (row) => row.rol || '',
+      sortFunction: (a, b) => normalize(a.rol).localeCompare(normalize(b.rol)),
+      cell: (row) => (
+        <span className={`${styles.badge} ${styles[`badgeRole${(row.rol || '').charAt(0).toUpperCase() + (row.rol || '').slice(1)}`] || styles.badgeRoleDefault}`}>
+          {row.rol || 'sin rol'}
+        </span>
+      ),
       sortable: true,
     },
     {
       name: 'Tipo',
-      selector: (row) => row.tipo_personal || 'Sin definir',
+      selector: (row) => row.tipo_personal || '',
+      sortFunction: (a, b) => normalize(a.tipo_personal).localeCompare(normalize(b.tipo_personal)),
+      cell: (row) => <span className={styles.typeTag}>{row.tipo_personal || 'Sin definir'}</span>,
       sortable: true,
     },
     {
       name: 'Organismo / Área',
       selector: (row) => getDependenciaNombre(row.dependencia_id),
+      sortFunction: (a, b) => normalize(getDependenciaNombre(a.dependencia_id)).localeCompare(normalize(getDependenciaNombre(b.dependencia_id))),
+      cell: (row) => <span className={styles.areaText}>{getDependenciaNombre(row.dependencia_id)}</span>,
       sortable: true,
       grow: 1.3,
     },
     {
       name: 'Estado',
-      selector: (row) => row.estado,
+      selector: (row) => row.estado || '',
+      sortFunction: (a, b) => normalize(a.estado).localeCompare(normalize(b.estado)),
+      cell: (row) => (
+        <span className={`${styles.badge} ${row.estado === 'activo' ? styles.badgeActive : styles.badgeInactive}`}>
+          {row.estado || 'sin estado'}
+        </span>
+      ),
       sortable: true,
     },
     {
@@ -528,8 +600,12 @@ export default function VistaAdministrarUsuarios() {
 
       <div className={styles.tableCard}>
         <div className={styles.tableHeader}>
-          <h3 className={styles.tableTitle}>Listado de Usuarios</h3>
+          <div className={styles.tableTitleWrap}>
+            <h3 className={styles.tableTitle}>Listado de Usuarios</h3>
+            <span className={styles.tableCountChip}>{usuariosVista.length} registros</span>
+          </div>
           <div className={styles.searchBox}>
+            <Search size={16} className={styles.searchIcon} />
             <input
               type="text"
               placeholder="Buscar por nombre, correo, rol, tipo o área..."
@@ -550,29 +626,71 @@ export default function VistaAdministrarUsuarios() {
             columns={columnas}
             data={usuariosVista}
             pagination
+            paginationPerPage={30}
+            paginationRowsPerPageOptions={[30, 50, 100]}
+            defaultSortFieldId={1}
             highlightOnHover
             responsive
-            striped
             noDataComponent="No hay usuarios registrados."
             customStyles={{
+              table: {
+                style: {
+                  backgroundColor: '#ffffff',
+                },
+              },
               headRow: {
                 style: {
-                  backgroundColor: '#f8fafc',
-                  borderBottom: '2px solid #e5e7eb',
+                  minHeight: '54px',
+                  background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
+                  borderBottom: '1px solid #dbe6f6',
                   fontWeight: '700',
-                  fontSize: '13px',
-                  color: '#475569',
+                  fontSize: '12px',
+                  color: '#334155',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
+                  letterSpacing: '0.08em',
+                },
+              },
+              headCells: {
+                style: {
+                  paddingLeft: '14px',
+                  paddingRight: '14px',
                 },
               },
               rows: {
                 style: {
+                  minHeight: '62px',
                   fontSize: '14px',
                   color: '#1e293b',
+                  borderBottom: '1px solid #eef2f7',
                   '&:hover': {
-                    backgroundColor: '#f1f5f9',
+                    backgroundColor: '#f8fbff',
                   },
+                },
+              },
+              cells: {
+                style: {
+                  paddingLeft: '14px',
+                  paddingRight: '14px',
+                },
+              },
+              pagination: {
+                style: {
+                  borderTop: '1px solid #e5edf7',
+                  padding: '8px 12px',
+                  fontSize: '13px',
+                  color: '#475569',
+                },
+                pageButtonsStyle: {
+                  borderRadius: '10px',
+                  height: '32px',
+                  width: '32px',
+                  padding: 0,
+                  margin: '0 2px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  color: '#1e40af',
+                  fill: '#1e40af',
+                  backgroundColor: '#eff6ff',
                 },
               },
             }}
@@ -881,6 +999,13 @@ export default function VistaAdministrarUsuarios() {
               </button>
               <button onClick={copiarCredenciales} className="px-4 py-2 rounded bg-gray-800 text-white hover:bg-gray-900">
                 Copiar cuerpo
+              </button>
+              <button
+                onClick={enviarCredencialesAhora}
+                disabled={enviandoCredenciales}
+                className="px-4 py-2 rounded bg-blue-700 text-white hover:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {enviandoCredenciales ? 'Enviando...' : 'Enviar ahora'}
               </button>
               <button onClick={abrirGmailCompose} className="px-4 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700">
                 Abrir en Gmail

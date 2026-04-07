@@ -9,10 +9,6 @@ export async function GET(request) {
     return NextResponse.json({ error }, { status: 401 })
   }
 
-  if (usuario?.rol !== 'admin' && usuario?.rol !== 'visualizador') {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
-
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -25,6 +21,16 @@ export async function GET(request) {
 
     if (!auditorId) {
       return NextResponse.json({ error: 'auditor_id es obligatorio' }, { status: 400 })
+    }
+
+    const userRole = usuario?.rol
+    const requestedAuditorId = String(auditorId).trim()
+    const authUserId = String(usuario?.auth_user_id || '').trim()
+    const isPrivilegedViewer = userRole === 'admin' || userRole === 'visualizador'
+    const isOwnAuditorDashboard = userRole === 'auditor' && authUserId && authUserId === requestedAuditorId
+
+    if (!isPrivilegedViewer && !isOwnAuditorDashboard) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
     const { data: auditor, error: auditorError } = await supabase

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, FileText, Home, Wrench, ClipboardList } from 'lucide-react'
+import { LogOut, Home, Wrench, ClipboardList, LayoutDashboard } from 'lucide-react'
 import styles from '@/components/CSS/AuditorDashboard.module.css'
 import VistaActual from '@/components/auditor/VistaActual'
 import { SpeedInsights } from "@vercel/speed-insights/next"
@@ -131,6 +131,16 @@ export default function AuditorDashboard() {
             >
               <ClipboardList className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Auditoría Interna</span>
             </button>
+
+            {/* <button
+              onClick={() => {
+                setVista('mi-dashboard')
+                window.history.pushState({}, '', '/auditor?vista=mi-dashboard')
+              }}
+              className={`${styles.navButton} ${vista === 'mi-dashboard' ? styles.active : ''}`}
+            >
+              <LayoutDashboard className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Mi Dashboard</span>
+            </button> */}
 
             {/* <button
               onClick={() => {

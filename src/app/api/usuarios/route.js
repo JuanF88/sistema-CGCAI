@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedClient } from '@/lib/authHelper'
 import { createClient } from '@supabase/supabase-js'
+import { sendCredentialsEmail } from '@/lib/notifications'
 
 export async function GET(request) {
   const { usuario, error } = await getAuthenticatedClient()
@@ -70,6 +71,7 @@ export async function POST(req) {
       email,
       password,
       rol,
+      sendCredentials = false,
       estado = 'activo',
       tipo_personal = null,
       dependencia_id = null,
@@ -135,7 +137,24 @@ export async function POST(req) {
       return NextResponse.json({ error: dbError.message }, { status: 500 })
     }
 
-    return NextResponse.json(data, { status: 201 })
+    let notification = null
+
+    if (sendCredentials) {
+      const emailResult = await sendCredentialsEmail({
+        nombre,
+        apellido,
+        email,
+        password,
+      })
+
+      notification = {
+        channel: 'email',
+        type: 'credentials_created_user',
+        ...emailResult,
+      }
+    }
+
+    return NextResponse.json({ ...data, notification }, { status: 201 })
   } catch (error) {
     console.error('Error en POST /api/usuarios:', error)
     return NextResponse.json({ error: 'Error interno del servidor.' }, { status: 500 })

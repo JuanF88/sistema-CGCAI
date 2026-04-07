@@ -18,7 +18,7 @@ const GESTIONES_MAP = {
   'otras': 'Otras / sin clasificar'
 }
 
-export default function VistaPowerBI() {
+export default function VistaPowerBI({ hideMainHeader = false }) {
   const [generando, setGenerando] = useState(false)
   
   // Estados para filtros
@@ -243,60 +243,61 @@ export default function VistaPowerBI() {
 
   return (
     <div className={styles.container}>
-      {/* Header modernizado */}
-      <div className={styles.modernHeader}>
-        <div className={styles.headerContent}>
-          <div className={styles.headerLeft}>
-            <div className={styles.headerIcon}>⚡</div>
-            <div className={styles.headerInfo}>
-              <h1 className={styles.headerTitle}>Estadísticas Power BI</h1>
-              <p className={styles.headerSubtitle}>Dashboard interactivo de análisis de auditorías</p>
+      {!hideMainHeader && (
+        <div className={styles.modernHeader}>
+          <div className={styles.headerContent}>
+            <div className={styles.headerLeft}>
+              <div className={styles.headerIcon}>⚡</div>
+              <div className={styles.headerInfo}>
+                <h1 className={styles.headerTitle}>Estadísticas Power BI</h1>
+                <p className={styles.headerSubtitle}>Dashboard interactivo de análisis de auditorías</p>
+              </div>
             </div>
-          </div>
-          
-          <div className={styles.headerRight}>
-            {/* Filtros de año y semestre */}
-            <div className={styles.filterGroup}>
-              <label className={styles.filterLabel}>Año:</label>
-              <select 
-                className={styles.filterSelect}
-                value={anioSeleccionado}
-                onChange={(e) => setAnioSeleccionado(e.target.value)}
-              >
-                <option value="todos">Todos</option>
-                {aniosDisponibles.map(anio => (
-                  <option key={anio} value={anio}>{anio}</option>
-                ))}
-              </select>
-            </div>
+            
+            <div className={styles.headerRight}>
+              {/* Filtros de año y semestre */}
+              <div className={styles.filterGroup}>
+                <label className={styles.filterLabel}>Año:</label>
+                <select 
+                  className={styles.filterSelect}
+                  value={anioSeleccionado}
+                  onChange={(e) => setAnioSeleccionado(e.target.value)}
+                >
+                  <option value="todos">Todos</option>
+                  {aniosDisponibles.map(anio => (
+                    <option key={anio} value={anio}>{anio}</option>
+                  ))}
+                </select>
+              </div>
 
-            <div className={styles.filterGroup}>
-              <label className={styles.filterLabel}>Semestre:</label>
-              <select 
-                className={styles.filterSelect}
-                value={semestreSeleccionado}
-                onChange={(e) => setSemestreSeleccionado(e.target.value)}
-                disabled={anioSeleccionado === 'todos'}
-              >
-                <option value="todos">Ambos</option>
-                {anioSeleccionado !== 'todos' && 
-                 semestresDisponibles[anioSeleccionado]?.map(sem => (
-                  <option key={sem} value={sem}>Sem. {sem}</option>
-                ))}
-              </select>
-            </div>
+              <div className={styles.filterGroup}>
+                <label className={styles.filterLabel}>Semestre:</label>
+                <select 
+                  className={styles.filterSelect}
+                  value={semestreSeleccionado}
+                  onChange={(e) => setSemestreSeleccionado(e.target.value)}
+                  disabled={anioSeleccionado === 'todos'}
+                >
+                  <option value="todos">Ambos</option>
+                  {anioSeleccionado !== 'todos' && 
+                   semestresDisponibles[anioSeleccionado]?.map(sem => (
+                    <option key={sem} value={sem}>Sem. {sem}</option>
+                  ))}
+                </select>
+              </div>
 
-            <button
-              onClick={generarExcelPowerBI}
-              disabled={generando}
-              className={styles.exportBtn}
-            >
-              <Download size={18} />
-              {generando ? 'Generando...' : 'Actualizar Datos'}
-            </button>
+              <button
+                onClick={generarExcelPowerBI}
+                disabled={generando}
+                className={styles.exportBtn}
+              >
+                <Download size={18} />
+                {generando ? 'Generando...' : 'Actualizar Datos'}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Contenedor del Power BI */}
       <div className={styles.powerBiWrapper}>

@@ -14,7 +14,6 @@ import {
 } from 'recharts'
 import {
   Search,
-  RefreshCw,
   UserRound,
   Mail,
   Phone,
@@ -43,15 +42,19 @@ const getAvatarSrc = (email = '') => {
 }
 
 export default function VistaDashboardAuditores() {
+  const [modoVista, setModoVista] = useState('general')
   const [auditores, setAuditores] = useState([])
   const [search, setSearch] = useState('')
   const [selectedAuditorId, setSelectedAuditorId] = useState('')
   const [dashboard, setDashboard] = useState(null)
   const [anioFiltro, setAnioFiltro] = useState('todos')
+  const [aniosGenerales, setAniosGenerales] = useState([])
+  const [anioGeneral, setAnioGeneral] = useState(String(new Date().getFullYear()))
+  const [resumenGeneral, setResumenGeneral] = useState(null)
   const [loadingAuditores, setLoadingAuditores] = useState(true)
   const [loadingDashboard, setLoadingDashboard] = useState(false)
+  const [loadingGeneral, setLoadingGeneral] = useState(false)
   const [error, setError] = useState('')
-  const [reloadToken, setReloadToken] = useState(0)
   const [avatarSrc, setAvatarSrc] = useState(DEFAULT_AVATAR)
 
   useEffect(() => {
@@ -84,6 +87,164 @@ export default function VistaDashboardAuditores() {
   }, [])
 
   useEffect(() => {
+    const loadAniosDisponibles = async () => {
+      try {
+        const res = await fetch('/api/evaluaciones-auditores/periodos-disponibles')
+        const data = await res.json()
+
+        if (!res.ok) {
+          throw new Error(data?.error || 'No se pudieron cargar los años disponibles')
+        }
+
+        const anios = Array.isArray(data?.anios) ? data.anios.map((item) => String(item)) : []
+        setAniosGenerales(anios)
+        if (anios.length) {
+          setAnioGeneral((prev) => (anios.includes(prev) ? prev : anios[0]))
+        }
+      } catch {
+        setAniosGenerales([])
+      }
+    }
+
+    loadAniosDisponibles()
+  }, [])
+
+  useEffect(() => {
+    if (!anioGeneral) {
+      setResumenGeneral(null)
+      return
+    }
+
+    const loadGeneral = async () => {
+      setLoadingGeneral(true)
+      setError('')
+      try {
+        const res = await fetch(`/api/evaluaciones-auditores?anio=${encodeURIComponent(anioGeneral)}`)
+        const data = await res.json()
+
+        if (!res.ok) {
+          throw new Error(data?.error || 'No se pudo cargar el consolidado general')
+        }
+
+        const evaluaciones = Array.isArray(data?.evaluaciones) ? data.evaluaciones : []
+        const porAuditorMap = new Map()
+        const estados = { completa: 0, borrador: 0, sin_evaluacion: 0 }
+        const acumulados = {
+          archivos: { suma: 0, cantidad: 0 },
+          encuesta: { suma: 0, cantidad: 0 },
+          rubrica: { suma: 0, cantidad: 0 },
+          final: { suma: 0, cantidad: 0 },
+        }
+
+        evaluaciones.forEach((item) => {
+          const auditorKey = String(item.auditor_id || item.auditor_email || 'sin-auditor')
+          const auditorNombre = `${item.auditor_nombre || ''} ${item.auditor_apellido || ''}`.trim() || 'Sin nombre'
+
+          if (!porAuditorMap.has(auditorKey)) {
+            porAuditorMap.set(auditorKey, {
+              auditor_id: auditorKey,
+              nombre: auditorNombre,
+              email: item.auditor_email || 'Sin correo',
+              total: 0,
+              sumaFinal: 0,
+              notasFinales: 0,
+              mejorNota: null,
+            })
+          }
+
+          const auditor = porAuditorMap.get(auditorKey)
+          auditor.total += 1
+
+          if (typeof item.nota_final === 'number') {
+            auditor.sumaFinal += item.nota_final
+            auditor.notasFinales += 1
+            auditor.mejorNota = auditor.mejorNota == null ? item.nota_final : Math.max(auditor.mejorNota, item.nota_final)
+
+            acumulados.final.suma += item.nota_final
+            acumulados.final.cantidad += 1
+          }
+
+          if (typeof item.nota_archivos === 'number') {
+            acumulados.archivos.suma += item.nota_archivos
+            acumulados.archivos.cantidad += 1
+          }
+
+          if (typeof item.nota_encuesta === 'number') {
+            acumulados.encuesta.suma += item.nota_encuesta
+            acumulados.encuesta.cantidad += 1
+          }
+
+          if (typeof item.nota_rubrica === 'number') {
+            acumulados.rubrica.suma += item.nota_rubrica
+            acumulados.rubrica.cantidad += 1
+          }
+
+          const estado = item.estado || 'sin_evaluacion'
+          if (estado === 'completa' || estado === 'borrador') {
+            estados[estado] += 1
+          } else {
+            estados.sin_evaluacion += 1
+          }
+        })
+
+        const rankingAuditores = Array.from(porAuditorMap.values())
+          .map((item) => ({
+            ...item,
+            promedioFinal: item.notasFinales
+              ? Number((item.sumaFinal / item.notasFinales).toFixed(2))
+              : null,
+          }))
+          .sort((a, b) => {
+            const promedioA = typeof a.promedioFinal === 'number' ? a.promedioFinal : -1
+            const promedioB = typeof b.promedioFinal === 'number' ? b.promedioFinal : -1
+            if (promedioB !== promedioA) return promedioB - promedioA
+            return b.total - a.total
+          })
+
+        const notasFinales = evaluaciones.filter((item) => typeof item.nota_final === 'number')
+        const promedioGeneral = notasFinales.length
+          ? Number((notasFinales.reduce((acc, item) => acc + item.nota_final, 0) / notasFinales.length).toFixed(2))
+          : null
+
+        const promediosGlobales = {
+          archivos: acumulados.archivos.cantidad
+            ? Number((acumulados.archivos.suma / acumulados.archivos.cantidad).toFixed(2))
+            : null,
+          encuesta: acumulados.encuesta.cantidad
+            ? Number((acumulados.encuesta.suma / acumulados.encuesta.cantidad).toFixed(2))
+            : null,
+          rubrica: acumulados.rubrica.cantidad
+            ? Number((acumulados.rubrica.suma / acumulados.rubrica.cantidad).toFixed(2))
+            : null,
+          final: acumulados.final.cantidad
+            ? Number((acumulados.final.suma / acumulados.final.cantidad).toFixed(2))
+            : null,
+        }
+
+        setResumenGeneral({
+          anio: anioGeneral,
+          totalAuditorias: evaluaciones.length,
+          auditoresEvaluados: rankingAuditores.length,
+          promedioGeneral,
+          promediosGlobales,
+          totalCompletas: estados.completa,
+          totalBorrador: estados.borrador,
+          totalSinEvaluacion: estados.sin_evaluacion,
+          rankingAuditores,
+        })
+      } catch (err) {
+        setError(err.message || 'No se pudo cargar el consolidado general')
+        setResumenGeneral(null)
+      } finally {
+        setLoadingGeneral(false)
+      }
+    }
+
+    loadGeneral()
+  }, [anioGeneral])
+
+  useEffect(() => {
+    if (modoVista !== 'auditor') return
     if (!selectedAuditorId) {
       setDashboard(null)
       return
@@ -111,7 +272,7 @@ export default function VistaDashboardAuditores() {
     }
 
     loadDashboard()
-  }, [selectedAuditorId, reloadToken])
+  }, [selectedAuditorId, modoVista])
 
   const filteredAuditores = useMemo(() => {
     const term = (search || '').trim().toLowerCase()
@@ -210,6 +371,54 @@ export default function VistaDashboardAuditores() {
       }))
   }, [auditoriasFiltradas])
 
+  const chartGeneralAuditorias = useMemo(() => {
+    const base = resumenGeneral?.rankingAuditores || []
+    return [...base]
+      .sort((a, b) => {
+        if (b.total !== a.total) return b.total - a.total
+        const promedioA = typeof a.promedioFinal === 'number' ? a.promedioFinal : -1
+        const promedioB = typeof b.promedioFinal === 'number' ? b.promedioFinal : -1
+        return promedioB - promedioA
+      })
+      .slice(0, 8)
+      .map((item) => ({
+        auditor: item.nombre,
+        auditorias: item.total,
+        promedio: item.promedioFinal,
+      }))
+  }, [resumenGeneral])
+
+  const chartGeneralPromedios = useMemo(() => {
+    const base = resumenGeneral?.rankingAuditores || []
+    return base
+      .filter((item) => typeof item.promedioFinal === 'number')
+      .slice(0, 8)
+      .map((item) => ({
+        auditor: item.nombre,
+        promedio: item.promedioFinal,
+      }))
+  }, [resumenGeneral])
+
+  const chartGeneralEstados = useMemo(() => {
+    if (!resumenGeneral) return []
+    return [
+      { estado: 'Completas', total: resumenGeneral.totalCompletas },
+      { estado: 'Borrador', total: resumenGeneral.totalBorrador },
+      { estado: 'Sin evaluación', total: resumenGeneral.totalSinEvaluacion },
+    ]
+  }, [resumenGeneral])
+
+  const chartPromediosEquipo = useMemo(() => {
+    if (!resumenGeneral?.promediosGlobales) return []
+
+    return [
+      { criterio: 'Archivos', promedio: resumenGeneral.promediosGlobales.archivos },
+      { criterio: 'Encuesta', promedio: resumenGeneral.promediosGlobales.encuesta },
+      { criterio: 'Rúbrica', promedio: resumenGeneral.promediosGlobales.rubrica },
+      { criterio: 'Final', promedio: resumenGeneral.promediosGlobales.final },
+    ]
+  }, [resumenGeneral])
+
   const CustomTooltipEvolucion = ({ active, payload }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload
@@ -236,69 +445,217 @@ export default function VistaDashboardAuditores() {
               <p className={styles.headerSubtitle}>Historial completo, evaluaciones y métricas de desempeño</p>
             </div>
           </div>
+
           <div className={styles.headerRight}>
-            <button
-              className={styles.modernRefreshBtn}
-              onClick={() => selectedAuditorId && setReloadToken((value) => value + 1)}
-              disabled={!selectedAuditorId || loadingDashboard}
-              title="Recargar datos"
-            >
-              <span className={styles.refreshIcon}>↻</span>
-              <span>{loadingDashboard ? 'Actualizando...' : 'Actualizar'}</span>
-            </button>
+            <div className={styles.viewToggle}>
+              <button
+                type="button"
+                className={`${styles.viewBtn} ${modoVista === 'general' ? styles.viewBtnActive : ''}`}
+                onClick={() => setModoVista('general')}
+              >
+                Consolidado general
+              </button>
+              <button
+                type="button"
+                className={`${styles.viewBtn} ${modoVista === 'auditor' ? styles.viewBtnActive : ''}`}
+                onClick={() => setModoVista('auditor')}
+              >
+                Por auditor
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Filtros compactos */}
       <div className={styles.filtersBar}>
-        <div className={styles.searchBox}>
-          <Search size={16} />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar auditor..."
-          />
-        </div>
+        {modoVista === 'general' ? (
+          <>
+            <select
+              className={styles.selectCompact}
+              value={anioGeneral}
+              onChange={(e) => setAnioGeneral(e.target.value)}
+              disabled={aniosGenerales.length === 0 || loadingGeneral}
+            >
+              {aniosGenerales.length === 0 ? (
+                <option value={anioGeneral}>Sin años disponibles</option>
+              ) : (
+                aniosGenerales.map((anio) => (
+                  <option key={anio} value={anio}>{anio}</option>
+                ))
+              )}
+            </select>
+          </>
+        ) : (
+          <>
+            <div className={styles.searchBox}>
+              <Search size={16} />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar auditor..."
+              />
+            </div>
 
-        <select
-          className={styles.selectCompact}
-          value={selectedAuditorId}
-          onChange={(e) => setSelectedAuditorId(e.target.value)}
-          disabled={loadingAuditores || filteredAuditores.length === 0}
-        >
-          {filteredAuditores.length === 0 ? (
-            <option value="">No hay auditores</option>
-          ) : (
-            filteredAuditores.map((auditor) => (
-              <option key={auditor.auth_user_id} value={auditor.auth_user_id}>
-                {`${auditor.nombre || ''} ${auditor.apellido || ''}`.trim()} {auditor.email ? `· ${auditor.email}` : ''}
-              </option>
-            ))
-          )}
-        </select>
+            <select
+              className={styles.selectCompact}
+              value={selectedAuditorId}
+              onChange={(e) => setSelectedAuditorId(e.target.value)}
+              disabled={loadingAuditores || filteredAuditores.length === 0}
+            >
+              {filteredAuditores.length === 0 ? (
+                <option value="">No hay auditores</option>
+              ) : (
+                filteredAuditores.map((auditor) => (
+                  <option key={auditor.auth_user_id} value={auditor.auth_user_id}>
+                    {`${auditor.nombre || ''} ${auditor.apellido || ''}`.trim()} {auditor.email ? `· ${auditor.email}` : ''}
+                  </option>
+                ))
+              )}
+            </select>
 
-        <select
-          className={styles.selectCompact}
-          value={anioFiltro}
-          onChange={(e) => setAnioFiltro(e.target.value)}
-          disabled={!dashboard || aniosDisponibles.length === 0}
-        >
-          <option value="todos">Todos los años</option>
-          {aniosDisponibles.map((anio) => (
-            <option key={anio} value={anio}>{anio}</option>
-          ))}
-        </select>
+            <select
+              className={styles.selectCompact}
+              value={anioFiltro}
+              onChange={(e) => setAnioFiltro(e.target.value)}
+              disabled={!dashboard || aniosDisponibles.length === 0}
+            >
+              <option value="todos">Todos los años</option>
+              {aniosDisponibles.map((anio) => (
+                <option key={anio} value={anio}>{anio}</option>
+              ))}
+            </select>
+          </>
+        )}
       </div>
 
       {error && <div className={styles.errorBox}>{error}</div>}
 
-      {(loadingAuditores || loadingDashboard) && (
-        <div className={styles.loadingBox}>Cargando dashboard del auditor...</div>
+      {(modoVista === 'auditor' && (loadingAuditores || loadingDashboard)) && (
+        <div className={styles.loadingBox}>Cargando dashboard por auditor...</div>
       )}
 
-      {!loadingAuditores && !loadingDashboard && dashboard?.auditor && (
+      {(modoVista === 'general' && loadingGeneral) && (
+        <div className={styles.loadingBox}>Cargando análisis general...</div>
+      )}
+
+      {modoVista === 'general' && !loadingGeneral && resumenGeneral && (
+        <>
+          <div className={styles.kpiRowCompact}>
+            <article className={styles.kpiCardSmall}>
+              <span className={styles.kpiLabelSmall}>Año</span>
+              <strong className={styles.kpiValueSmall}>{resumenGeneral.anio}</strong>
+            </article>
+            <article className={styles.kpiCardSmall}>
+              <span className={styles.kpiLabelSmall}>Auditorías</span>
+              <strong className={styles.kpiValueSmall}>{resumenGeneral.totalAuditorias}</strong>
+            </article>
+            <article className={styles.kpiCardSmall}>
+              <span className={styles.kpiLabelSmall}>Auditores</span>
+              <strong className={styles.kpiValueSmall}>{resumenGeneral.auditoresEvaluados}</strong>
+            </article>
+            <article className={styles.kpiCardSmall}>
+              <span className={styles.kpiLabelSmall}>Promedio General</span>
+              <strong className={styles.kpiValueSmall}>{formatNote(resumenGeneral.promedioGeneral)}</strong>
+            </article>
+          </div>
+
+          <div className={styles.chartsRowCompact}>
+            <article className={styles.chartCardSmall}>
+              <div className={styles.cardHeaderSmall}>
+                <h3>Auditorías por auditor (ordenado por cantidad)</h3>
+              </div>
+              <div className={styles.chartWrapSmall}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartGeneralAuditorias}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="auditor" hide />
+                    <YAxis width={35} allowDecimals={false} />
+                    <Tooltip />
+                    <Bar dataKey="auditorias" fill="#2563eb" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </article>
+
+            <article className={styles.chartCardSmall}>
+              <div className={styles.cardHeaderSmall}>
+                <h3>Promedio por auditor</h3>
+              </div>
+              <div className={styles.chartWrapSmall}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartGeneralPromedios}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="auditor" hide />
+                    <YAxis width={35} domain={[0, 5]} />
+                    <Tooltip />
+                    <Bar dataKey="promedio" fill="#0f766e" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </article>
+
+            <article className={styles.chartCardSmall}>
+              <div className={styles.cardHeaderSmall}>
+                <h3>Promedio del equipo por criterio</h3>
+              </div>
+              <div className={styles.chartWrapSmall}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartPromediosEquipo}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="criterio" />
+                    <YAxis width={35} domain={[0, 5]} />
+                    <Tooltip />
+                    <Bar dataKey="promedio" fill="#d97706" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </article>
+          </div>
+
+          <section className={styles.tableCardCompact}>
+            <div className={styles.cardHeaderSmall}>
+              <h3>Consolidado por auditor</h3>
+            </div>
+
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Auditor</th>
+                    <th>Email</th>
+                    <th>Auditorías</th>
+                    <th>Promedio final</th>
+                    <th>Mejor nota</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {resumenGeneral.rankingAuditores.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className={styles.emptyRow}>No hay evaluaciones registradas para el año seleccionado.</td>
+                    </tr>
+                  ) : (
+                    resumenGeneral.rankingAuditores.map((item, index) => (
+                      <tr key={item.auditor_id}>
+                        <td>{index + 1}</td>
+                        <td>{item.nombre}</td>
+                        <td>{item.email}</td>
+                        <td>{item.total}</td>
+                        <td className={styles.finalNote}>{formatNote(item.promedioFinal)}</td>
+                        <td>{formatNote(item.mejorNota)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      )}
+
+      {modoVista === 'auditor' && !loadingAuditores && !loadingDashboard && dashboard?.auditor && (
         <>
           {/* Perfil completo del auditor con KPIs integrados */}
           <div className={styles.profileBarCompact}>

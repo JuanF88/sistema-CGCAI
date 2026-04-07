@@ -7,6 +7,7 @@ import VistaBienvenida from '@/components/VistaBienvenida'
 import AuditoriasAsignadas from '@/components/auditor/AuditoriasAsignadas'
 import CajadeHerramientas from '@/components/auditor/CajadeHerramientas'
 import AuditoriasTimeline from '@/components/auditor/AuditoriasTimeline'
+import MiDashboardAuditor from '@/components/auditor/MiDashboardAuditor'
 
 
 export default function VistaActual({ usuario, reset, setReset }) {
@@ -31,6 +32,9 @@ export default function VistaActual({ usuario, reset, setReset }) {
       )}
       {vista === 'timeline' && (
         <AuditoriasTimeline usuario={usuario} reset={reset} />
+      )}
+      {vista === 'mi-dashboard' && (
+        <MiDashboardAuditor usuario={usuario} />
       )}
     </>
   )

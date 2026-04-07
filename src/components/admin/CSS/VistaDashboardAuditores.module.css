@@ -34,6 +34,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 24px;
+  flex-wrap: wrap;
 }
 
 .headerLeft {
@@ -73,6 +74,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-left: auto;
 }
 
 .modernAddBtn {
@@ -130,6 +132,38 @@
 .refreshIcon {
   display: inline-block;
   font-size: 14px;
+}
+
+.viewToggle {
+  display: inline-flex;
+  gap: 8px;
+  background: #fff;
+  border: 2px solid #dbeafe;
+  border-radius: 14px;
+  padding: 6px;
+  width: fit-content;
+}
+
+.viewBtn {
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #1e3a8a;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.viewBtn:hover {
+  background: #eff6ff;
+}
+
+.viewBtnActive {
+  background: #1d4ed8;
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(29, 78, 216, 0.25);
 }
 
 .filtersBar {
@@ -527,6 +561,10 @@
 }
 
 @media (max-width: 768px) {
+  .headerContent {
+    align-items: stretch;
+  }
+
   .chartsRowCompact {
     grid-template-columns: 1fr;
   }
@@ -576,6 +614,16 @@
 
   .headerLeft {
     flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .headerRight {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .viewToggle {
+    width: 100%;
   }
 
   .headerTitle {

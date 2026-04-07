@@ -16,8 +16,7 @@ import VistaInformesAdmin from '@/components/admin/VistaInformesAdmin'
 import VistaAdministrarUsuarios from '@/components/admin/VistaAdministrarUsuarios'
 import VistaAdministrarDependencias from '@/components/admin/VistaAdministrarDependencias'
 import VistaAdministrarHallazgos from '@/components/admin/VistaAdministrarHallazgos'
-import VistaEstadisticas from '@/components/admin/VistaEstadisticasNew'
-import VistaPowerBI from '@/components/admin/VistaPowerBI'
+import VistaEstadisticasPanel from '@/components/admin/VistaEstadisticasPanel'
 import VistaEvaluacionAuditores from '@/components/admin/VistaEvaluacionAuditores'
 import VistaDashboardAuditores from '@/components/admin/VistaDashboardAuditores'
 
@@ -126,19 +125,9 @@ export default function AdminDashboard() {
                 setVista('estadisticas')
                 window.history.pushState({}, '', '/admin?vista=estadisticas')
               }}
-              className={`${styles.navButton} ${vista === 'estadisticas' ? styles.active : ''}`}
+              className={`${styles.navButton} ${(vista === 'estadisticas' || vista === 'powerbi') ? styles.active : ''}`}
             >
               <BarChart className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Estadísticas</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setVista('powerbi')
-                window.history.pushState({}, '', '/admin?vista=powerbi')
-              }}
-              className={`${styles.navButton} ${vista === 'powerbi' ? styles.active : ''}`}
-            >
-              <TrendingUp className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Estadísticas Power BI</span>
             </button>
 
 
@@ -166,8 +155,7 @@ export default function AdminDashboard() {
   {vista === 'administrarHallazgos' && <VistaAdministrarHallazgos />}
   {vista === 'evaluacionAuditores' && <VistaEvaluacionAuditores />}
   {vista === 'dashboardAuditores' && <VistaDashboardAuditores />}
-  {vista === 'estadisticas' && <VistaEstadisticas />}
-  {vista === 'powerbi' && <VistaPowerBI />}
+  {(vista === 'estadisticas' || vista === 'powerbi') && <VistaEstadisticasPanel />}
   {vista === 'gestionarUsuarios' && (
     <p className="text-lg text-gray-700">Aquí irá la gestión de usuarios</p>
   )}

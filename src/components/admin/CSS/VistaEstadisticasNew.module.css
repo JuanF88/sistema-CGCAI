@@ -80,6 +80,10 @@
   align-items: center;
 }
 
+.headerExtra {
+  margin-top: -4px;
+}
+
 /* ===================== VIEW TABS ===================== */
 .viewTabs {
   display: flex;

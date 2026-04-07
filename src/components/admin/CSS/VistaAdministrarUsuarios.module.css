@@ -103,8 +103,8 @@
 /* ===== KPI GRID ===== */
 .kpiGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
   margin-bottom: 24px;
 }
 
@@ -112,10 +112,10 @@
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 16px;
-  padding: 24px;
+  padding: 14px 12px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: all 0.3s ease;
 }
@@ -126,13 +126,13 @@
 }
 
 .kpiIcon {
-  font-size: 40px;
-  width: 64px;
-  height: 64px;
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16px;
+  border-radius: 10px;
   flex-shrink: 0;
 }
 
@@ -140,19 +140,20 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
+  min-width: 0;
 }
 
 .kpiLabel {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
   color: #64748b;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
 }
 
 .kpiValue {
-  font-size: 32px;
+  font-size: 22px;
   font-weight: 800;
   color: #0f172a;
   line-height: 1;
@@ -161,13 +162,13 @@
 .kpiProgress {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 4px;
+  gap: 8px;
+  margin-top: 2px;
 }
 
 .kpiProgressTrack {
   flex: 1;
-  height: 8px;
+  height: 6px;
   background: #e2e8f0;
   border-radius: 999px;
   overflow: hidden;
@@ -181,11 +182,23 @@
 }
 
 .kpiPercent {
-  font-size: 0.875rem;
+  font-size: 12px;
   font-weight: 700;
   color: currentColor;
-  min-width: 45px;
+  min-width: 34px;
   text-align: right;
+}
+
+@media (max-width: 1400px) {
+  .kpiGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .kpiGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* KPI Color Variants */
@@ -263,11 +276,30 @@
   flex-wrap: wrap;
 }
 
+.tableTitleWrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .tableTitle {
   font-size: 20px;
   font-weight: 800;
   color: #0f172a;
   margin: 0;
+}
+
+.tableCountChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .searchBox {
@@ -279,12 +311,18 @@
   position: relative;
 }
 
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  color: #94a3b8;
+}
+
 .searchInput {
   flex: 1;
   border: 1px solid #e5e7eb;
   background: #ffffff;
   border-radius: 12px;
-  padding: 10px 16px;
+  padding: 11px 34px 11px 36px;
   font-size: 14px;
   outline: none;
   transition: all 0.2s ease;
@@ -313,6 +351,110 @@
 
 .tableWrapper {
   padding: 0;
+}
+
+.idPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  border: 1px solid #bfdbfe;
+  background: #f0f7ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.primaryCell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.primaryLine {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.emailText {
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.areaText {
+  color: #334155;
+  font-size: 13px;
+}
+
+.typeTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.badgeRoleAuditor {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.badgeRoleAdmin {
+  background: #ede9fe;
+  color: #5b21b6;
+  border: 1px solid #ddd6fe;
+}
+
+.badgeRoleGestor {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.badgeRoleVisualizador {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.badgeRoleDefault {
+  background: #e2e8f0;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+
+.badgeActive {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.badgeInactive {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
 }
 
 /* ===== USER MODAL ===== */
