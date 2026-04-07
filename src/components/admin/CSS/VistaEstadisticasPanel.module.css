@@ -1,0 +1,147 @@
+/* Contenedor principal */
+.container {
+  min-height: 100vh;
+  padding: 1rem;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+/* Mismo diseño de header que VistaDashboardAuditores */
+.modernHeader {
+  background: linear-gradient(135deg, #667eea 0%, #4b4ca2 100%);
+  border-radius: 20px;
+  padding: 32px 40px;
+  box-shadow: 0 10px 40px rgba(102, 126, 234, 0.25);
+  margin-bottom: 24px;
+  animation: slideDown 0.5s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.headerContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-left: auto;
+  gap: 12px;
+}
+
+.headerIcon {
+  font-size: 3rem;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+}
+
+.headerTitle {
+  margin: 0;
+  color: #ffffff;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.headerSubtitle {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.viewToggle {
+  display: inline-flex;
+  gap: 8px;
+  padding: 6px;
+  background: #fff;
+  border: 2px solid #dbeafe;
+  border-radius: 14px;
+  width: fit-content;
+}
+
+.viewBtn {
+  border: none;
+  background: transparent;
+  color: #1e3a8a;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 9px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.viewBtn:hover {
+  background: #eff6ff;
+}
+
+.viewBtnActive {
+  background: #1d4ed8;
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(29, 78, 216, 0.25);
+}
+
+.content {
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .modernHeader {
+    padding: 24px;
+  }
+
+  .headerIcon {
+    font-size: 36px;
+  }
+
+  .headerTitle {
+    font-size: 24px;
+  }
+
+  .headerSubtitle {
+    font-size: 14px;
+  }
+
+  .headerLeft {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .headerRight {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .viewToggle {
+    width: 100%;
+  }
+
+  .viewBtn {
+    flex: 1;
+    justify-content: center;
+  }
+}
