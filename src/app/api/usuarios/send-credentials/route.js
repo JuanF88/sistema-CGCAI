@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedClient } from '@/lib/authHelper'
-import { sendCredentialsEmail, sendAlertEmail } from '@/lib/notifications'
-import { buildProfessionalTemplateFromText } from '@/lib/notifications/templates'
+import { createClient } from '@supabase/supabase-js'
+import { sendCredentialsEmail } from '@/lib/notifications'
 
 export async function POST(request) {
   const { usuario, error } = await getAuthenticatedClient()
@@ -16,45 +16,46 @@ export async function POST(request) {
 
   try {
     const body = await request.json()
-    const { to, subject, email, password, nombre, apellido, nombreCompleto, text } = body || {}
+    const { usuario_id } = body || {}
 
-    if (!to || !subject) {
-      return NextResponse.json({ error: 'to y subject son obligatorios.' }, { status: 400 })
+    if (!usuario_id) {
+      return NextResponse.json({ error: 'usuario_id es obligatorio.' }, { status: 400 })
     }
 
-    // Si tenemos email y password, usamos buildCredentialsTemplate
-    if (email && password) {
-      const result = await sendCredentialsEmail({
-        nombre: nombre || '',
-        apellido: apellido || '',
-        email,
-        password,
-      })
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
 
-      if (result.ok) {
-        return NextResponse.json({ ok: true, notification: result })
-      }
+    const { data: userData, error: dbError } = await supabaseAdmin
+      .from('usuarios')
+      .select('usuario_id, nombre, apellido, email, password, estado')
+      .eq('usuario_id', usuario_id)
+      .maybeSingle()
 
-      return NextResponse.json({ ok: false, notification: result }, { status: 400 })
+    if (dbError) {
+      return NextResponse.json({ error: dbError.message || 'No se pudo consultar el usuario.' }, { status: 500 })
     }
 
-    // Si tenemos texto, usamos buildProfessionalTemplateFromText
-    if (!text) {
-      return NextResponse.json({
-        error: 'Debes proporcionar email/password o text.',
-        status: 400,
-      })
+    if (!userData) {
+      return NextResponse.json({ error: 'Usuario no encontrado.' }, { status: 404 })
     }
 
-    const html = buildProfessionalTemplateFromText({
-      subject,
-      text,
-      nombreCompleto,
-      processKeyValue: false,
+    if ((userData.estado || '').toLowerCase() !== 'activo') {
+      return NextResponse.json({ error: 'No se pueden enviar credenciales a usuarios inactivos.' }, { status: 400 })
+    }
+
+    if (!userData.email || !userData.password) {
+      return NextResponse.json({ error: 'El usuario no tiene credenciales completas para enviar.' }, { status: 400 })
+    }
+
+    const result = await sendCredentialsEmail({
+      nombre: userData.nombre || '',
+      apellido: userData.apellido || '',
+      email: userData.email,
+      password: userData.password,
     })
-
-    // Solo enviar HTML para evitar duplicación de contenido
-    const result = await sendAlertEmail({ to, subject, html })
 
     if (result.ok) {
       return NextResponse.json({ ok: true, notification: result })

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, FileText, UserPlus, Home, TrendingUp, Award, UserRound} from 'lucide-react'
+import { LogOut, FileText, UserPlus, Home, TrendingUp, Award, UserRound, ClipboardCheck } from 'lucide-react'
 import { Lightbulb } from 'lucide-react'
 import { Building } from 'lucide-react'   
 import { BarChart } from 'lucide-react'
@@ -19,6 +19,7 @@ import VistaAdministrarHallazgos from '@/components/admin/VistaAdministrarHallaz
 import VistaEstadisticasPanel from '@/components/admin/VistaEstadisticasPanel'
 import VistaEvaluacionAuditores from '@/components/admin/VistaEvaluacionAuditores'
 import VistaDashboardAuditores from '@/components/admin/VistaDashboardAuditores'
+import VistaPlanMejoraAdmin from '@/components/admin/VistaPlanMejoraAdmin'
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -122,6 +123,16 @@ export default function AdminDashboard() {
 
             <button
               onClick={() => {
+                setVista('planMejora')
+                window.history.pushState({}, '', '/admin?vista=planMejora')
+              }}
+              className={`${styles.navButton} ${vista === 'planMejora' ? styles.active : ''}`}
+            >
+              <ClipboardCheck className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Plan de Mejora</span>
+            </button>
+
+            <button
+              onClick={() => {
                 setVista('estadisticas')
                 window.history.pushState({}, '', '/admin?vista=estadisticas')
               }}
@@ -155,6 +166,7 @@ export default function AdminDashboard() {
   {vista === 'administrarHallazgos' && <VistaAdministrarHallazgos />}
   {vista === 'evaluacionAuditores' && <VistaEvaluacionAuditores />}
   {vista === 'dashboardAuditores' && <VistaDashboardAuditores />}
+  {vista === 'planMejora' && <VistaPlanMejoraAdmin />}
   {(vista === 'estadisticas' || vista === 'powerbi') && <VistaEstadisticasPanel />}
   {vista === 'gestionarUsuarios' && (
     <p className="text-lg text-gray-700">Aquí irá la gestión de usuarios</p>

@@ -77,12 +77,7 @@ export default function VistaAdministrarUsuarios() {
 
   const [busqueda, setBusqueda] = useState('')
 
-  const [credOpen, setCredOpen] = useState(false)
-  const [credUsuario, setCredUsuario] = useState(null)
-  const [credPassword, setCredPassword] = useState('')
-  const [credBody, setCredBody] = useState('')
-  const [credSubject, setCredSubject] = useState('')
-  const [enviandoCredenciales, setEnviandoCredenciales] = useState(false)
+  const [enviandoCredencialesId, setEnviandoCredencialesId] = useState(null)
 
   const [eliminandoId, setEliminandoId] = useState(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -125,88 +120,25 @@ export default function VistaAdministrarUsuarios() {
     return match?.nombre || 'Sin asignar'
   }
 
-  const plantillaCredenciales = ({ nombre, apellido, email, password }) => {
-    return `Se ha creado tu cuenta en el Sistema de Auditoría Interna CGCAI. A continuación encontraras tus credenciales de acceso para ingresar al aplicativo:
-
-Usuario: ${email}
-Contraseña: ${password}
-
-Puedes ingresar aquí: https://sistema-cgcai.vercel.app/`
-  }
-
-  const abrirCredenciales = (usuario) => {
-    const pwd = usuario.password || ''
-    setCredUsuario(usuario)
-    setCredPassword(pwd)
-
-    const subject = 'Credenciales de acceso'
-    const body = plantillaCredenciales({
-      nombre: usuario.nombre || '',
-      apellido: usuario.apellido || '',
-      email: usuario.email || '',
-      password: pwd || '*** (edita antes de enviar)',
-    })
-
-    setCredSubject(subject)
-    setCredBody(body)
-    setCredOpen(true)
-  }
-
-  const cerrarCredenciales = () => {
-    setCredOpen(false)
-    setCredUsuario(null)
-    setCredPassword('')
-    setCredBody('')
-    setCredSubject('')
-  }
-
-  const copiarCredenciales = async () => {
-    try {
-      await navigator.clipboard.writeText(credBody)
-      toast.success('Texto copiado al portapapeles')
-    } catch {
-      toast.error('No se pudo copiar')
-    }
-  }
-
-  const abrirGmailCompose = () => {
-    if (!credUsuario?.email) {
-      toast.error('Falta el correo del usuario.')
+  const enviarCredencialesAhora = async (usuario) => {
+    if (!usuario?.usuario_id) {
+      toast.error('No se encontró el ID del usuario.')
       return
     }
 
-    const to = encodeURIComponent(credUsuario.email)
-    const su = encodeURIComponent(credSubject)
-    const bo = encodeURIComponent(credBody)
-    const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${su}&body=${bo}`
-    window.open(url, '_blank', 'noopener,noreferrer')
-  }
-
-  const enviarCredencialesAhora = async () => {
-    if (!credUsuario?.email) {
-      toast.error('Falta el correo del usuario.')
-      return
-    }
-
-    if (!credSubject.trim() || !credBody.trim()) {
-      toast.error('Asunto y cuerpo son obligatorios para enviar.')
+    if ((usuario?.estado || '').toLowerCase() !== 'activo') {
+      toast.error('No se pueden enviar credenciales a usuarios inactivos.')
       return
     }
 
     try {
-      setEnviandoCredenciales(true)
+      setEnviandoCredencialesId(usuario.usuario_id)
 
       const res = await fetch('/api/usuarios/send-credentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          to: credUsuario.email,
-          subject: credSubject.trim(),
-          email: credUsuario.email,
-          password: credPassword,
-          nombre: credUsuario.nombre || '',
-          apellido: credUsuario.apellido || '',
-          nombreCompleto: `${credUsuario.nombre || ''} ${credUsuario.apellido || ''}`.trim(),
+          usuario_id: usuario.usuario_id,
         }),
       })
 
@@ -219,11 +151,10 @@ Puedes ingresar aquí: https://sistema-cgcai.vercel.app/`
       }
 
       toast.success('Credenciales enviadas por correo.')
-      cerrarCredenciales()
     } catch (error) {
       toast.error(error?.message || 'Error enviando credenciales.')
     } finally {
-      setEnviandoCredenciales(false)
+      setEnviandoCredencialesId(null)
     }
   }
 
@@ -506,8 +437,9 @@ Puedes ingresar aquí: https://sistema-cgcai.vercel.app/`
           </button>
 
           <button
-            onClick={() => abrirCredenciales(row)}
-            className={styles.btnCredentials}
+            onClick={() => enviarCredencialesAhora(row)}
+            disabled={enviandoCredencialesId === row.usuario_id || (row.estado || '').toLowerCase() !== 'activo'}
+            className={`${styles.btnCredentials} ${(enviandoCredencialesId === row.usuario_id || (row.estado || '').toLowerCase() !== 'activo') ? styles.btnDisabled : ''}`}
             title="Enviar credenciales"
           >
             <Send size={14} />
@@ -933,87 +865,6 @@ Puedes ingresar aquí: https://sistema-cgcai.vercel.app/`
         </div>
       )}
 
-      {credOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-xl space-y-4">
-            <h3 className="text-xl font-bold text-gray-800">Enviar credenciales</h3>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Para</label>
-                <input
-                  type="email"
-                  value={credUsuario?.email || ''}
-                  readOnly
-                  className="w-full border p-2 rounded bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Asunto</label>
-                <input
-                  type="text"
-                  value={credSubject}
-                  onChange={(e) => setCredSubject(e.target.value)}
-                  className="w-full border p-2 rounded"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Contraseña a incluir</label>
-              <input
-                type="text"
-                placeholder="Escribe la contraseña (o temporal)"
-                value={credPassword}
-                onChange={(e) => {
-                  const pwd = e.target.value
-                  setCredPassword(pwd)
-                  const nuevoBody = plantillaCredenciales({
-                    nombre: credUsuario?.nombre || '',
-                    apellido: credUsuario?.apellido || '',
-                    email: credUsuario?.email || '',
-                    password: pwd || '*** (edita antes de enviar)',
-                  })
-                  setCredBody(nuevoBody)
-                }}
-                className="w-full border p-2 rounded"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Nota: si tu API no devuelve la contraseña, puedes definir una temporal y obligar el cambio al primer ingreso.
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Cuerpo</label>
-              <textarea
-                rows={8}
-                value={credBody}
-                onChange={(e) => setCredBody(e.target.value)}
-                className="w-full border p-2 rounded font-mono"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <button onClick={cerrarCredenciales} className="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50">
-                Cerrar
-              </button>
-              <button onClick={copiarCredenciales} className="px-4 py-2 rounded bg-gray-800 text-white hover:bg-gray-900">
-                Copiar cuerpo
-              </button>
-              <button
-                onClick={enviarCredencialesAhora}
-                disabled={enviandoCredenciales}
-                className="px-4 py-2 rounded bg-blue-700 text-white hover:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {enviandoCredenciales ? 'Enviando...' : 'Enviar ahora'}
-              </button>
-              <button onClick={abrirGmailCompose} className="px-4 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700">
-                Abrir en Gmail
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

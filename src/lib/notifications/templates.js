@@ -101,7 +101,7 @@ export function buildCredentialsTemplate({ nombre, apellido, email, password, lo
   const subject = 'Credenciales de acceso - Sistema CGCAI'
 
   const credentialsCard = `
-    <p style="margin:0 0 14px; line-height:1.6; color:#334155; font-size:15px;">Se ha creado tu cuenta en el <strong>Sistema de Auditoría Interna CGCAI</strong>. A continuación encontrarás tus credenciales de acceso para ingresar al aplicativo:</p>
+    <p style="margin:0 0 14px; line-height:1.6; color:#334155; font-size:15px;">Este es un mensaje oficial del Sistema CGCAI. A continuación encontrarás tus credenciales de acceso para ingresar al aplicativo:</p>
     <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:16px; margin: 0 0 16px;">
       <p style="margin:0 0 8px; color:#0f172a;"><strong style="color:#1d4ed8;">Usuario:</strong> <br/><span style="font-family: monospace; background: #f0f9ff; padding: 4px 8px; border-radius: 4px;">${escapeHtml(email)}</span></p>
       <p style="margin:0; color:#0f172a;"><strong style="color:#1d4ed8;">Contraseña temporal:</strong> <br/><span style="font-family: monospace; background: #f0f9ff; padding: 4px 8px; border-radius: 4px;">${escapeHtml(password)}</span></p>
