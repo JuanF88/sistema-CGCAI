@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/alertas/ejecutar",
-      "schedule": "0 12 * * *"
+      "schedule": "0 14 * * *"
     }
   ]
 }

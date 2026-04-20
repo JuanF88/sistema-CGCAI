@@ -72,7 +72,7 @@ Se configuro un cron diario para ejecutar automaticamente el endpoint de alertas
 
 - Archivo: `vercel.json`
 - Ruta ejecutada: `/api/alertas/ejecutar`
-- Frecuencia actual: `0 12 * * *` (todos los dias a las 12:00 UTC)
+- Frecuencia actual: `0 14 * * *` (todos los dias a las 9:00 a. m. hora Colombia, 14:00 UTC)
 
 ### Variables de entorno necesarias (Vercel)
 
