@@ -18,11 +18,11 @@ import html2canvas from 'html2canvas'
 import styles from './CSS/VistaEstadisticasNew.module.css'
 
 // Paleta de colores
-const BRAND = '#667eea'
+const BRAND = '#6387d6'
 const BRAND_LIGHT = '#8b9bf7'
-const GREEN = '#10b981'
-const AMBER = '#f59e0b'
-const RED   = '#ef4444'
+const GREEN = '#36c797'
+const AMBER = '#ec81e7'
+const RED   = '#7d008d'
 const CYAN = '#06b6d4'
 const INDIGO = '#6366f1'
 const PINK = '#ec4899'
@@ -261,6 +261,7 @@ export default function VistaEstadisticasNew({ headerExtra = null, hideMainHeade
         ...it,
         tipo: normalizeTipo(it.tipo),
         iso: it.iso ?? it.iso_id ?? it.isoId ?? null,
+        numeral: it.numeral ?? it.numerales?.numeral ?? it.numeral_id ?? null,
         gestion: getGestionFromDependencia(it.dependencia, it.gestion),
       }))
     }
@@ -273,6 +274,7 @@ export default function VistaEstadisticasNew({ headerExtra = null, hideMainHeade
         tipo: normalizeTipo(i.tipo),
         cantidad: toNum(i.cantidad),
         iso: i.iso ?? i.iso_id ?? null,
+        numeral: i.numeral ?? i.numerales?.numeral ?? i.numeral_id ?? null,
         gestion: getGestionFromDependencia(i.dependencia, i.gestion),
       }))
     }
@@ -332,7 +334,7 @@ export default function VistaEstadisticasNew({ headerExtra = null, hideMainHeade
     }
     return Array.from(map, ([dependencia, cantidad]) => ({ dependencia, cantidad }))
       .sort((a, b) => b.cantidad - a.cantidad)
-      .slice(0, 15) // Top 15
+      .slice(0, 10) // Top 10
   }, [detalleFiltrado])
 
   const porTipoGrafico = useMemo(() => {
@@ -394,6 +396,49 @@ export default function VistaEstadisticasNew({ headerExtra = null, hideMainHeade
         row[tipo] = map.get(`${year}-${tipo}`) || 0
       })
       return row
+    })
+  }, [detalleFiltrado])
+
+  // Distribucion por numeral evaluado y tipo
+  const dataNumerales = useMemo(() => {
+    const map = new Map()
+
+    for (const it of detalleFiltrado) {
+      const numeral = s(it.numeral).trim()
+      if (!numeral) continue
+
+      if (!map.has(numeral)) {
+        map.set(numeral, {
+          numeral,
+          Fortaleza: 0,
+          'Oportunidad de Mejora': 0,
+          'No Conformidad': 0,
+        })
+      }
+
+      const row = map.get(numeral)
+      const t = normalizeTipo(it.tipo)
+      if (t === 'Fortaleza') row.Fortaleza += toNum(it.cantidad)
+      else if (t === 'Oportunidad de Mejora') row['Oportunidad de Mejora'] += toNum(it.cantidad)
+      else if (t === 'No Conformidad') row['No Conformidad'] += toNum(it.cantidad)
+    }
+
+    const parseNumeralParts = (value) =>
+      String(value)
+        .split(/\D+/)
+        .filter(Boolean)
+        .map((n) => Number(n))
+
+    return Array.from(map.values()).sort((a, b) => {
+      const pa = parseNumeralParts(a.numeral)
+      const pb = parseNumeralParts(b.numeral)
+      const len = Math.max(pa.length, pb.length)
+      for (let i = 0; i < len; i += 1) {
+        const da = pa[i] ?? -1
+        const db = pb[i] ?? -1
+        if (da !== db) return da - db
+      }
+      return a.numeral.localeCompare(b.numeral)
     })
   }, [detalleFiltrado])
 
@@ -740,13 +785,12 @@ export default function VistaEstadisticasNew({ headerExtra = null, hideMainHeade
 
       {/* CONTENIDO SEGÚN VISTA ACTIVA */}
       {vistaActiva === 'resumen' && (
-        <div className={styles.gridCharts}>
-          {/* Barras Top 15 */}
+        <div className={styles.gridChartsSummary}>
+          {/* Barras Top 10 */}
           <ChartCard 
-            className={styles.cardWide}
-            title="Top 15 Dependencias con Más Hallazgos"
+            title="Top 10 Dependencias con Más Hallazgos"
             subtitle={filtroAnio === 'todos' ? 'Todos los años' : `Año ${filtroAnio}`}
-            downloadName="top-15-dependencias"
+            downloadName="top-10-dependencias"
           >
             <CardContent className={styles.chartBox}>
               {dataBar.length ? (
@@ -755,7 +799,7 @@ export default function VistaEstadisticasNew({ headerExtra = null, hideMainHeade
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis
                       dataKey="dependencia"
-                      tick={{ fontSize: 11, fill: '#1e293b' }}
+                      tick={{ fontSize: 7, fill: '#1e293b' }}
                       interval={0}
                       angle={-45}
                       textAnchor="end"
@@ -831,6 +875,40 @@ export default function VistaEstadisticasNew({ headerExtra = null, hideMainHeade
                 </ResponsiveContainer>
               ) : (
                 <div className={styles.empty}>No hay datos</div>
+              )}
+            </CardContent>
+          </ChartCard>
+
+          <ChartCard
+            className={styles.cardFull}
+            title="Hallazgos por Numeral Evaluado"
+            subtitle="Eje X: numerales evaluados | Eje Y: cantidad por tipo"
+            downloadName="hallazgos-por-numeral"
+          >
+            <CardContent className={styles.chartBoxTall}>
+              {dataNumerales.length ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={dataNumerales} margin={{ top: 10, right: 24, bottom: 85, left: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis
+                      dataKey="numeral"
+                      interval={0}
+                      angle={-35}
+                      textAnchor="end"
+                      tick={{ fontSize: 11, fill: '#1e293b' }}
+                      tickMargin={10}
+                      height={100}
+                    />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip />
+                    <Legend />
+                    <Area type="monotone" dataKey="Fortaleza" stroke={GREEN} fill={GREEN} fillOpacity={0.22} strokeWidth={2} />
+                    <Area type="monotone" dataKey="Oportunidad de Mejora" stroke={AMBER} fill={AMBER} fillOpacity={0.22} strokeWidth={2} />
+                    <Area type="monotone" dataKey="No Conformidad" stroke={RED} fill={RED} fillOpacity={0.22} strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className={styles.empty}>No hay numerales evaluados para los filtros seleccionados</div>
               )}
             </CardContent>
           </ChartCard>

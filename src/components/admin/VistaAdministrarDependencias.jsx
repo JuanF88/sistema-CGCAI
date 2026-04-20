@@ -17,7 +17,7 @@ const GESTIONES = [
   { value: 'otras', label: 'Otras / sin clasificar' },
 ]
 
-export default function VistaAdministrarDependencias() {
+export default function VistaAdministrarDependencias({ headerActions = null }) {
   const router = useRouter()
   const [dependencias, setDependencias] = useState([])
   const [cargando, setCargando] = useState(true)
@@ -269,6 +269,7 @@ export default function VistaAdministrarDependencias() {
             </div>
           </div>
           <div className={styles.headerRight}>
+            {headerActions}
             <button className={styles.modernAddBtn} onClick={abrirNuevo} title="Crear nueva dependencia">
               <span className={styles.addIcon}>+</span>
               <span>Nueva Dependencia</span>

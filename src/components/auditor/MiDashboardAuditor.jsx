@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ResponsiveContainer,
   BarChart,
@@ -11,11 +11,52 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  LabelList,
 } from 'recharts'
-import { Sparkles, TrendingUp, ShieldCheck, CalendarRange, RefreshCw } from 'lucide-react'
+import html2canvas from 'html2canvas'
+import { Sparkles, TrendingUp, ShieldCheck, CalendarRange, RefreshCw, Download } from 'lucide-react'
 import styles from './miDashboardAuditor.module.css'
 
 const formatNote = (value) => (typeof value === 'number' ? value.toFixed(2) : '—')
+
+function ExportableChartCard({ title, downloadName, children }) {
+  const captureRef = useRef(null)
+
+  const downloadPng = async () => {
+    if (!captureRef.current) return
+    try {
+      const canvas = await html2canvas(captureRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        logging: false,
+        useCORS: true,
+      })
+      const url = canvas.toDataURL('image/png')
+      const link = document.createElement('a')
+      link.download = `${downloadName}_${new Date().toISOString().split('T')[0]}.png`
+      link.href = url
+      link.click()
+    } catch (error) {
+      console.error('Error al descargar gráfica:', error)
+    }
+  }
+
+  const TooltipContent = () => null
+
+  return (
+    <article className={styles.chartCard}>
+      <div className={styles.cardHeaderChart}>
+        <h3>{title}</h3>
+        <button type="button" className={styles.downloadChartBtn} onClick={downloadPng} title="Descargar gráfica en PNG">
+          <Download size={14} /> PNG
+        </button>
+      </div>
+      <div ref={captureRef} className={styles.chartCaptureArea}>
+        {children(TooltipContent)}
+      </div>
+    </article>
+  )
+}
 
 export default function MiDashboardAuditor({ usuario }) {
   const [dashboard, setDashboard] = useState(null)
@@ -188,45 +229,53 @@ export default function MiDashboardAuditor({ usuario }) {
           </section>
 
           <section className={styles.chartsGrid}>
-            <article className={styles.chartCard}>
-              <h3>Notas promedio por año</h3>
-              <div className={styles.chartWrap}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={notasPorAnio}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="anio" />
-                    <YAxis domain={[0, 5]} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="final" stroke="#1d4ed8" strokeWidth={2.8} />
-                    <Line type="monotone" dataKey="archivos" stroke="#2563eb" strokeWidth={1.8} />
-                    <Line type="monotone" dataKey="encuesta" stroke="#3b82f6" strokeWidth={1.8} />
-                    <Line type="monotone" dataKey="rubrica" stroke="#60a5fa" strokeWidth={1.8} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </article>
+            <ExportableChartCard title="Notas promedio por año" downloadName="notas-promedio-por-anio">
+              {(TooltipContent) => (
+                <div className={styles.chartWrap}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={notasPorAnio}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="anio" />
+                      <YAxis domain={[0, 5]} />
+                      <Tooltip content={<TooltipContent />} />
+                      <Line type="monotone" dataKey="final" stroke="#1d4ed8" strokeWidth={2.8}>
+                        <LabelList dataKey="final" position="top" formatter={formatNote} />
+                      </Line>
+                      <Line type="monotone" dataKey="archivos" stroke="#2563eb" strokeWidth={1.8} />
+                      <Line type="monotone" dataKey="encuesta" stroke="#3b82f6" strokeWidth={1.8} />
+                      <Line type="monotone" dataKey="rubrica" stroke="#60a5fa" strokeWidth={1.8} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </ExportableChartCard>
 
-            <article className={styles.chartCard}>
-              <h3>Evolución de nota final</h3>
-              <div className={styles.chartWrap}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={evolucion}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis
-                      dataKey="nombre_auditoria"
-                      interval={0}
-                      angle={-20}
-                      textAnchor="end"
-                      height={70}
-                      tick={{ fontSize: 11 }}
-                    />
-                    <YAxis domain={[0, 5]} />
-                    <Tooltip />
-                    <Bar dataKey="nota_final" fill="#2563eb" radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </article>
+            <ExportableChartCard title="Evolución de nota final" downloadName="evolucion-nota-final">
+              {(TooltipContent) => {
+                return (
+                  <div className={styles.chartWrap}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={evolucion}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis
+                          dataKey="nombre_auditoria"
+                          interval={0}
+                          angle={-20}
+                          textAnchor="end"
+                          height={70}
+                          tick={{ fontSize: 11 }}
+                        />
+                        <YAxis domain={[0, 5]} />
+                        <Tooltip content={<TooltipContent />} />
+                        <Bar dataKey="nota_final" fill="#2563eb" radius={[8, 8, 0, 0]}>
+                          <LabelList dataKey="nota_final" position="top" formatter={formatNote} />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )
+              }}
+            </ExportableChartCard>
           </section>
 
           <section className={styles.tableCard}>

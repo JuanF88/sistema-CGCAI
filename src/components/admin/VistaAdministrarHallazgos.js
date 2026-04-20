@@ -12,6 +12,37 @@ import { CloudUpload, Download, FilterX } from 'lucide-react'
 import { toast } from 'react-toastify'
 import styles from './CSS/VistaAdministrarHallazgos.module.css'
 
+const CAPITULO_TITULOS = {
+  1: 'NO APLICA',
+  2: 'NO APLICA',
+  3: 'NO APLICA',
+  4: 'FACTOR 1, FACTOR 2, FACTOR 3, FACTOR 4 Y FACTOR 7',
+  5: 'FACTOR 12',
+  6: 'FACTOR 2',
+  7: 'FACTOR 3, FACTOR 10, FACTOR 11',
+  8: 'FACTOR 2, FACTOR 3, FACTOR 4, FACTOR 5, FACTOR 6, FACTOR 7, FACTOR 8, FACTOR 8 Y FACTOR 11',
+  9: 'FACTOR 2, FACTOR 3, FACTOR 5, FACTOR 7, FACTOR 12, FACTOR 8 Y FACTOR 11',
+  10: 'FACTOR 9 Y FACTOR 12',
+  11: 'NO APLICA',
+  12: 'NO APLICA',
+}
+
+const formatCapitulo = (cap) => {
+  if (cap == null) return ''
+  const n = parseInt(String(cap).match(/\d+/)?.[0] ?? Number.NaN, 10)
+  if (!Number.isNaN(n) && CAPITULO_TITULOS[n]) {
+    return `${n}: ${CAPITULO_TITULOS[n]}`
+  }
+  return String(cap)
+}
+
+const fmtDate = (value) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString('es-CO')
+}
+
 /* ===================== Utils base ===================== */
 const getInforme = (row) =>
   Array.isArray(row?.informes_auditoria) ? row.informes_auditoria[0] : row?.informes_auditoria
@@ -207,6 +238,7 @@ export const exportarExcel = async (hallazgos) => {
 /* ===================== Componente ===================== */
 export default function VistaHallazgosAdmin({ soloLectura = false }) {
   const [hallazgos, setHallazgos] = useState([])
+  const [descargandoPM, setDescargandoPM] = useState(false)
 
   // Modal / carga Excel
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -635,6 +667,165 @@ const {
     { name: 'Descripción', selector: row => row.descripcion, wrap: true },
   ]
 
+  const descargarPMGeneral = async () => {
+    try {
+      setDescargandoPM(true)
+
+      const [informesRes, omRes, ncRes] = await Promise.all([
+        supabase
+          .from('informes_auditoria')
+          .select(`
+            id,
+            fecha_auditoria,
+            usuarios:usuario_id ( nombre, apellido ),
+            dependencias:dependencia_id ( nombre )
+          `)
+          .order('fecha_auditoria', { ascending: true }),
+        supabase
+          .from('oportunidades_mejora')
+          .select('informe_id, descripcion, capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )')
+          .order('informe_id', { ascending: true }),
+        supabase
+          .from('no_conformidades')
+          .select('informe_id, descripcion, capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )')
+          .order('informe_id', { ascending: true }),
+      ])
+
+      if (informesRes.error) throw informesRes.error
+      if (omRes.error) throw omRes.error
+      if (ncRes.error) throw ncRes.error
+
+      const informes = Array.isArray(informesRes.data) ? informesRes.data : []
+      const oportunidades = Array.isArray(omRes.data) ? omRes.data : []
+      const noConformidades = Array.isArray(ncRes.data) ? ncRes.data : []
+
+      const omByInforme = oportunidades.reduce((acc, item) => {
+        const key = String(item.informe_id)
+        if (!acc[key]) acc[key] = []
+        acc[key].push(item)
+        return acc
+      }, {})
+
+      const ncByInforme = noConformidades.reduce((acc, item) => {
+        const key = String(item.informe_id)
+        if (!acc[key]) acc[key] = []
+        acc[key].push(item)
+        return acc
+      }, {})
+
+      const rows = []
+      let pmNumero = 0
+
+      for (const informe of informes) {
+        const informeId = String(informe.id)
+        const om = omByInforme[informeId] || []
+        const nc = ncByInforme[informeId] || []
+
+        if (!om.length && !nc.length) continue
+
+        pmNumero += 1
+        const auditor = `${informe.usuarios?.nombre || ''} ${informe.usuarios?.apellido || ''}`.trim() || 'Sin auditor'
+        const dependencia = informe.dependencias?.nombre || 'Sin dependencia'
+        const fechaAuditoria = informe.fecha_auditoria || null
+
+        for (const item of om) {
+          rows.push({
+            pm_numero: pmNumero,
+            auditor,
+            fecha_auditoria: fechaAuditoria,
+            dependencia,
+            fuente: 'Auditoria interna',
+            tipo: 'Oportunidad de Mejora',
+            factor: formatCapitulo(item?.capitulo?.capitulo),
+            numeral_iso: item?.numeral?.numeral || '',
+            descripcion: item.descripcion || '',
+          })
+        }
+
+        for (const item of nc) {
+          rows.push({
+            pm_numero: pmNumero,
+            auditor,
+            fecha_auditoria: fechaAuditoria,
+            dependencia,
+            fuente: 'Auditoria interna',
+            tipo: 'No Conformidad',
+            factor: formatCapitulo(item?.capitulo?.capitulo),
+            numeral_iso: item?.numeral?.numeral || '',
+            descripcion: item.descripcion || '',
+          })
+        }
+      }
+
+      if (!rows.length) {
+        toast.info('No hay datos OM/NC para generar el PM general.')
+        return
+      }
+
+      const workbook = new ExcelJS.Workbook()
+      const worksheet = workbook.addWorksheet('Plan de mejora general')
+
+      worksheet.columns = [
+        { header: 'PM #', key: 'pm_numero', width: 10 },
+        { header: 'Auditor', key: 'auditor', width: 28 },
+        { header: 'Fecha auditoria', key: 'fecha_auditoria', width: 16 },
+        { header: 'Dependencia', key: 'dependencia', width: 30 },
+        { header: 'Fuente', key: 'fuente', width: 18 },
+        { header: 'Tipo', key: 'tipo', width: 24 },
+        { header: 'Factor', key: 'factor', width: 55 },
+        { header: 'Numeral ISO', key: 'numeral_iso', width: 18 },
+        { header: 'Descripcion', key: 'descripcion', width: 70 },
+      ]
+
+      worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
+      worksheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF667EEA' },
+      }
+      worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' }
+      worksheet.getRow(1).height = 24
+
+      for (const row of rows) {
+        const excelRow = worksheet.addRow({
+          ...row,
+          fecha_auditoria: fmtDate(row.fecha_auditoria),
+        })
+        excelRow.alignment = { vertical: 'top', wrapText: true }
+        excelRow.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            right: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+          }
+        })
+      }
+
+      worksheet.getRow(1).eachCell((cell) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FF667EEA' } },
+          left: { style: 'thin', color: { argb: 'FF667EEA' } },
+          bottom: { style: 'thin', color: { argb: 'FF667EEA' } },
+          right: { style: 'thin', color: { argb: 'FF667EEA' } },
+        }
+      })
+
+      const buffer = await workbook.xlsx.writeBuffer()
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      })
+      const stamp = new Date().toISOString().slice(0, 10)
+      saveAs(blob, `PlanMejora_General_${stamp}.xlsx`)
+      toast.success('Plan de mejora general descargado.')
+    } catch (error) {
+      console.error('Error descargando PM general:', error)
+      toast.error(error?.message || 'No se pudo descargar el PM general.')
+    } finally {
+      setDescargandoPM(false)
+    }
+  }
+
   return (
     <div className={styles.container}>
       {/* HEADER MODERNO */}
@@ -659,12 +850,21 @@ const {
             </button> */}
             <button
               onClick={() => exportarExcel(filtrados)}
-              disabled={estaCargando}
+              disabled={estaCargando || descargandoPM}
               className={styles.modernBtnSecondary}
               title="Descargar reporte en Excel"
             >
               <Download size={18} />
               <span>Exportar</span>
+            </button>
+            <button
+              onClick={descargarPMGeneral}
+              disabled={estaCargando || descargandoPM}
+              className={styles.modernBtnSecondary}
+              title="Descargar PM General"
+            >
+              <Download size={18} />
+              <span>{descargandoPM ? 'Generando PM...' : 'Descargar PM General'}</span>
             </button>
           </div>
         </div>

@@ -131,3 +131,81 @@ export function buildProfessionalTemplateFromText({ subject, text, intro, nombre
     bodyHtml: textToHtml(text, processKeyValue),
   })
 }
+
+export function buildAuditAssignmentTemplate({
+  nombre,
+  apellido,
+  dependencia,
+  fechaAuditoria,
+  fechaSeguimiento,
+  loginUrl,
+}) {
+  const nombreCompleto = `${nombre || ''} ${apellido || ''}`.trim() || 'Auditor'
+  const acceso = loginUrl || process.env.APP_LOGIN_URL || 'https://sistema-cgcai.vercel.app/'
+
+  const subject = 'Nueva auditoría asignada - Sistema CGCAI'
+
+  const detailsCard = `
+    <p style="margin:0 0 14px; line-height:1.6; color:#334155; font-size:15px;">Se te ha asignado una nueva auditoría. Ingresa al sistema para revisar el detalle y las fechas de cargue de información.</p>
+    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:16px; margin: 0 0 16px;">
+      <p style="margin:0 0 8px; color:#0f172a;"><strong style="color:#1d4ed8;">Dependencia:</strong> ${escapeHtml(dependencia || 'Sin dependencia definida')}</p>
+      <p style="margin:0 0 8px; color:#0f172a;"><strong style="color:#1d4ed8;">Fecha de auditoría:</strong> ${escapeHtml(fechaAuditoria || 'Por definir')}</p>
+    </div>
+    <div style="text-align: center; margin: 0 0 16px;">
+      <a href="${escapeHtml(acceso)}" style="display:inline-block; background:linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%); color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:8px; font-weight:700; font-size:15px; box-shadow: 0 4px 12px rgba(29, 78, 216, 0.3);">Consultar auditoría en el sistema</a>
+    </div>
+    <p style="margin:0; font-size:13px; color:#64748b; line-height:1.5;">Recuerda registrar la información dentro de los plazos definidos para mantener la trazabilidad del proceso de auditoría interna.</p>
+  `
+
+  const html = wrapProfessionalTemplate({
+    title: 'Auditoría asignada',
+    subtitle: 'Notificación de asignación en el Sistema CGCAI',
+    intro: `Hola ${escapeHtml(nombreCompleto)},`,
+    bodyHtml: detailsCard,
+  })
+
+  return { subject, html }
+}
+
+export function buildAuditDeadlineAlertTemplate({
+  processLabel,
+  alertTitle,
+  summary,
+  detail,
+  ctaLabel,
+  loginUrl,
+  nombre,
+  apellido,
+  dependencyName,
+  auditId,
+  dueDateText,
+}) {
+  const nombreCompleto = `${nombre || ''} ${apellido || ''}`.trim() || 'Auditor'
+  const acceso = loginUrl || process.env.APP_LOGIN_URL || 'https://sistema-cgcai.vercel.app/'
+
+  const subject = alertTitle || `Recordatorio: ${processLabel}`
+
+  const bodyHtml = `
+    <p style="margin:0 0 14px; line-height:1.6; color:#334155; font-size:15px;">${escapeHtml(summary || 'Tienes una tarea pendiente asociada a una auditoría asignada.')}</p>
+    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:16px; margin: 0 0 16px;">
+      <p style="margin:0 0 8px; color:#0f172a;"><strong style="color:#1d4ed8;">Proceso:</strong> ${escapeHtml(processLabel || 'Proceso de auditoría')}</p>
+      <p style="margin:0 0 8px; color:#0f172a;"><strong style="color:#1d4ed8;">Auditoría:</strong> #${escapeHtml(auditId || 'N/A')}</p>
+      <p style="margin:0 0 8px; color:#0f172a;"><strong style="color:#1d4ed8;">Dependencia:</strong> ${escapeHtml(dependencyName || 'Sin dependencia definida')}</p>
+      <p style="margin:0; color:#0f172a;"><strong style="color:#1d4ed8;">Fecha límite:</strong> ${escapeHtml(dueDateText || 'Por definir')}</p>
+    </div>
+    <p style="margin:0 0 14px; line-height:1.6; color:#334155; font-size:14px;">${escapeHtml(detail || 'Consulta el sistema para verificar el estado y realizar la carga de información.')}</p>
+    <div style="text-align: center; margin: 0 0 16px;">
+      <a href="${escapeHtml(acceso)}" style="display:inline-block; background:linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%); color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:8px; font-weight:700; font-size:15px; box-shadow: 0 4px 12px rgba(29, 78, 216, 0.3);">${escapeHtml(ctaLabel || 'Abrir sistema')}</a>
+    </div>
+    <p style="margin:0; font-size:13px; color:#64748b; line-height:1.5;">Hola ${escapeHtml(nombreCompleto)}, gracias por mantener la información al día y apoyar el proceso de auditoría interna.</p>
+  `
+
+  const html = wrapProfessionalTemplate({
+    title: processLabel || 'Recordatorio de auditoría',
+    subtitle: 'Notificación automática del Sistema CGCAI',
+    intro: '',
+    bodyHtml,
+  })
+
+  return { subject, html }
+}

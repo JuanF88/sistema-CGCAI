@@ -65,3 +65,29 @@ APP_ASSET_BASE_URL=https://sistema-cgcai.vercel.app
 - `src/lib/notifications/emailClient.js`
 - `src/lib/notifications/templates.js`
 - `src/lib/notifications/index.js`
+
+## Cron automatico de alertas
+
+Se configuro un cron diario para ejecutar automaticamente el endpoint de alertas:
+
+- Archivo: `vercel.json`
+- Ruta ejecutada: `/api/alertas/ejecutar`
+- Frecuencia actual: `0 12 * * *` (todos los dias a las 12:00 UTC)
+
+### Variables de entorno necesarias (Vercel)
+
+Define al menos una de estas variables con el mismo valor del secreto del cron:
+
+- `CRON_SECRET`
+- `ALERTAS_CRON_SECRET`
+
+El endpoint valida el token recibido por `Authorization: Bearer <secret>` o `x-cron-secret`.
+
+### Prueba manual
+
+Puedes probar desde terminal con:
+
+```bash
+curl -X POST "https://TU_DOMINIO/api/alertas/ejecutar" \
+	-H "Authorization: Bearer TU_SECRETO"
+```

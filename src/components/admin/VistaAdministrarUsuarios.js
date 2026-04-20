@@ -67,7 +67,7 @@ const normalize = (s) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
 
-export default function VistaAdministrarUsuarios() {
+export default function VistaAdministrarUsuarios({ headerActions = null }) {
   const [usuarios, setUsuarios] = useState([])
   const [dependencias, setDependencias] = useState([])
   const [mostrarModal, setMostrarModal] = useState(false)
@@ -471,6 +471,7 @@ export default function VistaAdministrarUsuarios() {
             </div>
           </div>
           <div className={styles.headerRight}>
+            {headerActions}
             <button className={styles.modernAddBtn} onClick={abrirNuevo} title="Crear nuevo usuario">
               <span className={styles.addIcon}>+</span>
               <span>Nuevo Usuario</span>

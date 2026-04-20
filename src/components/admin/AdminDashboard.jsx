@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, FileText, UserPlus, Home, TrendingUp, Award, UserRound, ClipboardCheck } from 'lucide-react'
+import { LogOut, FileText, Home, TrendingUp, Award, UserRound } from 'lucide-react'
+import { BellRing } from 'lucide-react'
 import { Lightbulb } from 'lucide-react'
 import { Building } from 'lucide-react'   
 import { BarChart } from 'lucide-react'
@@ -13,13 +14,12 @@ import styles from '@/components/admin/CSS/AdminDashboard.module.css'
 
 import VistaTimeline from '@/components/admin/VistaTimeline'
 import VistaInformesAdmin from '@/components/admin/VistaInformesAdmin'
-import VistaAdministrarUsuarios from '@/components/admin/VistaAdministrarUsuarios'
-import VistaAdministrarDependencias from '@/components/admin/VistaAdministrarDependencias'
+import VistaAdministracionPanel from '@/components/admin/VistaAdministracionPanel'
 import VistaAdministrarHallazgos from '@/components/admin/VistaAdministrarHallazgos'
 import VistaEstadisticasPanel from '@/components/admin/VistaEstadisticasPanel'
 import VistaEvaluacionAuditores from '@/components/admin/VistaEvaluacionAuditores'
 import VistaDashboardAuditores from '@/components/admin/VistaDashboardAuditores'
-import VistaPlanMejoraAdmin from '@/components/admin/VistaPlanMejoraAdmin'
+import VistaAlertasAuditoria from '@/components/admin/VistaAlertasAuditoria'
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -72,23 +72,12 @@ export default function AdminDashboard() {
 
             <button
               onClick={() => {
-                setVista('crearUsuario')
-                window.history.pushState({}, '', '/admin?vista=crearUsuario')
+                setVista('administracion')
+                window.history.pushState({}, '', '/admin?vista=administracion')
               }}
-              className={`${styles.navButton} ${vista === 'crearUsuario' ? styles.active : ''}`}
+              className={`${styles.navButton} ${(vista === 'administracion' || vista === 'crearUsuario' || vista === 'adminDependencia') ? styles.active : ''}`}
             >
-
-              <UserPlus  className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Administrar Usuarios</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setVista('adminDependencia')
-                window.history.pushState({}, '', '/admin?vista=adminDependencia')
-              }}
-              className={`${styles.navButton} ${vista === 'adminDependencia' ? styles.active : ''}`}
-            >
-              <Building className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Administrar Dependencia</span>
+              <Building className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Administración</span>
             </button>
 
             <button
@@ -123,12 +112,12 @@ export default function AdminDashboard() {
 
             <button
               onClick={() => {
-                setVista('planMejora')
-                window.history.pushState({}, '', '/admin?vista=planMejora')
+                setVista('alertasAuditoria')
+                window.history.pushState({}, '', '/admin?vista=alertasAuditoria')
               }}
-              className={`${styles.navButton} ${vista === 'planMejora' ? styles.active : ''}`}
+              className={`${styles.navButton} ${vista === 'alertasAuditoria' ? styles.active : ''}`}
             >
-              <ClipboardCheck className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Plan de Mejora</span>
+              <BellRing className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Alertas de Auditoría</span>
             </button>
 
             <button
@@ -161,12 +150,13 @@ export default function AdminDashboard() {
 <main className={styles.mainContent}>
   {vista === 'VistaTimeline' && usuario && <VistaTimeline usuario={usuario} />}
   {vista === 'crearInforme' && <VistaInformesAdmin />}
-  {vista === 'crearUsuario' && <VistaAdministrarUsuarios />}
-  {vista === 'adminDependencia' && <VistaAdministrarDependencias />}
+  {(vista === 'administracion' || vista === 'crearUsuario' || vista === 'adminDependencia') && (
+    <VistaAdministracionPanel initialTab={vista === 'adminDependencia' ? 'dependencias' : 'usuarios'} />
+  )}
   {vista === 'administrarHallazgos' && <VistaAdministrarHallazgos />}
   {vista === 'evaluacionAuditores' && <VistaEvaluacionAuditores />}
   {vista === 'dashboardAuditores' && <VistaDashboardAuditores />}
-  {vista === 'planMejora' && <VistaPlanMejoraAdmin />}
+  {vista === 'alertasAuditoria' && <VistaAlertasAuditoria />}
   {(vista === 'estadisticas' || vista === 'powerbi') && <VistaEstadisticasPanel />}
   {vista === 'gestionarUsuarios' && (
     <p className="text-lg text-gray-700">Aquí irá la gestión de usuarios</p>

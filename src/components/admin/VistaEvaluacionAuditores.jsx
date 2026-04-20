@@ -1252,8 +1252,8 @@ export default function VistaEvaluacionAuditores() {
                       <th>Auditor</th>
                       <th>Dependencia</th>
                       <th>Fecha Auditoría</th>
-                      <th>Nota Archivos</th>
                       <th>Nota Encuesta</th>
+                      <th>Nota Archivos</th>
                       <th>Nota Rúbrica</th>
                       <th>Nota Final</th>
                     </tr>
@@ -1280,6 +1280,15 @@ export default function VistaEvaluacionAuditores() {
                           </span>
                         </td>
                         <td>
+                          {ev.nota_encuesta !== null ? (
+                            <span style={{fontWeight: '500', color: ev.nota_encuesta >= 4 ? '#22c55e' : ev.nota_encuesta >= 3 ? '#f59e0b' : '#ef4444'}}>
+                              {ev.nota_encuesta.toFixed(2)}
+                            </span>
+                          ) : (
+                            <span style={{color: '#94a3b8'}}>-</span>
+                          )}
+                        </td>
+                        <td>
                           {ev.nota_archivos !== null ? (
                             <button
                               onClick={() => mostrarDesgloseArchivos(ev)}
@@ -1303,15 +1312,7 @@ export default function VistaEvaluacionAuditores() {
                             '-'
                           )}
                         </td>
-                        <td>
-                          {ev.nota_encuesta !== null ? (
-                            <span style={{fontWeight: '500', color: ev.nota_encuesta >= 4 ? '#22c55e' : ev.nota_encuesta >= 3 ? '#f59e0b' : '#ef4444'}}>
-                              {ev.nota_encuesta.toFixed(2)}
-                            </span>
-                          ) : (
-                            <span style={{color: '#94a3b8'}}>-</span>
-                          )}
-                        </td>
+                        
                         <td>
                           {ev.nota_rubrica !== null ? (
                             <span style={{fontWeight: '500', color: ev.nota_rubrica >= 4 ? '#22c55e' : ev.nota_rubrica >= 3 ? '#f59e0b' : '#ef4444'}}>

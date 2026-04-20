@@ -1,5 +1,6 @@
 import { getAuthenticatedClient } from '@/lib/authHelper'
 import { createClient } from '@supabase/supabase-js'
+import { sendAuditAssignmentEmail } from '@/lib/notifications'
 
 export async function GET() {
   const { usuario, error } = await getAuthenticatedClient()
@@ -184,6 +185,43 @@ export async function POST(req) {
     if (error) {
       console.error('❌ Error al crear informe:', error.message)
       return Response.json({ error: error.message }, { status: 500 })
+    }
+
+    // Notificación de asignación al auditor (no bloqueante para la creación del informe).
+    try {
+      const supabaseAdmin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      )
+
+      const { data: auditorData, error: auditorError } = await supabaseAdmin
+        .from('usuarios')
+        .select('usuario_id, nombre, apellido, email, estado')
+        .eq('usuario_id', usuario_id)
+        .maybeSingle()
+
+      if (auditorError) {
+        console.warn('[POST /api/informes] No se pudo consultar auditor para notificar:', auditorError.message)
+      } else if (auditorData?.email && (auditorData.estado || '').toLowerCase() === 'activo') {
+        const informeCreado = Array.isArray(data) ? data[0] : data
+        const dependenciaNombre = informeCreado?.dependencias?.nombre || 'Dependencia asignada'
+
+        const notificationResult = await sendAuditAssignmentEmail({
+          nombre: auditorData.nombre || '',
+          apellido: auditorData.apellido || '',
+          email: auditorData.email,
+          dependencia: dependenciaNombre,
+          fechaAuditoria: fecha_auditoria,
+          fechaSeguimiento: fecha_seguimiento,
+        })
+
+        if (!notificationResult?.ok) {
+          console.warn('[POST /api/informes] Informe creado, pero correo de asignación no enviado:', notificationResult)
+        }
+      }
+    } catch (notificationError) {
+      console.warn('[POST /api/informes] Informe creado, pero falló la notificación de asignación:', notificationError?.message || notificationError)
     }
 
     return Response.json(data, { status: 201 })

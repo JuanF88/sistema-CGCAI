@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ResponsiveContainer,
   BarChart,
@@ -11,7 +11,9 @@ import {
   Tooltip,
   LineChart,
   Line,
+  LabelList,
 } from 'recharts'
+import html2canvas from 'html2canvas'
 import {
   Search,
   UserRound,
@@ -24,10 +26,50 @@ import {
   Calendar,
   FileText,
   BarChart3,
+  Download,
 } from 'lucide-react'
 import styles from './CSS/VistaDashboardAuditores.module.css'
 
 const formatNote = (value) => (typeof value === 'number' ? value.toFixed(2) : '—')
+
+function ExportableChartCard({ title, className = '', downloadName, children }) {
+  const captureRef = useRef(null)
+
+  const downloadPng = async () => {
+    if (!captureRef.current) return
+    try {
+      const canvas = await html2canvas(captureRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        logging: false,
+        useCORS: true,
+      })
+      const url = canvas.toDataURL('image/png')
+      const link = document.createElement('a')
+      link.download = `${downloadName}_${new Date().toISOString().split('T')[0]}.png`
+      link.href = url
+      link.click()
+    } catch (error) {
+      console.error('Error al descargar gráfica:', error)
+    }
+  }
+
+  const TooltipContent = () => null
+
+  return (
+    <article className={`${styles.chartCardSmall} ${className}`}>
+      <div className={styles.cardHeaderSmall}>
+        <h3>{title}</h3>
+        <button type="button" className={styles.downloadChartBtn} onClick={downloadPng} title="Descargar gráfica en PNG">
+          <Download size={14} /> PNG
+        </button>
+      </div>
+      <div ref={captureRef} className={styles.chartCaptureArea}>
+        {children(TooltipContent)}
+      </div>
+    </article>
+  )
+}
 
 const DEFAULT_AVATAR = '/avatares/Silueta.png'
 
@@ -562,56 +604,59 @@ export default function VistaDashboardAuditores() {
           </div>
 
           <div className={styles.chartsRowCompact}>
-            <article className={styles.chartCardSmall}>
-              <div className={styles.cardHeaderSmall}>
-                <h3>Auditorías por auditor (ordenado por cantidad)</h3>
-              </div>
-              <div className={styles.chartWrapSmall}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartGeneralAuditorias}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="auditor" hide />
-                    <YAxis width={35} allowDecimals={false} />
-                    <Tooltip />
-                    <Bar dataKey="auditorias" fill="#2563eb" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </article>
+            <ExportableChartCard title="Auditorías por auditor (ordenado por cantidad)" downloadName="auditorias-por-auditor">
+              {(TooltipContent) => (
+                <div className={styles.chartWrapSmall}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartGeneralAuditorias}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="auditor" hide />
+                      <YAxis width={35} allowDecimals={false} />
+                      <Tooltip content={<TooltipContent />} />
+                      <Bar dataKey="auditorias" fill="#6387d6" radius={[6, 6, 0, 0]}>
+                        <LabelList dataKey="auditorias" position="top" />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </ExportableChartCard>
 
-            <article className={styles.chartCardSmall}>
-              <div className={styles.cardHeaderSmall}>
-                <h3>Promedio por auditor</h3>
-              </div>
-              <div className={styles.chartWrapSmall}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartGeneralPromedios}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="auditor" hide />
-                    <YAxis width={35} domain={[0, 5]} />
-                    <Tooltip />
-                    <Bar dataKey="promedio" fill="#0f766e" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </article>
+            <ExportableChartCard title="Promedio por auditor" downloadName="promedio-por-auditor">
+              {(TooltipContent) => (
+                <div className={styles.chartWrapSmall}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartGeneralPromedios}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="auditor" hide />
+                      <YAxis width={35} domain={[0, 5]} />
+                      <Tooltip content={<TooltipContent />} />
+                      <Bar dataKey="promedio" fill="rgb(110, 191, 206)" radius={[6, 6, 0, 0]}>
+                        <LabelList dataKey="promedio" position="top" formatter={formatNote} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </ExportableChartCard>
 
-            <article className={styles.chartCardSmall}>
-              <div className={styles.cardHeaderSmall}>
-                <h3>Promedio del equipo por criterio</h3>
-              </div>
-              <div className={styles.chartWrapSmall}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartPromediosEquipo}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="criterio" />
-                    <YAxis width={35} domain={[0, 5]} />
-                    <Tooltip />
-                    <Bar dataKey="promedio" fill="#d97706" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </article>
+            <ExportableChartCard title="Promedio del equipo por criterio" downloadName="promedio-equipo-por-criterio">
+              {(TooltipContent) => (
+                <div className={styles.chartWrapSmallTall}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartPromediosEquipo} margin={{ top: 20, right: 8, bottom: 0, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="criterio" />
+                      <YAxis width={35} domain={[0, 5]} />
+                      <Tooltip content={<TooltipContent />} />
+                      <Bar dataKey="promedio" fill="#b2a9ff" radius={[6, 6, 0, 0]}>
+                        <LabelList dataKey="promedio" position="top" formatter={formatNote} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </ExportableChartCard>
           </div>
 
           <section className={styles.tableCardCompact}>
@@ -704,59 +749,62 @@ export default function VistaDashboardAuditores() {
 
           {/* Gráficos compactos - 3 en una fila */}
           <div className={styles.chartsRowCompact}>
-            <article className={styles.chartCardSmall}>
-              <div className={styles.cardHeaderSmall}>
-                <h3>Auditorías/año</h3>
-              </div>
-              <div className={styles.chartWrapSmall}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartAuditoriasPorAnio}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="anio" height={30} />
-                    <YAxis width={35} allowDecimals={false} />
-                    <Tooltip />
-                    <Bar dataKey="auditorias" fill="#2563eb" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </article>
+            <ExportableChartCard title="Auditorías/año" downloadName="auditorias-por-anio">
+              {(TooltipContent) => (
+                <div className={styles.chartWrapSmall}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartAuditoriasPorAnio}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="anio" height={30} />
+                      <YAxis width={35} allowDecimals={false} />
+                      <Tooltip content={<TooltipContent />} />
+                      <Bar dataKey="auditorias" fill="#6387d6" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </ExportableChartCard>
 
-            <article className={styles.chartCardSmall}>
-              <div className={styles.cardHeaderSmall}>
-                <h3>Notas/año</h3>
-              </div>
-              <div className={styles.chartWrapSmall}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartNotasPorAnio}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="anio" height={30} />
-                    <YAxis width={35} domain={[0, 5]} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="final" stroke="#2563eb" strokeWidth={2} />
-                    <Line type="monotone" dataKey="archivos" stroke="#0f766e" strokeWidth={1.5} />
-                    <Line type="monotone" dataKey="encuesta" stroke="#d97706" strokeWidth={1.5} />
-                    <Line type="monotone" dataKey="rubrica" stroke="#7c3aed" strokeWidth={1.5} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </article>
+            <ExportableChartCard title="Notas/año" downloadName="notas-por-anio">
+              {(TooltipContent) => (
+                <div className={styles.chartWrapSmall}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartNotasPorAnio}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="anio" height={30} />
+                      <YAxis width={35} domain={[0, 5]} />
+                      <Tooltip content={<TooltipContent />} />
+                      <Line type="monotone" dataKey="final" stroke="#2563eb" strokeWidth={2}>
+                        <LabelList dataKey="final" position="top" formatter={formatNote} />
+                      </Line>
+                      <Line type="monotone" dataKey="archivos" stroke="#0f766e" strokeWidth={1.5} />
+                      <Line type="monotone" dataKey="encuesta" stroke="#d97706" strokeWidth={1.5} />
+                      <Line type="monotone" dataKey="rubrica" stroke="#7c3aed" strokeWidth={1.5} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </ExportableChartCard>
 
-            <article className={styles.chartCardSmall}>
-              <div className={styles.cardHeaderSmall}>
-                <h3>Evolución</h3>
-              </div>
-              <div className={styles.chartWrapSmall}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartNotasPorAuditoria}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="nota_final" height={30} />
-                    <YAxis width={35} domain={[0, 5]} />
-                    <Tooltip content={<CustomTooltipEvolucion />} />
-                    <Bar dataKey="nota_final" fill="#10b981" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </article>
+            <ExportableChartCard title="Evolución" downloadName="evolucion-por-auditoria">
+              {(TooltipContent) => {
+                return (
+                <div className={styles.chartWrapSmall}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartNotasPorAuditoria}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="nota_final" height={30} />
+                      <YAxis width={35} domain={[0, 5]} />
+                      <Tooltip content={<TooltipContent />} />
+                      <Bar dataKey="nota_final" fill="#aa6cc7" radius={[6, 6, 0, 0]}>
+                        <LabelList dataKey="nota_final" position="top" formatter={formatNote} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                )
+              }}
+            </ExportableChartCard>
           </div>
 
           {/* Tabla completa */}

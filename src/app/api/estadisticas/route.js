@@ -49,6 +49,7 @@ export async function GET() {
           .select(`
             id,
             iso:iso_id ( iso ),
+            numeral:numeral_id ( numeral ),
             informes_auditoria:informe_id (
               id,
               fecha_auditoria,
@@ -79,6 +80,7 @@ export async function GET() {
         const dependencia = ia.dependencias?.nombre || 'Desconocida'
         const gestion = normalizeGestion(ia.dependencias?.gestion) || null
         const iso = item.iso?.iso || null
+        const numeral = item.numeral?.numeral || null
 
         if (dependencia) {
           const prev = depsMap.get(dependencia)
@@ -93,6 +95,7 @@ export async function GET() {
           gestion,
           tipo,
           iso,                  // incluir ISO
+          numeral,              // incluir numeral para trazabilidad en gráficas
           cantidad: 1,          // cada hallazgo cuenta 1
         })
       }

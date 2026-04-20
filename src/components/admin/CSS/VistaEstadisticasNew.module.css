@@ -569,6 +569,12 @@
   gap: 1.5rem;
 }
 
+.gridChartsSummary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
 .cardWide {
   grid-column: span 2;
 }
@@ -811,9 +817,19 @@
   .gridCharts {
     grid-template-columns: 1fr;
   }
+
+  .gridChartsSummary {
+    grid-template-columns: 1fr;
+  }
   
   .cardWide {
     grid-column: auto;
+  }
+}
+
+@media (max-width: 1600px) and (min-width: 1201px) {
+  .gridChartsSummary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

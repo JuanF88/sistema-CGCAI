@@ -204,11 +204,92 @@
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
+.cardHeaderChart {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
 .chartCard h3 {
   margin: 0 0 10px;
   font-size: 15px;
   font-weight: 800;
   color: #0f172a;
+}
+
+.cardHeaderChart h3 {
+  margin: 0;
+}
+
+.chartCaptureArea {
+  position: relative;
+}
+
+.downloadChartBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #1e40af;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.downloadChartBtn:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.pinnedTooltip {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  min-width: 170px;
+  max-width: 260px;
+  z-index: 5;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+  pointer-events: none;
+}
+
+.tooltipLabel {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.tooltipRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #475569;
+}
+
+.tooltipName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tooltipValue {
+  color: #1d4ed8;
+  font-weight: 800;
+  flex-shrink: 0;
 }
 
 .chartWrap {

@@ -13,9 +13,9 @@ import styles from './VistaEstadisticas.module.css'
 import * as XLSX from 'xlsx'
 
 // Paleta coherente (brand + semáforos)
-const BRAND = '#667eea'        // purple-600
+const BRAND = '#6387d6'        // purple-600
 const BRAND_LIGHT = '#8b9bf7'
-const GREEN = '#10b981'        // fortalezas
+const GREEN = '#98f7d7'        // fortalezas
 const AMBER = '#f59e0b'        // oportunidades
 const RED   = '#ef4444'        // no conformidades
 const CYAN = '#06b6d4'
