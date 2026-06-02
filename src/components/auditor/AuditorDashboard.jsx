@@ -132,7 +132,7 @@ export default function AuditorDashboard() {
               <ClipboardList className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Auditoría Interna</span>
             </button>
 
-            {/* <button
+            <button
               onClick={() => {
                 setVista('mi-dashboard')
                 window.history.pushState({}, '', '/auditor?vista=mi-dashboard')
@@ -140,7 +140,7 @@ export default function AuditorDashboard() {
               className={`${styles.navButton} ${vista === 'mi-dashboard' ? styles.active : ''}`}
             >
               <LayoutDashboard className={styles.navIconSmall} size={18} /> <span className={styles.navTextSmall}>Mi Dashboard</span>
-            </button> */}
+            </button>
 
             {/* <button
               onClick={() => {
