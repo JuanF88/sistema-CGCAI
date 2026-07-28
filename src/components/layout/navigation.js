@@ -9,6 +9,7 @@ import {
   BarChart,
   BellRing,
   Building,
+  CalendarRange,
   ClipboardList,
   Eye,
   FileText,
@@ -33,6 +34,7 @@ import { ROLES } from '@/lib/auth/roles'
 export const ADMIN_NAV = [
   { key: 'crearInforme', label: 'Inicio', icon: FileText },
   { key: 'VistaTimeline', label: 'Administrar Auditorías', icon: Home },
+  { key: 'programaAuditoria', label: 'Programa de Auditoría', icon: CalendarRange },
   {
     key: 'administracion',
     label: 'Administración',

@@ -10,6 +10,7 @@ import { Dialog } from '@headlessui/react'
 import { Download, FilterX } from 'lucide-react'
 import { toast } from 'react-toastify'
 import { listarHallazgos } from '@/features/hallazgos/api/hallazgos-api'
+import { useAnioInicial } from '@/hooks/useAnioInicial'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -402,6 +403,8 @@ const {
   };
 }, [hallazgos]);
 
+  // El filtro compara con `String(...)`, así que el año se guarda como texto.
+  useAnioInicial(opcionesAnios, (anio) => setFiltroAnio(String(anio)), { sinDatos: '' })
 
   /* ===================== Aplicación de filtros ===================== */
   const filtrados = useMemo(() => {
@@ -695,12 +698,17 @@ const {
   }
 
   /* ===================== KPIs ===================== */
+  // El desglose va sobre `filtrados`: las tarjetas resumen lo que se está
+  // viendo. `registrados` queda aparte como referencia de cuánto hay en total.
   const stats = useMemo(() => {
-    const total = hallazgos.length
-    const fortalezas = hallazgos.filter(h => (h.tipo || inferirTipoDesdeTabla(h)) === 'Fortalezas').length
-    const oportunidades = hallazgos.filter(h => (h.tipo || inferirTipoDesdeTabla(h)) === 'Oportunidades de Mejora').length
-    const noConformidades = hallazgos.filter(h => (h.tipo || inferirTipoDesdeTabla(h)) === 'No Conformidades').length
-    return { total, fortalezas, oportunidades, noConformidades, filtrados: filtrados.length }
+    const tipoDe = (h) => h.tipo || inferirTipoDesdeTabla(h)
+    return {
+      total: filtrados.length,
+      fortalezas: filtrados.filter(h => tipoDe(h) === 'Fortalezas').length,
+      oportunidades: filtrados.filter(h => tipoDe(h) === 'Oportunidades de Mejora').length,
+      noConformidades: filtrados.filter(h => tipoDe(h) === 'No Conformidades').length,
+      registrados: hallazgos.length,
+    }
   }, [hallazgos, filtrados])
 
   /* ===================== Columnas ===================== */
@@ -912,7 +920,7 @@ const {
 
       {/* KPIs */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-        <StatCard icon="📊" tone="blue" label="Total hallazgos" value={stats.total} />
+        <StatCard icon="📊" tone="blue" label="Hallazgos filtrados" value={stats.total} />
         <StatCard
           icon="✅"
           tone="green"
@@ -931,7 +939,7 @@ const {
           label="No conformidades"
           value={`${stats.noConformidades} · ${pct(stats.noConformidades)}%`}
         />
-        <StatCard icon="🔍" tone="purple" label="Resultados filtrados" value={stats.filtrados} />
+        <StatCard icon="🔍" tone="purple" label="Registrados en total" value={stats.registrados} />
       </section>
 
       {/* Filtros */}

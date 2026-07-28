@@ -37,6 +37,7 @@ import {
   descargarPlanMejora,
 } from '@/features/auditorias/lib/descargas'
 import { useNovedades } from '@/features/auditorias/hooks/useNovedades'
+import { useAnioInicial } from '@/hooks/useAnioInicial'
 import { useSubidaDocumento } from '@/features/auditorias/hooks/useSubidaDocumento'
 import {
   CHECKS_RAPIDOS,
@@ -410,6 +411,8 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
     return [...set].sort((a, b) => a - b)
   }, [auditorias])
 
+  useAnioInicial(anios, (anio) => setFiltro('anio', String(anio)))
+
   const filtradas = useMemo(
     () =>
       auditorias.filter((a) => {
@@ -678,16 +681,18 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
 
   /* ── KPIs ── */
 
+  // Sobre `filtradas`, no sobre `auditorias`: las tarjetas resumen lo que se
+  // está viendo. Si no, al filtrar por año seguían contando todos los años.
   const kpis = useMemo(() => {
-    const t = { total: auditorias.length, plan: 0, informe: 0, val: 0 }
-    auditorias.forEach((a) => {
+    const t = { total: filtradas.length, plan: 0, informe: 0, val: 0 }
+    filtradas.forEach((a) => {
       const flags = computeFlags(a)
       if (flags.tienePlan) t.plan++
       if (flags.informeCompleto) t.informe++
       if (flags.validado) t.val++
     })
     return t
-  }, [auditorias])
+  }, [filtradas])
 
   const pct = (n) => (kpis.total > 0 ? Math.round((n / kpis.total) * 100) : 0)
 

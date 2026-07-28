@@ -23,6 +23,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { PAGE_SHELL, SECTION_CARD } from '@/components/ui/tokens'
+import { anioPorDefecto } from '@/lib/fechas/anio'
+import { useAnioInicial } from '@/hooks/useAnioInicial'
 import { cn } from '@/lib/utils'
 
 const MODOS = [
@@ -90,7 +92,11 @@ export default function VistaDashboardAuditores() {
         const anios = Array.isArray(data?.anios) ? data.anios.map((item) => String(item)) : []
         setAniosGenerales(anios)
         if (anios.length) {
-          setAnioGeneral((prev) => (anios.includes(prev) ? prev : anios[0]))
+          // Si el año que ya estaba elegido sigue teniendo datos se respeta;
+          // si no, el actual, y en su defecto el más reciente.
+          setAnioGeneral((prev) =>
+            anios.includes(prev) ? prev : String(anioPorDefecto(anios, { sinDatos: prev }))
+          )
         }
       } catch {
         setAniosGenerales([])
@@ -283,6 +289,8 @@ export default function VistaDashboardAuditores() {
       setSelectedAuditorId(filteredAuditores[0].auth_user_id)
     }
   }, [filteredAuditores, selectedAuditorId])
+
+  useAnioInicial(aniosDisponibles, (anio) => setAnioFiltro(String(anio)))
 
   useEffect(() => {
     if (anioFiltro !== 'todos' && !aniosDisponibles.includes(anioFiltro)) {

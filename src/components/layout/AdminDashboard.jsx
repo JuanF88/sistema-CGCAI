@@ -13,6 +13,7 @@ import VistaEstadisticasPanel from '@/features/estadisticas/components/VistaEsta
 import VistaEvaluacionAuditores from '@/features/evaluaciones/components/VistaEvaluacionAuditores'
 import VistaDashboardAuditores from '@/features/evaluaciones/components/VistaDashboardAuditores'
 import VistaAlertasAuditoria from '@/features/alertas/components/VistaAlertasAuditoria'
+import VistaProgramaAuditoria from '@/features/programa/components/VistaProgramaAuditoria'
 
 // `usuario` llega ya verificado desde el Server Component de la ruta
 // (`src/app/admin/page.js`), no desde localStorage.
@@ -35,6 +36,7 @@ export default function AdminDashboard({ usuario }) {
     >
       {vista === 'VistaTimeline' && usuario && <VistaTimeline usuario={usuario} />}
       {vista === 'crearInforme' && <VistaInformesAdmin />}
+      {vista === 'programaAuditoria' && <VistaProgramaAuditoria />}
       {(vista === 'administracion' || vista === 'crearUsuario' || vista === 'adminDependencia') && (
         <VistaAdministracionPanel
           initialTab={vista === 'adminDependencia' ? 'dependencias' : 'usuarios'}

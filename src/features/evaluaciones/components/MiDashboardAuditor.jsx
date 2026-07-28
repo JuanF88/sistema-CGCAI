@@ -45,6 +45,7 @@ import {
   TABLE_TOOLBAR,
 } from '@/components/ui/tokens'
 import { cn } from '@/lib/utils'
+import { useAnioInicial } from '@/hooks/useAnioInicial'
 
 const formatNote = (value) => (typeof value === 'number' ? value.toFixed(2) : '—')
 
@@ -127,6 +128,8 @@ export default function MiDashboardAuditor({ usuario }) {
   const aniosDisponibles = useMemo(() => {
     return (dashboard?.resumenPorAnio || []).map((item) => String(item.anio))
   }, [dashboard])
+
+  useAnioInicial(aniosDisponibles, (anio) => setAnioFiltro(String(anio)))
 
   useEffect(() => {
     if (anioFiltro !== 'todos' && !aniosDisponibles.includes(anioFiltro)) {

@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { BellRing, Building2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Combobox, ComboboxMultiple } from '@/components/ui/combobox'
 import { Field, FieldGrid } from '@/components/ui/field'
 import { FormDrawer } from '@/components/ui/form-drawer'
 import { FormSection } from '@/components/ui/form-section'
@@ -41,8 +42,31 @@ const FILAS = [
   { id: 55, nombre: 'UNIDAD DE PERMANENCIA Y GRADUACIÓN', gestion: 'Control', badge: 'info' },
 ]
 
+const OPCIONES_DEPENDENCIA = FILAS.map((f) => ({
+  value: f.nombre,
+  description: `Gestión ${f.gestion}`,
+}))
+
+const OPCIONES_AUDITOR = [
+  { value: 'Ana Pérez', description: 'ana.perez@unicauca.edu.co', datos: { email: 'ana.perez@unicauca.edu.co' } },
+  { value: 'Luis Gómez', description: 'luis.gomez@unicauca.edu.co', datos: { email: 'luis.gomez@unicauca.edu.co' } },
+  { value: 'Marta Ruiz', description: 'marta.ruiz@unicauca.edu.co', datos: { email: 'marta.ruiz@unicauca.edu.co' } },
+]
+
+const OPCIONES_NUMERAL = [
+  { value: '4.1', description: 'Comprensión de la organización y su contexto' },
+  { value: '4.2', description: 'Necesidades y expectativas de las partes interesadas' },
+  { value: '5.1', description: 'Liderazgo y compromiso' },
+  { value: '8.1', description: 'Planificación y control operacional' },
+  { value: '9.2', description: 'Auditoría interna' },
+]
+
 export default function PreviewContent() {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [dependencia, setDependencia] = useState('')
+  const [auditor, setAuditor] = useState('')
+  const [correo, setCorreo] = useState('')
+  const [requisitos, setRequisitos] = useState('4.1, 9.2')
 
   // Fuera de `AppShell`, así que el padding lo pone esta página.
   return (
@@ -151,6 +175,57 @@ export default function PreviewContent() {
             help="Ocupa toda la fila con `wide`."
           >
             <Textarea id="preview-criterios" placeholder="Normas y procedimientos…" />
+          </Field>
+        </FieldGrid>
+      </FormSection>
+
+      <FormSection
+        tone="neutral"
+        title="Combobox"
+        description="Sugerencias de la base de datos sin cerrar la puerta al texto libre: se puede escribir un valor que no esté en la lista."
+      >
+        <FieldGrid>
+          <Field
+            label="Dependencia"
+            htmlFor="preview-dep"
+            help={`Elegida: ${dependencia || '—'}`}
+          >
+            <Combobox
+              id="preview-dep"
+              value={dependencia}
+              onChange={setDependencia}
+              options={OPCIONES_DEPENDENCIA}
+              placeholder="Busca o escribe una dependencia…"
+            />
+          </Field>
+
+          <Field label="Auditor" htmlFor="preview-aud" help={`Correo: ${correo || '—'}`}>
+            <Combobox
+              id="preview-aud"
+              value={auditor}
+              // Elegir de la lista rellena de paso el campo vecino.
+              onChange={(valor, opcion) => {
+                setAuditor(valor)
+                setCorreo(opcion?.datos?.email ?? '')
+              }}
+              options={OPCIONES_AUDITOR}
+              placeholder="Busca o escribe un auditor…"
+            />
+          </Field>
+
+          <Field
+            label="Requisitos ISO"
+            htmlFor="preview-req"
+            wide
+            help={`Se guarda como una sola cadena: "${requisitos || '—'}"`}
+          >
+            <ComboboxMultiple
+              id="preview-req"
+              value={requisitos}
+              onChange={setRequisitos}
+              options={OPCIONES_NUMERAL}
+              placeholder="Busca un numeral…"
+            />
           </Field>
         </FieldGrid>
       </FormSection>

@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { PAGE_SHELL, SECTION_CARD } from '@/components/ui/tokens'
+import { useAnioInicial } from '@/hooks/useAnioInicial'
 import { cn } from '@/lib/utils'
 import {
   parseYMD,
@@ -164,6 +165,8 @@ export default function AuditoriasMallaControl() {
     auditorias.forEach(a => { const d = parseYMD(a.fecha_auditoria); if (d) s.add(d.getFullYear()) })
     return Array.from(s).sort((a, b) => a - b)
   }, [auditorias])
+
+  useAnioInicial(years, (anio) => setSelectedYear(String(anio)), { sinDatos: '' })
 
   const filtered = useMemo(() => {
     if (!selectedYear) return auditorias

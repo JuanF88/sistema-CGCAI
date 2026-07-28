@@ -35,7 +35,9 @@ export function Field({
     <div
       className={cn(
         'space-y-1',
-        wide && 'sm:col-span-2 lg:col-span-3',
+        // `col-span-full` y no un número: la rejilla puede tener 1, 2 o 3
+        // columnas, y un span mayor que las que hay crea columnas implícitas.
+        wide && 'col-span-full',
         // El control no necesita saber que hay error: se pinta desde aquí.
         error &&
           '[&_input]:border-destructive [&_button[role=combobox]]:border-destructive [&_textarea]:border-destructive',

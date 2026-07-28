@@ -16,6 +16,7 @@ import { toast } from 'react-toastify'
 import { ArrowLeft, CircleHelp, FileText, Plus, Save, X } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase/client'
+import { enfocarNuevo } from '@/lib/dom/desplazar'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Field, FieldGrid } from '@/components/ui/field'
@@ -176,45 +177,6 @@ const CAMPOS_INFORME = [
 
 /** `''` → `null`: Postgres rechaza la cadena vacía en columnas enteras. */
 const idONulo = (v) => (v === '' || v === undefined ? null : v)
-
-/** Aire que se deja por encima de la tarjeta a la que se salta. */
-const MARGEN_SCROLL = 16
-
-/** Antecesor que realmente desplaza a `el`; `null` si es la propia ventana. */
-function contenedorConScroll(el) {
-  for (let p = el.parentElement; p; p = p.parentElement) {
-    const { overflowY } = getComputedStyle(p)
-    const desplaza = overflowY === 'auto' || overflowY === 'scroll'
-    if (desplaza && p.scrollHeight > p.clientHeight) return p
-  }
-  return null
-}
-
-/**
- * Deja `el` arriba de su zona visible.
- *
- * No se usa `scrollIntoView` porque desplaza **todos** los antecesores con
- * scroll, la ventana incluida: dentro del drawer eso subía el panel entero
- * hasta chocar con el borde superior. Aquí solo se mueve el contenedor que
- * corresponde.
- */
-function desplazarHasta(el) {
-  const contenedor = contenedorConScroll(el)
-
-  if (!contenedor) {
-    const top = el.getBoundingClientRect().top + window.scrollY - MARGEN_SCROLL
-    window.scrollTo({ top, behavior: 'smooth' })
-    return
-  }
-
-  const top =
-    el.getBoundingClientRect().top -
-    contenedor.getBoundingClientRect().top +
-    contenedor.scrollTop -
-    MARGEN_SCROLL
-
-  contenedor.scrollTo({ top, behavior: 'smooth' })
-}
 
 /* ------------------------------------------------------------------ *
  * Piezas de UI
@@ -448,16 +410,9 @@ export default function FormularioRegistro({
   useEffect(() => {
     if (!hallazgoNuevo) return
 
-    const tarjeta = tarjetas.current[hallazgoNuevo]
-    if (tarjeta) {
-      desplazarHasta(tarjeta)
-      // El primer control es el selector de ISO; así se puede seguir escribiendo
-      // sin volver a coger el ratón. `preventScroll` evita que el foco haga su
-      // propio salto y pelee con el desplazamiento suave.
-      tarjeta
-        .querySelector('[role="combobox"], textarea, input')
-        ?.focus({ preventScroll: true })
-    }
+    // El primer control es el selector de ISO; así se puede seguir escribiendo
+    // sin volver a coger el ratón.
+    enfocarNuevo(tarjetas.current[hallazgoNuevo])
 
     setHallazgoNuevo(null)
   }, [hallazgoNuevo])

@@ -46,6 +46,7 @@ import {
 } from 'lucide-react'
 
 import { obtenerEstadisticas } from '@/features/estadisticas/api/estadisticas-api'
+import { useAnioInicial } from '@/hooks/useAnioInicial'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -260,6 +261,9 @@ export default function VistaEstadisticas({ headerExtra = null, hideMainHeader =
     }
     cargar()
   }, [])
+
+  // Los filtros comparan con `s(...)`, que normaliza a texto.
+  useAnioInicial(aniosDisponibles, (anio) => setFiltro('anio', String(anio)))
 
   /* ── Normalización ── */
 
