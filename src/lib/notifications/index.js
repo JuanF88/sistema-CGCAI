@@ -1,5 +1,5 @@
-import { sendEmail } from './emailClient'
-import { buildAuditAssignmentTemplate, buildAuditDeadlineAlertTemplate, buildCredentialsTemplate } from './templates'
+import { sendEmail } from '@/lib/notifications/emailClient'
+import { buildAuditAssignmentTemplate, buildAuditDeadlineAlertTemplate, buildCredentialsTemplate } from '@/lib/notifications/templates'
 
 export async function sendCredentialsEmail({ nombre, apellido, email, password, loginUrl }) {
   const { subject, html } = buildCredentialsTemplate({

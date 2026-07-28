@@ -1,30 +1,14 @@
 // Archivo: /app/api/plan-auditoria/route.js (o route.ts si usas TypeScript)
 
-import { getAuthenticatedClient } from '@/lib/authHelper'
-import { createClient } from '@supabase/supabase-js'
+import { requireRole } from '@/lib/api/guard'
+import { AUDITORIA_READ_ROLES } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
-  const { usuario, error } = await getAuthenticatedClient()
-  
-  if (error) {
-    return NextResponse.json({ error }, { status: 401 })
-  }
+  const guard = await requireRole(AUDITORIA_READ_ROLES)
+  if (!guard.ok) return guard.response
 
-  // Permitir acceso a admin, auditor y visualizador
-  const rolesPermitidos = ['admin', 'auditor', 'visualizador']
-  if (!rolesPermitidos.includes(usuario?.rol)) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
-
-  // Usar service role para consultas (bypass RLS temporal)
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-
-  const { data, error: dbError } = await supabase
+  const { data, error: dbError } = await guard.admin
     .from('plan_auditoria')
     .select('id, enlace, dependencias(nombre)') // accede al nombre de la dependencia
 

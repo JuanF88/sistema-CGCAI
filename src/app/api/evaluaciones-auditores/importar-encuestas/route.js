@@ -1,30 +1,17 @@
 import { NextResponse } from 'next/server'
-import { getAuthenticatedClient } from '@/lib/authHelper'
-import { createClient } from '@supabase/supabase-js'
+import { readFirstSheetAsObjects } from '@/lib/excel/readSheet'
+import { requireRole } from '@/lib/api/guard'
+import { ROLES } from '@/lib/auth/roles'
 
 // POST /api/evaluaciones-auditores/importar-encuestas
 // Importa encuestas desde archivo Excel exportado de Google Forms
 export async function POST(request) {
-  const { usuario, error } = await getAuthenticatedClient()
-  
-  if (error) {
-    return NextResponse.json({ error }, { status: 401 })
-  }
+  const guard = await requireRole(ROLES.ADMIN)
+  if (!guard.ok) return guard.response
 
-  // Solo admin puede importar encuestas
-  if (usuario?.rol !== 'admin') {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
-
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const supabaseAdmin = guard.admin
 
   try {
-    const xlsx = require('xlsx')
-    
     const formData = await request.formData()
     const file = formData.get('archivo')
     const anio = parseInt(formData.get('anio'))
@@ -40,25 +27,33 @@ export async function POST(request) {
 
     const periodo = `${anio}-${semestre}`
 
+    // Solo .xlsx: ExcelJS no lee el formato antiguo .xls (BIFF).
+    if (/\.xls$/i.test(file.name || '')) {
+      return NextResponse.json(
+        {
+          error:
+            'El formato .xls no está soportado. Abre el archivo en Excel y guárdalo como .xlsx.',
+        },
+        { status: 400 }
+      )
+    }
+
     // Leer el archivo Excel
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    // Procesar Excel con xlsx
-    let workbook
+    let rows
     try {
-      workbook = xlsx.read(buffer, { type: 'buffer' })
-    } catch (xlsxError) {
-      return NextResponse.json({ 
-        error: 'Error al procesar archivo Excel',
-        detalles: xlsxError.message 
-      }, { status: 500 })
+      rows = await readFirstSheetAsObjects(buffer)
+    } catch (excelError) {
+      return NextResponse.json(
+        {
+          error: 'Error al procesar archivo Excel',
+          detalles: excelError.message,
+        },
+        { status: 400 }
+      )
     }
-
-    // Obtener la primera hoja
-    const sheetName = workbook.SheetNames[0]
-    const sheet = workbook.Sheets[sheetName]
-    const rows = xlsx.utils.sheet_to_json(sheet)
 
     if (!rows || rows.length === 0) {
       return NextResponse.json({ error: 'El archivo está vacío' }, { status: 400 })
@@ -245,9 +240,16 @@ export async function POST(request) {
         if (marcaTemporalRaw) {
           try {
             let fecha = null
-            
+
+            // ExcelJS devuelve las celdas con formato de fecha ya como Date.
+            // (SheetJS las entregaba como número serial y había que convertirlas
+            // a mano, camino que se conserva abajo por si el Excel trae el valor
+            // como número crudo.)
+            if (marcaTemporalRaw instanceof Date) {
+              fecha = marcaTemporalRaw
+
             // Verificar si es un número serial de Excel
-            if (typeof marcaTemporalRaw === 'number' || !isNaN(parseFloat(marcaTemporalRaw))) {
+            } else if (typeof marcaTemporalRaw === 'number' || !isNaN(parseFloat(marcaTemporalRaw))) {
               // Convertir número serial de Excel a fecha
               // Excel cuenta días desde 1900-01-01 (con bug: considera 1900 bisiesto)
               const serialNumber = parseFloat(marcaTemporalRaw)
@@ -522,16 +524,8 @@ export async function POST(request) {
             // para calcular el promedio de todas las encuestas que matchean
             const dependenciaEvaluacion = evaluacion.dependencia_auditada
             
-            // Calcular promedio de TODAS las encuestas del auditor en este periodo PARA ESTA DEPENDENCIA
-            // Incluir tanto matches exactos como fuzzy
-            const { data: todasEncuestasExactas } = await supabaseAdmin
-              .from('encuestas_auditores')
-              .select('nota_calculada')
-              .eq('auditor_id', auditor.auth_user_id)
-              .eq('periodo', periodoEncuesta)
-              .eq('dependencia_auditada', dependenciaEvaluacion)
-
-            // También buscar encuestas que matcheen por fuzzy (como la actual)
+            // Traemos todas las encuestas del auditor en el periodo y filtramos
+            // por fuzzy matching de dependencia (cubre también los exactos).
             const { data: todasEncuestas } = await supabaseAdmin
               .from('encuestas_auditores')
               .select('id, nota_calculada, dependencia_auditada')

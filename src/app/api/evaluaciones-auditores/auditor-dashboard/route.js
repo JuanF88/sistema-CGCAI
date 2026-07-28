@@ -1,19 +1,13 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { getAuthenticatedClient } from '@/lib/authHelper'
+import { requireAuth } from '@/lib/api/guard'
+import { ROLES } from '@/lib/auth/roles'
 
 export async function GET(request) {
-  const { usuario, error } = await getAuthenticatedClient()
+  const guard = await requireAuth()
+  if (!guard.ok) return guard.response
 
-  if (error) {
-    return NextResponse.json({ error }, { status: 401 })
-  }
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const { usuario, rol: userRole } = guard
+  const supabase = guard.admin
 
   try {
     const { searchParams } = new URL(request.url)
@@ -23,11 +17,11 @@ export async function GET(request) {
       return NextResponse.json({ error: 'auditor_id es obligatorio' }, { status: 400 })
     }
 
-    const userRole = usuario?.rol
     const requestedAuditorId = String(auditorId).trim()
     const authUserId = String(usuario?.auth_user_id || '').trim()
-    const isPrivilegedViewer = userRole === 'admin' || userRole === 'visualizador'
-    const isOwnAuditorDashboard = userRole === 'auditor' && authUserId && authUserId === requestedAuditorId
+    const isPrivilegedViewer = userRole === ROLES.ADMIN || userRole === ROLES.VISUALIZADOR
+    const isOwnAuditorDashboard =
+      userRole === ROLES.AUDITOR && authUserId && authUserId === requestedAuditorId
 
     if (!isPrivilegedViewer && !isOwnAuditorDashboard) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })

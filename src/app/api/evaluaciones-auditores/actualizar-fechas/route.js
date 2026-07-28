@@ -1,38 +1,18 @@
 import { NextResponse } from 'next/server'
-import { getAuthenticatedClient } from '@/lib/authHelper'
-import { createClient } from '@supabase/supabase-js'
+import { requireRole } from '@/lib/api/guard'
+import { ROLES } from '@/lib/auth/roles'
 
 // POST /api/evaluaciones-auditores/actualizar-fechas
 // Actualiza manualmente las fechas de entrega de archivos
 export async function POST(request) {
-  console.log('\n================================')
-  console.log('📝 INICIO: Actualizar fechas manualmente')
-  console.log('================================')
-  
-  const { usuario, error } = await getAuthenticatedClient()
-  
-  if (error) {
-    console.error('❌ Error de autenticación:', error)
-    return NextResponse.json({ error }, { status: 401 })
-  }
+  const guard = await requireRole(ROLES.ADMIN)
+  if (!guard.ok) return guard.response
 
-  if (usuario?.rol !== 'admin') {
-    console.error('❌ Usuario no autorizado:', usuario?.rol)
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
-
-  console.log('✅ Usuario autenticado:', usuario.email)
-
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const supabaseAdmin = guard.admin
 
   try {
     const body = await request.json()
-    console.log('📦 Body recibido:', body)
-    
+
     const { 
       evaluacion_id, 
       detalle_archivos, 

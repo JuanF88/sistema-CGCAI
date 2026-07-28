@@ -1,7 +1,7 @@
 // src/app/api/estadisticas/route.js
 import { NextResponse } from 'next/server'
-import { getAuthenticatedClient } from '@/lib/authHelper'
-import { createClient } from '@supabase/supabase-js'
+import { requireRole } from '@/lib/api/guard'
+import { AUDITORIA_READ_ROLES } from '@/lib/auth/roles'
 
 const normalizeGestion = (g) => {
   if (!g) return null
@@ -15,24 +15,10 @@ const normalizeGestion = (g) => {
 }
 
 export async function GET() {
-  const { usuario, error } = await getAuthenticatedClient()
-  
-  if (error) {
-    return NextResponse.json({ error }, { status: 401 })
-  }
+  const guard = await requireRole(AUDITORIA_READ_ROLES)
+  if (!guard.ok) return guard.response
 
-  // Permitir acceso a admin, auditor y visualizador
-  const rolesPermitidos = ['admin', 'auditor', 'visualizador']
-  if (!rolesPermitidos.includes(usuario?.rol)) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
-
-  // Usar service role para consultas (bypass RLS temporal)
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const supabase = guard.admin
 
   const tipos = [
     { tabla: 'fortalezas', tipo: 'Fortaleza' },

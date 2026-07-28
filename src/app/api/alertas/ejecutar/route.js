@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getAuthenticatedClient } from '@/lib/authHelper'
-import { createClient } from '@supabase/supabase-js'
+import { requireCronOrRole } from '@/lib/api/guard'
+import { ROLES } from '@/lib/auth/roles'
 import {
   buildAlertMessage,
   buildDeadlineNotifications,
@@ -12,46 +12,16 @@ import {
 } from '@/lib/alertas/auditAlertService'
 import { sendAuditDeadlineAlertEmail } from '@/lib/notifications'
 
-function buildSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
-
-function extractCronToken(request) {
-  return request.headers.get('x-cron-secret') || request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || ''
-}
-
-function hasValidCronAccess(request) {
-  const cronToken = extractCronToken(request)
-  if (!cronToken) return false
-
-  const validSecrets = [process.env.ALERTAS_CRON_SECRET, process.env.CRON_SECRET].filter(Boolean)
-  if (!validSecrets.length) return false
-
-  return validSecrets.includes(cronToken)
-}
-
+// Se puede disparar de dos maneras: por el cron de Vercel (secreto compartido
+// en `x-cron-secret` o `Authorization: Bearer`) o manualmente por un admin
+// desde el panel de alertas.
 async function executeAlerts(request) {
-  const hasCronAccess = hasValidCronAccess(request)
+  const guard = await requireCronOrRole(request, ROLES.ADMIN)
+  if (!guard.ok) return guard.response
 
-  let usuario = null
-  if (!hasCronAccess) {
-    const authResult = await getAuthenticatedClient()
-    usuario = authResult.usuario
-    if (authResult.error) {
-      return NextResponse.json({ error: authResult.error }, { status: 401 })
-    }
-
-    if (usuario?.rol !== 'admin') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
-  }
+  const supabaseAdmin = guard.admin
 
   try {
-    const supabaseAdmin = buildSupabaseAdmin()
     const configs = await getAlertConfigs(supabaseAdmin)
     const processDefinitions = getProcessDefinitions()
     const buckets = processDefinitions.map((item) => item.bucket)
@@ -98,7 +68,6 @@ async function executeAlerts(request) {
       try {
         const auditor = notification.audit
         const processLabel = notification.processDefinition.label
-        const config = notification.config
         const dueDateText = notification.dueDate?.toISOString().slice(0, 10) || 'Por definir'
         const dependencyName = auditor?.dependencia_nombre || auditor?.dependencias?.nombre || 'Dependencia'
 

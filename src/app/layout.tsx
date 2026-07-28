@@ -1,7 +1,9 @@
 // app/layout.tsx
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import ToastProvider from "@/components/ToastProvider";
+import ToastProvider from "@/components/ui/ToastProvider";
+import ThemeToggle from "@/components/ui/theme-toggle";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
 import { Poppins, Geist, Geist_Mono } from "next/font/google";
 
@@ -46,10 +48,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="es"
       // 👇 todas las vars de fuentes en <html>
       className={`${poppins.variable} ${geistSans.variable} ${geistMono.variable}`}
+      suppressHydrationWarning
     >
+      <head>
+        {/* Aplica el tema guardado antes del primer pintado: sin esto, quien
+            tenga el modo oscuro vería un parpadeo blanco al cargar. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       {/* Usa font-family desde globals.css (var --font-poppins) */}
       <body className="antialiased">
         {children}
+        <ThemeToggle />
         <ToastProvider />
       </body>
     </html>
