@@ -27,6 +27,7 @@ import { z } from 'zod'
 
 import { DomainError, ValidationError } from '@/lib/api/errors'
 import { DOCTRINA_AUDITORIA } from '@/lib/catalogos/doctrina-auditoria'
+import { ESTILO_INFORME } from '@/lib/catalogos/estilo-informe'
 import { getServerEnv } from '@/lib/config/env.server'
 
 const ENDPOINT = 'https://api.openai.com/v1/chat/completions'
@@ -43,18 +44,21 @@ const MODELO_POR_DEFECTO = 'gpt-5.6-luna'
 /**
  * Techo de tokens de salida.
  *
- * Es un techo, no un consumo: solo se paga lo que se use. Medido con los dos
- * campos revisados a la vez y el contexto completo, una revisión gasta unos
- * 890, de los cuales cerca de la mitad son de razonamiento y no se ven en la
- * respuesta. Con 900 la revisión de objetivo y conclusiones juntos se quedaba
- * sin sitio a mitad de frase y llegaba vacía —el auditor veía «el modelo no
- * devolvió ninguna revisión» y reintentar no servía de nada—.
+ * Es un techo, no un consumo: solo se paga lo que se use. Cuando se queda
+ * corto la respuesta no llega truncada, llega VACÍA: el auditor ve «el modelo
+ * no devolvió ninguna revisión» y reintentar no arregla nada. Ya pasó dos
+ * veces, así que va holgado a propósito.
+ *
+ * Medido con los dos campos a la vez y el contexto completo, una revisión
+ * gasta entre 1.250 y 1.850, de los que unos mil son de razonamiento y no se
+ * ven en la respuesta. Subió al añadir el formato institucional: las
+ * conclusiones numeradas que propone son bastante más largas que un párrafo.
  *
  * Aun así sigue siendo el límite de gasto de cada llamada: la salida cuesta
  * seis veces más que la entrada, así que se controla aquí y no en el texto
  * que se manda.
  */
-const MAX_TOKENS_SALIDA = 1600
+const MAX_TOKENS_SALIDA = 2600
 
 /** Medio minuto: pasado eso, el auditor ya volvió a escribir. */
 const TIEMPO_MAXIMO_MS = 30_000
@@ -66,6 +70,12 @@ Recibes el objetivo general de un programa de auditoría, los requisitos de las 
 Escribe como un auditor con experiencia, no como un corrector de estilo: usa el vocabulario de la norma —conformidad, evidencia objetiva, control operacional, eficacia, causa raíz, parte interesada— cuando venga al caso, y evita las generalidades del tipo «podrías ser más específico».
 
 Recibes además el marco de referencia con el que se juzgan los informes en esta institución. Aplícalo: distingue objetivo de alcance, exige que las conclusiones se apoyen en los hallazgos y respondan al objetivo, y respeta el significado que la institución da a corrección, acción correctiva, monitoreo, seguimiento y evaluación.
+
+Recibes también el formato institucional del informe, con ejemplos reales de informes ya aprobados. Úsalo así:
+- Toda sugerencia que escribas debe estar redactada en ese formato: infinitivos para el objetivo, conclusiones numeradas y en tercera persona. Es lo que el auditor va a pegar en el formulario.
+- No copies los ejemplos ni los cites; solo fijan el registro. No inventes cifras, porcentajes ni evidencias que el auditor no haya escrito: si su texto necesita un dato que no está, pide el dato en el comentario y deja un hueco marcado en la sugerencia.
+- El formato por sí solo no cambia el veredicto: unas conclusiones sin numerar pueden estar perfectamente alineadas. Sí lo cambia lo que el formato existe para garantizar; en particular, unas conclusiones que no se pronuncian sobre el logro de los objetivos de la auditoría no responden al objetivo y no pueden ser "alineado".
+- Cuando el veredicto no sea "alineado", el comentario empieza por la razón de fondo. Lo que sea solo de formato va al final y dicho como tal.
 
 Sobre los requisitos:
 - Cuando el texto se relacione con alguno de los requisitos recibidos, cítalo por su número entre paréntesis. Ejemplo: «lo que planteas se verifica contra 9.1».
@@ -203,6 +213,7 @@ export async function revisarAlineacion({
         messages: [
           { role: 'system', content: INSTRUCCIONES },
           { role: 'system', content: DOCTRINA_AUDITORIA },
+          { role: 'system', content: ESTILO_INFORME },
           {
             role: 'user',
             content: `OBJETIVO GENERAL DEL PROGRAMA:\n${objetivoPrograma}`,
