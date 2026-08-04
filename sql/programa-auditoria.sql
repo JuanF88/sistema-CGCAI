@@ -121,6 +121,14 @@ END $$;
 
 -- ------------------------------------------------------------
 -- 2. CRONOGRAMA  (hoja «Programa AI Estratégico», filas 14+)
+--
+-- Dos niveles, como el formato: una fila por **proceso** del mapa institucional
+-- y, colgando de ella, las dependencias que se auditan en ese proceso.
+--
+-- En el Excel esto se ve como un bloque por proceso: A:B (proceso), E (ISO
+-- 9001), F (ISO 14001) y las cuatro columnas de semanas van combinadas
+-- verticalmente en todo el bloque, y solo C (auditado) y D (auditores) cambian
+-- de una línea a otra.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS programa_auditoria_cronograma (
   id             bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -128,11 +136,15 @@ CREATE TABLE IF NOT EXISTS programa_auditoria_cronograma (
                  REFERENCES programas_auditoria(id) ON DELETE CASCADE,
 
   orden          integer NOT NULL DEFAULT 0,
-  proceso        text NOT NULL,          -- PROCESO A AUDITAR
-  auditado       text,                   -- AUDITADO/PROGRAMA
-  auditores      text,                   -- AUDITOR(ES)
+  proceso        text NOT NULL,          -- PROCESO A AUDITAR (nombre impreso)
+  proceso_clave  text,                   -- clave del mapa: igual a dependencias.gestion
   requisitos_9001  text,
   requisitos_14001 text,
+
+  -- Semanas del mes marcadas para este proceso, separadas por comas: «1,3».
+  -- En el formato son las cuatro columnas (G:H, I:J, K:L, M:N) a la derecha de
+  -- los requisitos ISO 14001, bajo el rótulo «MES DE AUDITORIA: …».
+  semanas        text,
 
   created_at     timestamptz NOT NULL DEFAULT now()
 );
@@ -140,9 +152,72 @@ CREATE TABLE IF NOT EXISTS programa_auditoria_cronograma (
 CREATE INDEX IF NOT EXISTS programa_cronograma_programa_idx
   ON programa_auditoria_cronograma (programa_id, orden);
 
--- La primera versión tenía una columna `semana` (1-4) que marcaba la X en la
--- cuadrícula del formato. Se retiró: el mes de auditoría de la cabecera basta.
-ALTER TABLE programa_auditoria_cronograma DROP COLUMN IF EXISTS semana;
+-- `CREATE TABLE IF NOT EXISTS` no toca una tabla que ya existe.
+ALTER TABLE programa_auditoria_cronograma
+  ADD COLUMN IF NOT EXISTS semanas       text,
+  ADD COLUMN IF NOT EXISTS proceso_clave text;
+
+-- La primera versión tenía una columna `semana` (un único 1-4). Ahora un mismo
+-- proceso puede ocupar varias semanas, así que se pasa a la lista y se retira.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'programa_auditoria_cronograma' AND column_name = 'semana'
+  ) THEN
+    UPDATE programa_auditoria_cronograma
+       SET semanas = semana::text
+     WHERE semanas IS NULL AND semana IS NOT NULL;
+
+    ALTER TABLE programa_auditoria_cronograma DROP COLUMN semana;
+  END IF;
+END $$;
+
+-- ---- 2b. Dependencias auditadas en cada proceso -------------
+CREATE TABLE IF NOT EXISTS programa_auditoria_cronograma_dependencias (
+  id             bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  cronograma_id  bigint NOT NULL
+                 REFERENCES programa_auditoria_cronograma(id) ON DELETE CASCADE,
+
+  orden          integer NOT NULL DEFAULT 0,
+  auditado       text NOT NULL,          -- AUDITADO/PROGRAMA
+  auditores      text,                   -- AUDITOR(ES)
+
+  -- Texto libre y opcional: la «AA» (Auditor Acompañante) de la nomenclatura
+  -- del formato. Va aquí y no en la sección porque acompaña a una auditoría
+  -- concreta, y suele ser alguien que no está en el catálogo de usuarios.
+  auditor_acompanante text,
+
+  created_at     timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS programa_cronograma_dep_idx
+  ON programa_auditoria_cronograma_dependencias (cronograma_id, orden);
+
+-- `CREATE TABLE IF NOT EXISTS` no toca una tabla que ya existe.
+ALTER TABLE programa_auditoria_cronograma_dependencias
+  ADD COLUMN IF NOT EXISTS auditor_acompanante text;
+
+-- Antes el cronograma era plano: una fila por dependencia, repitiendo el
+-- proceso y los requisitos. Cada una de esas filas pasa a ser una sección con
+-- una sola dependencia. Puede dejar varias secciones del mismo proceso; se ven
+-- en el formulario y se juntan a mano, que es preferible a adivinar cuál de los
+-- requisitos repetidos era el bueno.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'programa_auditoria_cronograma' AND column_name = 'auditado'
+  ) THEN
+    INSERT INTO programa_auditoria_cronograma_dependencias (cronograma_id, orden, auditado, auditores)
+    SELECT id, 0, coalesce(nullif(auditado, ''), proceso), auditores
+      FROM programa_auditoria_cronograma;
+
+    ALTER TABLE programa_auditoria_cronograma
+      DROP COLUMN auditado,
+      DROP COLUMN auditores;
+  END IF;
+END $$;
 
 -- ------------------------------------------------------------
 -- 3. DISTRIBUCIÓN  (hoja «Distribución»)
@@ -277,3 +352,39 @@ WITH CHECK (
   EXISTS (SELECT 1 FROM usuarios u
           WHERE u.auth_user_id = auth.uid() AND lower(u.rol) = 'admin')
 );
+
+-- ------------------------------------------------------------
+-- 5. DE QUÉ PROGRAMA VIENE CADA AUDITORÍA
+--
+-- Al aprobar un programa se podrán generar sus auditorías, y luego hay que
+-- poder responder «¿de qué programa salió esta?».
+--
+-- Va en `informes_auditoria` y NO en `planes_auditoria_informe`: esa tabla es
+-- el PDF del plan (`archivo_path NOT NULL`, una fila por informe) y solo existe
+-- cuando alguien lo sube. Una auditoría recién generada todavía no tiene plan,
+-- así que no tendría dónde guardar su origen.
+--
+-- Las auditorías que ya existen NO se tocan:
+--   · la columna es NULLABLE y sin DEFAULT, así que Postgres no reescribe la
+--     tabla; es un cambio solo de catálogo y las filas antiguas quedan en NULL.
+--   · `ON DELETE SET NULL` y nunca CASCADE: borrar un programa jamás puede
+--     arrastrar auditorías.
+--   · el índice es parcial, así que solo pesa lo que ocupen las nuevas.
+--
+-- NULL significa exactamente «se creó a mano, antes de los programas»; es un
+-- dato, no un hueco por rellenar.
+-- ------------------------------------------------------------
+ALTER TABLE informes_auditoria
+  ADD COLUMN IF NOT EXISTS programa_auditoria_id bigint
+    REFERENCES programas_auditoria(id) ON DELETE SET NULL;
+
+COMMENT ON COLUMN informes_auditoria.programa_auditoria_id IS
+  'Programa de auditoría que generó esta auditoría. NULL = creada a mano.';
+
+CREATE INDEX IF NOT EXISTS informes_programa_auditoria_idx
+  ON informes_auditoria (programa_auditoria_id)
+  WHERE programa_auditoria_id IS NOT NULL;
+
+-- Comprobación: cuántas auditorías vienen de un programa y cuántas son previas.
+--   SELECT coalesce(programa_auditoria_id::text, 'a mano') AS origen, count(*)
+--     FROM informes_auditoria GROUP BY 1 ORDER BY 2 DESC;

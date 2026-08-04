@@ -11,6 +11,16 @@ import {
 
 const CAMPOS = 'dependencia_id, nombre, gestion'
 
+/**
+ * Las escrituras van con `admin` (service-role), no con el cliente de sesión.
+ *
+ * `dependencias` está bajo RLS y sus políticas solo cubren SELECT: con el
+ * cliente ligado a la sesión, cualquier INSERT/UPDATE/DELETE lo rechazaba la
+ * política, aunque quien lo pidiera fuera admin. Quién puede escribir ya lo
+ * decide `requireRole(ROLES.ADMIN)` unas líneas más arriba, que es donde vive
+ * la autorización en el resto del proyecto.
+ */
+
 /** Lee y valida el `?id=` de la query. */
 const parseId = (request) =>
   dependenciaIdSchema.parse(new URL(request.url).searchParams.get('id'))
@@ -37,7 +47,7 @@ export const POST = withRoute(async (request) => {
 
   const dto = crearDependenciaSchema.parse(await request.json())
 
-  const { data, error } = await guard.supabase
+  const { data, error } = await guard.admin
     .from('dependencias')
     .insert(dto)
     .select(CAMPOS)
@@ -61,7 +71,7 @@ export const PUT = withRoute(async (request) => {
     Object.entries(dto).filter(([, value]) => value !== undefined)
   )
 
-  const { data, error } = await guard.supabase
+  const { data, error } = await guard.admin
     .from('dependencias')
     .update(update)
     .eq('dependencia_id', id)
@@ -81,7 +91,7 @@ export const DELETE = withRoute(async (request) => {
 
   const id = parseId(request)
 
-  const { error } = await guard.supabase
+  const { error } = await guard.admin
     .from('dependencias')
     .delete()
     .eq('dependencia_id', id)

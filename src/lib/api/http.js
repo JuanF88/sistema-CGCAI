@@ -20,9 +20,41 @@ export class ApiError extends Error {
   }
 }
 
+/** Cuántos motivos se listan antes de resumir; más no se lee en un aviso. */
+const MAX_MOTIVOS = 3
+
+/**
+ * Los motivos concretos de un error de validación.
+ *
+ * El backend manda `message: 'Datos inválidos.'` y los mensajes de verdad en
+ * `details.fields`. Sin esto, un formulario rechazado decía «Datos inválidos» y
+ * nada más: el usuario veía que fallaba, pero no qué corregir.
+ *
+ * Se usan solo los mensajes, no las rutas: `cronograma.0.dependencias.1.auditado`
+ * no le dice nada a nadie, y los mensajes ya están escritos para leerse.
+ */
+function motivosDeValidacion(details) {
+  const mensajes = (details?.fields ?? [])
+    .map((campo) => String(campo?.message ?? '').trim())
+    .filter(Boolean)
+
+  // Un mismo mensaje se repite por cada fila que lo incumple.
+  const unicos = [...new Set(mensajes)]
+  if (!unicos.length) return ''
+
+  const visibles = unicos.slice(0, MAX_MOTIVOS).join(' · ')
+  const resto = unicos.length - MAX_MOTIVOS
+
+  return resto > 0 ? `${visibles} · y ${resto} más` : visibles
+}
+
 /** Mensaje legible a partir del cuerpo de error del backend. */
 export function getApiErrorMessage(data, status) {
   if (typeof data === 'string' && data.trim()) return data
+
+  const motivos = motivosDeValidacion(data?.details)
+  if (motivos) return motivos
+
   if (data?.message) return data.message
   if (data?.error) return data.error // alias en desuso
   if (status === 401) return 'Tu sesión expiró. Vuelve a iniciar sesión.'

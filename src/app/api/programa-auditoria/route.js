@@ -9,30 +9,81 @@ import {
   programaIdSchema,
 } from '@/features/programa/dto/programa-dto'
 
-/** Cabecera con sus dos listas hijas, ya ordenadas. */
+/**
+ * Cabecera con sus listas hijas, ya ordenadas.
+ *
+ * El cronograma tiene tres niveles: programa → sección de proceso →
+ * dependencias auditadas.
+ */
 const SELECT_COMPLETO = `
   *,
-  cronograma:programa_auditoria_cronograma ( * ),
+  cronograma:programa_auditoria_cronograma (
+    *,
+    dependencias:programa_auditoria_cronograma_dependencias ( * )
+  ),
   distribucion:programa_auditoria_distribucion ( * )
 `
 
 const parseId = (request) =>
   programaIdSchema.parse(new URL(request.url).searchParams.get('id'))
 
+const porOrden = (a, b) => a.orden - b.orden
+
 /** Las filas hijas llegan sin ordenar; el `orden` es el del formulario. */
 const ordenar = (programa) => ({
   ...programa,
-  cronograma: [...(programa.cronograma ?? [])].sort((a, b) => a.orden - b.orden),
-  distribucion: [...(programa.distribucion ?? [])].sort((a, b) => a.orden - b.orden),
+  cronograma: [...(programa.cronograma ?? [])].sort(porOrden).map((seccion) => ({
+    ...seccion,
+    dependencias: [...(seccion.dependencias ?? [])].sort(porOrden),
+  })),
+  distribucion: [...(programa.distribucion ?? [])].sort(porOrden),
 })
 
-/** Inserta las dos listas hijas de un programa. Lanza si algo falla. */
+/**
+ * Fila de una sección del cronograma.
+ *
+ * Se enumeran las columnas en vez de esparcir la sección entera: `dependencias`
+ * viaja dentro del DTO y va a su propia tabla, no a esta.
+ */
+const filaSeccion = (seccion, programaId, orden) => ({
+  programa_id: programaId,
+  orden,
+  proceso: seccion.proceso,
+  proceso_clave: seccion.proceso_clave,
+  requisitos_9001: seccion.requisitos_9001,
+  requisitos_14001: seccion.requisitos_14001,
+  semanas: seccion.semanas,
+})
+
+/** Inserta las listas hijas de un programa. Lanza si algo falla. */
 async function guardarHijos(db, programaId, { cronograma, distribucion }) {
   if (cronograma.length) {
-    const { error } = await db.from('programa_auditoria_cronograma').insert(
-      cronograma.map((fila, orden) => ({ ...fila, programa_id: programaId, orden }))
-    )
+    // Se piden de vuelta `id` y `orden` porque las dependencias necesitan la
+    // clave de su sección: el orden de un insert masivo no está garantizado, así
+    // que se emparejan por `orden` y no por posición del array devuelto.
+    const { data: secciones, error } = await db
+      .from('programa_auditoria_cronograma')
+      .insert(cronograma.map((seccion, orden) => filaSeccion(seccion, programaId, orden)))
+      .select('id, orden')
+
     if (error) throw fromPostgresError(error)
+
+    const idPorOrden = new Map((secciones ?? []).map((s) => [s.orden, s.id]))
+
+    const filas = cronograma.flatMap((seccion, orden) =>
+      (seccion.dependencias ?? []).map((dep, i) => ({
+        ...dep,
+        cronograma_id: idPorOrden.get(orden),
+        orden: i,
+      }))
+    )
+
+    if (filas.length) {
+      const { error: depError } = await db
+        .from('programa_auditoria_cronograma_dependencias')
+        .insert(filas)
+      if (depError) throw fromPostgresError(depError)
+    }
   }
 
   if (distribucion.length) {
@@ -123,7 +174,8 @@ export const PUT = withRoute(async (request) => {
   if (error) throw fromPostgresError(error)
   if (!data) throw new NotFoundError('Programa no encontrado.')
 
-  // Las listas se reescriben enteras (ver nota en el DTO).
+  // Las listas se reescriben enteras (ver nota en el DTO). Las dependencias del
+  // cronograma caen con su sección por `ON DELETE CASCADE`.
   for (const tabla of ['programa_auditoria_cronograma', 'programa_auditoria_distribucion']) {
     const { error: delErr } = await guard.admin.from(tabla).delete().eq('programa_id', id)
     if (delErr) throw fromPostgresError(delErr)

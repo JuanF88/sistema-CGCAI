@@ -192,7 +192,13 @@ html {
     background-image: url('/Banner2.0.png');
     background-repeat: no-repeat;
     background-position: center;
-    background-size: 130%;
+    /* En píxeles y no en porcentaje. Antes era 130 %, que se mide sobre el
+       ancho del elemento: al plegar el panel de 288 a 80 px la imagen se
+       encogía con él y quedaba encuadrada en otra zona del banner, de otro
+       color. 374 px es exactamente ese 130 % del panel desplegado, así que
+       desplegado se ve igual que siempre y plegado se ve el centro de la
+       misma imagen, con los mismos colores. */
+    background-size: 374px auto;
   }
 
   /* Fondo animado de la pantalla de login. */
@@ -210,6 +216,61 @@ html {
     0% { background-position: 0% 50%, center; }
     50% { background-position: 100% 50%, center; }
     100% { background-position: 0% 50%, center; }
+  }
+}
+
+/* Degradado multicolor de la revisión con IA.
+   Va como utilidad y no como clases sueltas de Tailwind por dos motivos: el
+   fondo mide el triple del ancho —es lo que permite desplazarlo con la
+   animación en vez de animar los colores—, y el borde degradado necesita dos
+   capas de fondo, que en un valor arbitrario de Tailwind es ilegible. */
+@layer utilities {
+  /* El degradado, una sola vez, para que el relleno y el borde no se
+     desincronicen. El verde es el de ChatGPT y lleva una banda plana de doce
+     puntos: sin ella queda como un roce entre el azul y el violeta y no se
+     reconoce. */
+  .bg-ia,
+  .borde-ia {
+    --ia: linear-gradient(
+      110deg,
+      #7c3aed 0%,
+      #d946ef 22%,
+      #0ea5e9 45%,
+      #10a37f 68%,
+      #10a37f 80%,
+      #7c3aed 100%
+    );
+  }
+
+  /* Relleno macizo: la pastilla del logo y el botón. Sin `background-size`,
+     así los cuatro colores caben en un elemento pequeño. */
+  .bg-ia {
+    background-image: var(--ia);
+  }
+
+  /* Solo el borde. El degradado detrás del texto de un informe institucional
+     sería ilegible; en el borde basta para distinguir el bloque de la IA.
+     El truco son las dos capas: el color de la tarjeta ocupa hasta el borde
+     (`padding-box`) y el degradado ocupa el borde entero (`border-box`). */
+  .borde-ia {
+    border: 1.5px solid transparent;
+    background:
+      linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box,
+      var(--ia) border-box;
+  }
+
+  /* Solo mientras se revisa: un borde moviéndose todo el rato al lado de un
+     campo de texto es un distractor permanente. Aquí el degradado se ensancha
+     al triple —es lo que deja sitio para desplazarlo— y vuelve al ancho normal
+     en cuanto termina. */
+  .animate-borde-ia {
+    background-size: auto, 300% 100%;
+    animation: iaGradiente 3s linear infinite;
+  }
+
+  @keyframes iaGradiente {
+    0% { background-position: 0 0, 0% 50%; }
+    100% { background-position: 0 0, 300% 50%; }
   }
 }
 

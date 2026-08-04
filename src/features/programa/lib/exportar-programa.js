@@ -6,12 +6,15 @@
  * texto plano. Aquí se generan solo las dos que se piden —«Programa AI
  * Estratégico» y «Distribución»— reproduciendo la maquetación: combinaciones,
  * anchos y bordes.
+ *
+ * La segunda es opcional: un programa sin asignaciones se exporta con una sola
+ * hoja.
  */
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { toast } from 'react-toastify'
 
-import { CODIGO_FORMATO, TITULO_FORMATO, VERSION_FORMATO } from './formato'
+import { CODIGO_FORMATO, SEMANAS, TITULO_FORMATO, VERSION_FORMATO, semanasDe } from './formato'
 
 /* ── Estilos ── */
 
@@ -59,12 +62,42 @@ function escribir(ws, dir, valor, { combinar, etiqueta, titulo, centrar, wrap = 
 const ANCHOS_PROGRAMA = [25, 15, 51, 47, 31, 26, 5, 16, 18, 2, 2, 15, 7, 5]
 
 /**
+ * Las cuatro semanas del cronograma, en pares de columnas.
+ *
+ * Son los mismos rangos del formato original: G:H, I:J, K:L y M:N a la derecha
+ * de los requisitos ISO 14001. Los anchos vienen del Excel institucional, por
+ * eso las cuatro parejas no miden lo mismo.
+ */
+const COLUMNAS_SEMANA = [
+  ['G', 'H'],
+  ['I', 'J'],
+  ['K', 'L'],
+  ['M', 'N'],
+]
+
+/**
  * Reparte un texto en dos mitades por líneas.
  *
  * Los criterios se escriben en un solo campo, pero el formato los pinta en dos
  * celdas contiguas: se corta por el salto de línea más cercano a la mitad para
  * no partir ningún renglón.
  */
+/**
+ * La celda AUDITOR(ES) de una línea del cronograma.
+ *
+ * El formato no tiene columna para el acompañante —las catorce están
+ * repartidas—, pero sí lo nombra en la nomenclatura del pie: «AA: Auditor
+ * Acompañante». Así que va en la misma celda, en un segundo renglón y con esa
+ * misma marca, en vez de inventar una columna que descuadraría la hoja.
+ */
+function celdaAuditores(dep) {
+  const auditores = String(dep.auditores ?? '').trim()
+  const acompanante = String(dep.auditor_acompanante ?? '').trim()
+
+  if (!acompanante) return auditores
+  return auditores ? `${auditores}\nAA: ${acompanante}` : `AA: ${acompanante}`
+}
+
 function partirEnDos(texto) {
   const lineas = String(texto ?? '').split('\n')
   if (lineas.length < 2) return [texto ?? '', '']
@@ -158,41 +191,95 @@ function hojaPrograma(wb, programa) {
 
   // Cronograma
   //
-  // Sin la cuadrícula de semanas, las columnas G–N quedaban muertas: se las
-  // reparten los dos bloques de requisitos, que son los que necesitan sitio.
+  // Sin dependencias no se dibuja nada: el título y los encabezados solos
+  // parecían un cronograma con dos renglones puestos por el sistema, y no lo
+  // eran. Las secciones sin dependencias tampoco salen, aunque tengan
+  // requisitos: una fila de proceso sin nadie auditado no dice nada.
   let fila = ultima + 1
+  const filasCronograma = (programa.cronograma ?? []).filter(
+    (seccion) => (seccion.dependencias ?? []).length > 0
+  )
 
-  const mes = programa.mes_auditoria ? ` — MES DE AUDITORÍA: ${programa.mes_auditoria}` : ''
-  escribir(ws, `A${fila}`, `CRONOGRAMA${mes}`, { combinar: `A${fila}:N${fila}`, etiqueta: true })
-  fila++
-
-  const cabecera = fila
-  escribir(ws, `A${cabecera}`, 'PROCESO A AUDITAR', {
-    combinar: `A${cabecera}:B${cabecera}`,
-    etiqueta: true,
-  })
-  escribir(ws, `C${cabecera}`, 'AUDITADO/PROGRAMA', { etiqueta: true })
-  escribir(ws, `D${cabecera}`, 'AUDITOR(ES)', { etiqueta: true })
-  escribir(ws, `E${cabecera}`, 'REQUISITOS ISO 9001:2015', {
-    combinar: `E${cabecera}:G${cabecera}`,
-    etiqueta: true,
-  })
-  escribir(ws, `H${cabecera}`, 'REQUISITOS ISO 14001:2015', {
-    combinar: `H${cabecera}:N${cabecera}`,
-    etiqueta: true,
-  })
-
-  fila = cabecera + 1
-
-  for (const item of programa.cronograma ?? []) {
-    escribir(ws, `A${fila}`, item.proceso, { combinar: `A${fila}:B${fila}` })
-    escribir(ws, `C${fila}`, item.auditado)
-    escribir(ws, `D${fila}`, item.auditores)
-    escribir(ws, `E${fila}`, item.requisitos_9001, { combinar: `E${fila}:G${fila}` })
-    escribir(ws, `H${fila}`, item.requisitos_14001, { combinar: `H${fila}:N${fila}` })
-
-    ws.getRow(fila).height = 30
+  if (filasCronograma.length) {
+    escribir(ws, `A${fila}`, 'CRONOGRAMA', { combinar: `A${fila}:N${fila}`, etiqueta: true })
     fila++
+
+    // Encabezado a dos alturas, como el formato: las cinco columnas de datos
+    // ocupan las dos filas, y bajo el rótulo del mes se abre la cuadrícula de
+    // semanas.
+    const alto = fila
+    const bajo = fila + 1
+
+    escribir(ws, `A${alto}`, 'PROCESO A AUDITAR', {
+      combinar: `A${alto}:B${bajo}`,
+      etiqueta: true,
+    })
+    escribir(ws, `C${alto}`, 'AUDITADO/PROGRAMA', { combinar: `C${alto}:C${bajo}`, etiqueta: true })
+    escribir(ws, `D${alto}`, 'AUDITOR(ES)', { combinar: `D${alto}:D${bajo}`, etiqueta: true })
+    escribir(ws, `E${alto}`, 'REQUISITOS ISO 9001:2015', {
+      combinar: `E${alto}:E${bajo}`,
+      etiqueta: true,
+    })
+    escribir(ws, `F${alto}`, 'REQUISITOS ISO 14001:2015', {
+      combinar: `F${alto}:F${bajo}`,
+      etiqueta: true,
+    })
+
+    escribir(ws, `G${alto}`, `MES DE AUDITORIA: ${programa.mes_auditoria || ''}`.trim(), {
+      combinar: `G${alto}:N${alto}`,
+      etiqueta: true,
+    })
+
+    COLUMNAS_SEMANA.forEach(([desde, hasta], i) => {
+      escribir(ws, `${desde}${bajo}`, `Semana ${SEMANAS[i]}`, {
+        combinar: `${desde}${bajo}:${hasta}${bajo}`,
+        etiqueta: true,
+      })
+    })
+
+    ws.getRow(alto).height = 30
+    ws.getRow(bajo).height = 18
+
+    fila = bajo + 1
+
+    // Un bloque por proceso: el nombre, los requisitos y las semanas se combinan
+    // de arriba abajo en todo el bloque —son del proceso, no de cada línea— y
+    // solo el auditado y sus auditores cambian de una fila a la siguiente.
+    for (const seccion of filasCronograma) {
+      const dependencias = seccion.dependencias ?? []
+      if (!dependencias.length) continue
+
+      const primeraFila = fila
+      const ultimaFila = fila + dependencias.length - 1
+
+      escribir(ws, `A${primeraFila}`, seccion.proceso, {
+        combinar: `A${primeraFila}:B${ultimaFila}`,
+      })
+      escribir(ws, `E${primeraFila}`, seccion.requisitos_9001, {
+        combinar: `E${primeraFila}:E${ultimaFila}`,
+      })
+      escribir(ws, `F${primeraFila}`, seccion.requisitos_14001, {
+        combinar: `F${primeraFila}:F${ultimaFila}`,
+      })
+
+      const marcadas = semanasDe(seccion.semanas)
+      COLUMNAS_SEMANA.forEach(([desde, hasta], i) => {
+        escribir(ws, `${desde}${primeraFila}`, marcadas.has(SEMANAS[i]) ? 'X' : '', {
+          combinar: `${desde}${primeraFila}:${hasta}${ultimaFila}`,
+          centrar: 'center',
+        })
+      })
+
+      for (const dep of dependencias) {
+        escribir(ws, `C${fila}`, dep.auditado)
+        escribir(ws, `D${fila}`, celdaAuditores(dep))
+
+        // Con acompañante la celda ocupa dos renglones y, con el alto fijo, el
+        // segundo se quedaba cortado.
+        ws.getRow(fila).height = dep.auditor_acompanante ? 44 : 30
+        fila++
+      }
+    }
   }
 
   // Pie
@@ -311,7 +398,7 @@ const nombreArchivo = (programa) =>
     .replace(/^_+|_+$/g, '')}.xlsx`
 
 /**
- * Arma el libro con las dos hojas, sin descargarlo.
+ * Arma el libro, sin descargarlo.
  *
  * Separado de la descarga para poder comprobarlo fuera del navegador.
  * @param {Object} programa Cabecera con `cronograma` y `distribucion`
@@ -322,7 +409,11 @@ export function construirLibroPrograma(programa) {
   wb.created = new Date()
 
   hojaPrograma(wb, programa)
-  hojaDistribucion(wb, programa)
+
+  // La distribución es opcional: sin asignaciones se omite la hoja entera. Una
+  // hoja con solo los encabezados y ninguna fila, en un archivo que se entrega,
+  // se lee como un olvido y no como una decisión.
+  if (programa.distribucion?.length) hojaDistribucion(wb, programa)
 
   return wb
 }

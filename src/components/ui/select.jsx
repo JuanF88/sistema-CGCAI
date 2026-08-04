@@ -4,6 +4,7 @@ import * as React from 'react'
 import * as SelectPrimitive from '@radix-ui/react-select'
 import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Z_POPOVER } from '@/components/ui/tokens'
 
 const Select = SelectPrimitive.Root
 const SelectGroup = SelectPrimitive.Group
@@ -58,6 +59,11 @@ const SelectScrollDownButton = React.forwardRef(function SelectScrollDownButton(
   )
 })
 
+/**
+ * La lista se porta al `<body>`, así que necesita la capa de desplegable: con
+ * `z-50` se abría **detrás** de los paneles laterales y parecía que el
+ * desplegable no respondía al pulsarlo.
+ */
 const SelectContent = React.forwardRef(function SelectContent(
   { className, children, position = 'popper', ...props },
   ref
@@ -68,7 +74,8 @@ const SelectContent = React.forwardRef(function SelectContent(
         ref={ref}
         position={position}
         className={cn(
-          'relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md',
+          'relative max-h-96 min-w-[8rem] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md',
+          Z_POPOVER,
           'data-[state=open]:animate-in data-[state=closed]:animate-out',
           'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
           position === 'popper' && 'data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1',

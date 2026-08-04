@@ -22,13 +22,32 @@ const listaDeTextos = () =>
     .default([])
     .transform((valores) => valores.filter((v) => v.length > 0))
 
-/** Fila del cronograma (hoja «Programa AI Estratégico»). */
-export const cronogramaItemSchema = z.object({
-  proceso: requiredText('El proceso a auditar es obligatorio.', 500),
-  auditado: nullableText(500),
+/** Una dependencia auditada dentro de una sección del cronograma. */
+export const cronogramaDependenciaSchema = z.object({
+  auditado: requiredText('Cada línea necesita la dependencia auditada.', 500),
   auditores: nullableText(500),
+  // Texto libre: suele ser alguien que no está en el catálogo de usuarios.
+  auditor_acompanante: nullableText(500),
+})
+
+/**
+ * Sección del cronograma: un proceso del mapa institucional.
+ *
+ * Los requisitos ISO y las semanas son del proceso entero —en el Excel van
+ * combinados verticalmente en todo el bloque—; lo que cambia línea a línea son
+ * las dependencias auditadas y sus auditores.
+ *
+ * `semanas` son las del mes de auditoría, separadas por comas («1,3»): la
+ * cuadrícula de cuatro columnas a la derecha de los requisitos ISO 14001.
+ */
+export const cronogramaSeccionSchema = z.object({
+  // La clave del proceso (`dependencias.gestion`); el nombre impreso va aparte.
+  proceso_clave: nullableText(40),
+  proceso: requiredText('El proceso es obligatorio.', 500),
   requisitos_9001: nullableText(1000),
   requisitos_14001: nullableText(1000),
+  semanas: nullableText(20),
+  dependencias: z.array(cronogramaDependenciaSchema).max(200).optional().default([]),
 })
 
 /**
@@ -95,10 +114,22 @@ const cabecera = {
   fecha_aprobacion: nullableYmdDate(),
 }
 
-/** POST /api/programa-auditoria */
+/**
+ * POST /api/programa-auditoria
+ *
+ * Las secciones del cronograma llegan siempre (una por proceso), así que lo que
+ * se exige es que **alguna** tenga dependencias: un cronograma con los seis
+ * procesos vacíos no programa nada. La distribución sí es opcional: sin ella el
+ * Excel sale con una sola hoja.
+ */
 export const crearProgramaSchema = z.object({
   ...cabecera,
-  cronograma: z.array(cronogramaItemSchema).max(200).optional().default([]),
+  cronograma: z
+    .array(cronogramaSeccionSchema)
+    .max(20)
+    .refine((secciones) => secciones.some((s) => s.dependencias.length > 0), {
+      message: 'El cronograma necesita al menos una dependencia en algún proceso.',
+    }),
   distribucion: z.array(distribucionItemSchema).max(500).optional().default([]),
 })
 

@@ -13,6 +13,7 @@ import { X } from 'lucide-react'
 import { Drawer as DrawerPrimitive } from 'vaul'
 
 import { cn } from '@/lib/utils'
+import { Z_DRAWER, Z_DRAWER_OVERLAY } from '@/components/ui/tokens'
 
 /**
  * `shouldScaleBackground` solo hace algo si existe un elemento con
@@ -33,7 +34,10 @@ const DrawerOverlay = React.forwardRef(function DrawerOverlay({ className, ...pr
     <DrawerPrimitive.Overlay
       ref={ref}
       className={cn(
-        'fixed inset-0 z-50 bg-black/60',
+        // El velo justo debajo del panel: con `z-50` el botón flotante de tema
+        // (`z-[60]`) quedaba encima y se podía pulsar con el panel abierto.
+        'fixed inset-0 bg-black/60',
+        Z_DRAWER_OVERLAY,
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
         className
@@ -53,7 +57,8 @@ const DrawerContent = React.forwardRef(function DrawerContent(
       <DrawerPrimitive.Content
         ref={ref}
         className={cn(
-          'fixed inset-y-0 right-0 z-[9999] flex h-full w-full flex-col',
+          'fixed inset-y-0 right-0 flex h-full w-full flex-col',
+          Z_DRAWER,
           'max-w-[min(1040px,calc(100vw-1rem))] sm:max-w-[min(1040px,calc(100vw-2rem))]',
           'border-l border-border bg-background shadow-2xl duration-200 sm:rounded-l-2xl',
           'data-[state=open]:animate-in data-[state=closed]:animate-out',

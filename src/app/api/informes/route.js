@@ -28,6 +28,7 @@ export async function GET() {
       usuario_id,
       dependencia_id,
       validado,
+      programa_auditoria_id,
       usuarios:usuario_id (
         nombre,
         apellido
@@ -54,7 +55,9 @@ export const DELETE = withRoute(async (request) => {
 
   const { id } = eliminarInformeSchema.parse(await request.json())
 
-  const { error } = await guard.supabase
+  // Con `admin`, como el resto de escrituras: las políticas RLS de esta tabla
+  // solo cubren SELECT, y quién puede borrar ya lo decide `requireRole`.
+  const { error } = await guard.admin
     .from('informes_auditoria')
     .delete()
     .eq('id', id)
@@ -68,14 +71,14 @@ export const POST = withRoute(async (req) => {
   const guard = await requireRole(AUDITORIA_WRITE_ROLES)
   if (!guard.ok) return guard.response
 
-  const { supabase } = guard
-
   // Sin try/catch: `withRoute` traduce el ZodError a 400 y cualquier otro
   // error a la respuesta estándar.
   const payload = crearInformeSchema.parse(flattenInformeBody(await req.json()))
   const { usuario_id, fecha_auditoria, fecha_seguimiento } = payload
 
-  const { data, error } = await supabase
+  // Con `admin`, igual que el DELETE de más arriba: las políticas RLS de esta
+  // tabla solo cubren SELECT y quién puede crear ya lo decide `requireRole`.
+  const { data, error } = await guard.admin
       .from('informes_auditoria')
       .insert([payload])
     .select(`
@@ -91,6 +94,7 @@ export const POST = withRoute(async (req) => {
       usuario_id,
       dependencia_id,
       validado,
+      programa_auditoria_id,
       usuarios:usuario_id ( nombre, apellido ),
       dependencias:dependencia_id ( nombre ),
       fortalezas ( id ),

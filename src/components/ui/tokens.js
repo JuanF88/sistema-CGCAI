@@ -10,6 +10,36 @@
  *   3. token de aquí o componente → si se repite entre pantallas
  */
 
+/* ── Orden de capas ── */
+
+/**
+ * Quién tapa a quién.
+ *
+ * Las capas flotantes se portan al `<body>`, así que el orden del DOM las pone
+ * unas encima de otras sin que el z-index lo diga: la última en montarse gana
+ * si empatan. Eso ya rompió tres cosas —el modal de ayuda del informe, los
+ * avisos y las listas de los desplegables, todos dentro de un panel lateral—,
+ * de modo que los valores viven aquí y no repartidos por los componentes.
+ *
+ * La regla: cada capa puede abrirse **dentro** de la anterior, así que va por
+ * encima.
+ *
+ *   panel lateral  9998 / 9999
+ *   diálogo       10000   se abre desde dentro de un panel
+ *   desplegable   10010   se abre dentro de un panel o de un diálogo
+ *   aviso         10050   nunca lo tapa nada
+ *
+ * Son strings literales y no números porque Tailwind necesita ver la clase
+ * completa en el código para generarla.
+ */
+export const Z_DRAWER_OVERLAY = 'z-[9998]'
+export const Z_DRAWER = 'z-[9999]'
+export const Z_DIALOG = 'z-[10000]'
+export const Z_POPOVER = 'z-[10010]'
+
+/** El aviso se aplica con `style`; ver `ToastProvider`. */
+export const Z_TOAST = 10050
+
 /* ── Estructura de página ── */
 
 /**

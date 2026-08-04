@@ -44,6 +44,22 @@ export function desplazarHasta(el) {
 }
 
 /**
+ * Sube al principio el contenedor que desplaza a `el`.
+ *
+ * Para cambiar de pestaña dentro de un panel: el contenido es otro, pero el
+ * scroll se queda donde estaba y la pestaña nueva aparece empezada por la mitad.
+ * Sin animación a propósito —no es un salto dentro de la misma página, sino
+ * contenido distinto— y sin tocar la ventana.
+ */
+export function subirAlInicio(el) {
+  if (!el) return
+
+  const contenedor = contenedorConScroll(el)
+  if (contenedor) contenedor.scrollTop = 0
+  else window.scrollTo({ top: 0 })
+}
+
+/**
  * Lleva la vista y el foco al elemento recién añadido.
  *
  * `preventScroll` evita que el foco haga su propio salto y pelee con el

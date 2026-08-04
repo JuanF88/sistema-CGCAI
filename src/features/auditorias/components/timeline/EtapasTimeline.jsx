@@ -17,13 +17,14 @@ import { fmt } from '@/features/auditorias/hooks/useAuditTimeline'
 import { PUNTO_POR_ESTADO, TARJETA_POR_ESTADO, badgeFor } from './etapas'
 
 /**
- * Variante, icono y tamaño del botón según el tipo de acción.
+ * Variante e icono del botón según el tipo de acción.
  *
- * `fill` es la acción principal de la etapa del informe: destacada y con
- * icono de documento, para que se distinga de «ver» o «descargar».
+ * `fill` es la acción principal de la etapa del informe: se distingue por el
+ * relleno sólido y el icono de documento, no por el tamaño — todas las
+ * acciones van en `sm` para que la fila quede pareja.
  */
 const ESTILO_ACCION = {
-  fill: { variant: 'default', icon: <FilePen />, size: 'default' },
+  fill: { variant: 'default', icon: <FilePen /> },
   view: { variant: 'outline', icon: <Eye /> },
   edit: { variant: 'secondary', icon: <Pencil /> },
   download: { variant: 'outline', icon: <Download /> },

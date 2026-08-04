@@ -11,7 +11,7 @@ import { AlertCircle, Save } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { DatePicker } from '@/components/ui/date-picker'
 import {
   Dialog,
   DialogContent,
@@ -92,17 +92,16 @@ function TablaArchivos({ informe, informeIdx, editados, onFecha }) {
 
                 <TableCell>
                   {archivo.existe || editado ? (
-                    <Input
-                      type="date"
+                    <DatePicker
                       value={fechaCarga || ''}
-                      onChange={(e) => onFecha(informeIdx, archIdx, e.target.value)}
+                      onChange={(v) => onFecha(informeIdx, archIdx, v)}
                       title={
                         manual
                           ? 'Fecha editada manualmente (preservada en recálculos)'
                           : 'Cambiar la fecha de entrega'
                       }
                       className={cn(
-                        'h-8 font-mono text-xs',
+                        'h-8 text-xs',
                         editado && 'border-primary bg-primary/5',
                         manual && !editado && 'border-emerald-500'
                       )}

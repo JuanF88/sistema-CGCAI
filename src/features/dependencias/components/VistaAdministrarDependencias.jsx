@@ -61,27 +61,16 @@ import {
   listarDependencias,
 } from '@/features/dependencias/api/dependencias-api'
 
-/**
- * `tono`  → color de la tarjeta KPI (ver STAT_TONES)
- * `badge` → tono del badge en la tabla (ver STATUS_BADGE_TONES)
- */
-const GESTIONES = [
-  { value: 'estrategica', label: 'Gestión Estratégica', corto: 'Estratégica', emoji: '🎯', tono: 'purple', badge: 'accent' },
-  { value: 'academica', label: 'Gestión Académica', corto: 'Académica', emoji: '🎓', tono: 'green', badge: 'success' },
-  { value: 'investigacion', label: 'Gestión de Investigación, Innovación e Interacción Social', corto: 'Investigación', emoji: '🔬', tono: 'cyan', badge: 'info' },
-  { value: 'administrativa', label: 'Gestión Administrativa', corto: 'Administrativa', emoji: '💼', tono: 'orange', badge: 'warning' },
-  { value: 'cultura', label: 'Gestión de Cultura y Bienestar', corto: 'Cultura', emoji: '🎨', tono: 'pink', badge: 'accent' },
-  { value: 'control', label: 'Gestión de Control y Mejoramiento Continuo', corto: 'Control', emoji: '🔒', tono: 'indigo', badge: 'info' },
-  { value: 'otras', label: 'Otras / sin clasificar', corto: 'Otras', emoji: '📁', tono: 'gray', badge: 'neutral' },
-]
+// La columna se llama `gestion` y sus valores no cambian; en pantalla son
+// «procesos», con el nombre que les da el formato de auditoría. La lista es
+// compartida con el cronograma del programa, que tiene una sección por proceso.
+import { PROCESOS, procesoDe } from '@/lib/catalogos/procesos'
 
 const FORM_INICIAL = { dependencia_id: null, nombre: '', gestion: 'otras' }
 
 /** Sin acentos y en minúsculas, para buscar y ordenar de forma estable. */
 const normalize = (s) =>
   (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-
-const gestionDe = (value) => GESTIONES.find((g) => g.value === (value || 'otras')) ?? GESTIONES.at(-1)
 
 export default function VistaAdministrarDependencias({ headerActions = null }) {
   const [dependencias, setDependencias] = useState([])
@@ -121,7 +110,7 @@ export default function VistaAdministrarDependencias({ headerActions = null }) {
 
   const stats = useMemo(() => {
     const porGestion = Object.fromEntries(
-      GESTIONES.map((g) => [g.value, dependencias.filter((d) => (d.gestion || 'otras') === g.value).length])
+      PROCESOS.map((g) => [g.value, dependencias.filter((d) => (d.gestion || 'otras') === g.value).length])
     )
     return { total: dependencias.length, porGestion }
   }, [dependencias])
@@ -205,7 +194,7 @@ export default function VistaAdministrarDependencias({ headerActions = null }) {
       <PageHeader
         icon={<Building2 />}
         title="Administrar Dependencias"
-        subtitle="Gestión de dependencias y áreas organizacionales"
+        subtitle="Dependencias y el proceso institucional al que pertenece cada una"
         actions={
           <>
             {headerActions}
@@ -220,10 +209,10 @@ export default function VistaAdministrarDependencias({ headerActions = null }) {
         }
       />
 
-      {/* KPIs por gestión */}
+      {/* KPIs por proceso */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
         <StatCard icon="🏢" tone="blue" label="Total" value={stats.total} />
-        {GESTIONES.map((g) => (
+        {PROCESOS.map((g) => (
           <StatCard
             key={g.value}
             icon={g.emoji}
@@ -252,7 +241,7 @@ export default function VistaAdministrarDependencias({ headerActions = null }) {
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-20">ID</TableHead>
               <TableHead>Nombre</TableHead>
-              <TableHead className="w-56">Gestión</TableHead>
+              <TableHead className="w-56">Proceso</TableHead>
               <TableHead className="w-32 text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -268,7 +257,7 @@ export default function VistaAdministrarDependencias({ headerActions = null }) {
 
             {!cargando &&
               paginacion.pageItems.map((row) => {
-                const gestion = gestionDe(row.gestion)
+                const proceso = procesoDe(row.gestion)
                 return (
                   <TableRow key={row.dependencia_id}>
                     <TableCell className="tabular-nums text-muted-foreground">
@@ -276,8 +265,8 @@ export default function VistaAdministrarDependencias({ headerActions = null }) {
                     </TableCell>
                     <TableCell className="font-medium">{row.nombre}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={cn(STATUS_BADGE_TONES[gestion.badge])}>
-                        {gestion.corto}
+                      <Badge variant="outline" className={cn(STATUS_BADGE_TONES[proceso.badge])}>
+                        {proceso.corto}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -339,16 +328,16 @@ export default function VistaAdministrarDependencias({ headerActions = null }) {
               />
             </Field>
 
-            <Field label="Gestión" htmlFor="dep-gestion" required wide>
+            <Field label="Proceso" htmlFor="dep-gestion" required wide>
               <Select
                 value={form.gestion}
                 onValueChange={(gestion) => setForm((prev) => ({ ...prev, gestion }))}
               >
                 <SelectTrigger id="dep-gestion">
-                  <SelectValue placeholder="Selecciona una gestión" />
+                  <SelectValue placeholder="Selecciona un proceso" />
                 </SelectTrigger>
                 <SelectContent>
-                  {GESTIONES.map((g) => (
+                  {PROCESOS.map((g) => (
                     <SelectItem key={g.value} value={g.value}>
                       {g.label}
                     </SelectItem>

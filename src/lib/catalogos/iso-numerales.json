@@ -1,0 +1,77 @@
+{
+  "_nota": "Numerales auditables de las dos normas del sistema integrado. Cada entrada lleva el título de la cláusula y una descripción PROPIA de qué se verifica; NO reproduce el texto normativo, que tiene derechos de autor de ICONTEC/ISO. Se usa para dar contexto técnico a la revisión de alineación (src/lib/ia/alineacion.js): solo se envían los numerales que el cronograma del programa asigna al proceso auditado. Los títulos deben contrastarse con el ejemplar oficial antes de darlos por buenos.",
+
+  "9001": {
+    "norma": "NTC-ISO 9001:2015 — Sistemas de gestión de la calidad",
+    "numerales": {
+      "4.1": { "capitulo": "4. Contexto de la organización", "titulo": "Comprensión de la organización y de su contexto", "verifica": "Que estén identificadas las cuestiones internas y externas que afectan al propósito del proceso y que se revisen periódicamente." },
+      "4.2": { "capitulo": "4. Contexto de la organización", "titulo": "Comprensión de las necesidades y expectativas de las partes interesadas", "verifica": "Que se sepa quiénes son las partes interesadas del proceso y qué requisitos suyos son pertinentes." },
+      "4.3": { "capitulo": "4. Contexto de la organización", "titulo": "Determinación del alcance del sistema de gestión de la calidad", "verifica": "Que el proceso sepa qué parte del alcance declarado le corresponde y qué exclusiones aplican." },
+      "4.4": { "capitulo": "4. Contexto de la organización", "titulo": "Sistema de gestión de la calidad y sus procesos", "verifica": "Que el proceso esté caracterizado: entradas, salidas, secuencia, interacciones, responsables, criterios y métodos de control." },
+
+      "5.1": { "capitulo": "5. Liderazgo", "titulo": "Liderazgo y compromiso", "verifica": "Que la dirección del proceso asuma la rendición de cuentas por su eficacia y no la delegue en el responsable de calidad." },
+      "5.2": { "capitulo": "5. Liderazgo", "titulo": "Política de la calidad", "verifica": "Que la política sea conocida en el proceso y que se entienda qué implica para el trabajo diario." },
+      "5.3": { "capitulo": "5. Liderazgo", "titulo": "Roles, responsabilidades y autoridades en la organización", "verifica": "Que las responsabilidades estén asignadas, comunicadas y entendidas por quien las tiene." },
+
+      "6.1": { "capitulo": "6. Planificación", "titulo": "Acciones para abordar riesgos y oportunidades", "verifica": "Que los riesgos del proceso estén identificados, con acciones proporcionales y evidencia de su eficacia." },
+      "6.2": { "capitulo": "6. Planificación", "titulo": "Objetivos de la calidad y planificación para lograrlos", "verifica": "Que los objetivos sean medibles, tengan responsable, plazo y seguimiento, y que se midan de verdad." },
+      "6.3": { "capitulo": "6. Planificación", "titulo": "Planificación de los cambios", "verifica": "Que los cambios en el proceso se planifiquen y no se improvisen, considerando consecuencias y recursos." },
+
+      "7.1": { "capitulo": "7. Apoyo", "titulo": "Recursos", "verifica": "Que el proceso cuente con las personas, la infraestructura y el ambiente necesarios, y que los equipos de medición estén controlados." },
+      "7.2": { "capitulo": "7. Apoyo", "titulo": "Competencia", "verifica": "Que se haya determinado la competencia necesaria, que se evidencie con formación o experiencia y que se evalúe su eficacia." },
+      "7.3": { "capitulo": "7. Apoyo", "titulo": "Toma de conciencia", "verifica": "Que el personal sepa cómo su trabajo contribuye a los objetivos y qué implica no cumplir los requisitos." },
+      "7.4": { "capitulo": "7. Apoyo", "titulo": "Comunicación", "verifica": "Que esté definido qué se comunica, a quién, cuándo y por qué medio, tanto interna como externamente." },
+      "7.5": { "capitulo": "7. Apoyo", "titulo": "Información documentada", "verifica": "Que los documentos y registros estén vigentes, identificados, disponibles donde se usan y protegidos; que no circulen versiones obsoletas." },
+
+      "8.1": { "capitulo": "8. Operación", "titulo": "Planificación y control operacional", "verifica": "Que la operación del proceso esté planificada con criterios de aceptación y controles, y que se ejecute como está planificado." },
+      "8.2": { "capitulo": "8. Operación", "titulo": "Requisitos para los productos y servicios", "verifica": "Que los requisitos del usuario se determinen y revisen antes de comprometerse, y que los cambios se gestionen." },
+      "8.3": { "capitulo": "8. Operación", "titulo": "Diseño y desarrollo de los productos y servicios", "verifica": "Que el diseño tenga etapas, entradas, controles, salidas y control de cambios documentados." },
+      "8.4": { "capitulo": "8. Operación", "titulo": "Control de los procesos, productos y servicios suministrados externamente", "verifica": "Que los proveedores se evalúen y reevalúen con criterios definidos y que lo suministrado se verifique." },
+      "8.5": { "capitulo": "8. Operación", "titulo": "Producción y provisión del servicio", "verifica": "Que la prestación esté bajo condiciones controladas, con trazabilidad, cuidado de la propiedad del usuario y control de cambios." },
+      "8.6": { "capitulo": "8. Operación", "titulo": "Liberación de los productos y servicios", "verifica": "Que exista evidencia de la conformidad antes de entregar, con la autorización de quien corresponde." },
+      "8.7": { "capitulo": "8. Operación", "titulo": "Control de las salidas no conformes", "verifica": "Que lo no conforme se identifique, se controle y se trate, y que quede registro de la acción tomada." },
+
+      "9.1": { "capitulo": "9. Evaluación del desempeño", "titulo": "Seguimiento, medición, análisis y evaluación", "verifica": "Que los indicadores estén definidos, se midan con datos confiables, se analicen y sirvan para decidir. Incluye la satisfacción del usuario." },
+      "9.2": { "capitulo": "9. Evaluación del desempeño", "titulo": "Auditoría interna", "verifica": "Que el programa de auditoría se ejecute según lo planificado y que sus resultados se traten." },
+      "9.3": { "capitulo": "9. Evaluación del desempeño", "titulo": "Revisión por la dirección", "verifica": "Que la dirección revise el sistema con las entradas requeridas y que de ahí salgan decisiones con seguimiento." },
+
+      "10.1": { "capitulo": "10. Mejora", "titulo": "Generalidades", "verifica": "Que se identifiquen y seleccionen oportunidades de mejora, no solo correcciones de lo que falla." },
+      "10.2": { "capitulo": "10. Mejora", "titulo": "No conformidad y acción correctiva", "verifica": "Que las no conformidades se analicen hasta la causa raíz, no solo se corrijan, y que se verifique la eficacia de la acción." },
+      "10.3": { "capitulo": "10. Mejora", "titulo": "Mejora continua", "verifica": "Que haya evidencia de mejora sostenida del desempeño, no de acciones aisladas." }
+    }
+  },
+
+  "14001": {
+    "norma": "NTC-ISO 14001:2015 — Sistemas de gestión ambiental",
+    "numerales": {
+      "4.1": { "capitulo": "4. Contexto de la organización", "titulo": "Comprensión de la organización y de su contexto", "verifica": "Que estén identificadas las condiciones ambientales y las cuestiones que afectan al desempeño ambiental del proceso." },
+      "4.2": { "capitulo": "4. Contexto de la organización", "titulo": "Comprensión de las necesidades y expectativas de las partes interesadas", "verifica": "Que se identifiquen las partes interesadas en lo ambiental y cuáles de sus requisitos se asumen como obligaciones." },
+      "4.3": { "capitulo": "4. Contexto de la organización", "titulo": "Determinación del alcance del sistema de gestión ambiental", "verifica": "Que el proceso sepa qué actividades e instalaciones suyas quedan dentro del alcance ambiental." },
+      "4.4": { "capitulo": "4. Contexto de la organización", "titulo": "Sistema de gestión ambiental", "verifica": "Que los procesos necesarios para el sistema ambiental estén establecidos y mantenidos en el proceso auditado." },
+
+      "5.1": { "capitulo": "5. Liderazgo", "titulo": "Liderazgo y compromiso", "verifica": "Que la dirección del proceso responda por el desempeño ambiental y asigne los recursos." },
+      "5.2": { "capitulo": "5. Liderazgo", "titulo": "Política ambiental", "verifica": "Que la política ambiental sea conocida por el personal del proceso y que se entienda qué compromisos impone." },
+      "5.3": { "capitulo": "5. Liderazgo", "titulo": "Roles, responsabilidades y autoridades en la organización", "verifica": "Que las responsabilidades ambientales estén asignadas y comunicadas dentro del proceso." },
+
+      "6.1": { "capitulo": "6. Planificación", "titulo": "Acciones para abordar riesgos y oportunidades", "verifica": "Que estén identificados los aspectos ambientales y sus impactos, los requisitos legales aplicables, y que haya acciones planificadas para los aspectos significativos." },
+      "6.2": { "capitulo": "6. Planificación", "titulo": "Objetivos ambientales y planificación para lograrlos", "verifica": "Que los objetivos ambientales sean coherentes con los aspectos significativos, medibles y con seguimiento." },
+
+      "7.1": { "capitulo": "7. Apoyo", "titulo": "Recursos", "verifica": "Que el proceso disponga de los recursos necesarios para su gestión ambiental." },
+      "7.2": { "capitulo": "7. Apoyo", "titulo": "Competencia", "verifica": "Que quien realiza trabajos que afectan al desempeño ambiental sea competente y que se conserve la evidencia." },
+      "7.3": { "capitulo": "7. Apoyo", "titulo": "Toma de conciencia", "verifica": "Que el personal conozca la política ambiental, los aspectos ambientales significativos de su trabajo y las consecuencias de no cumplir." },
+      "7.4": { "capitulo": "7. Apoyo", "titulo": "Comunicación", "verifica": "Que la comunicación ambiental interna y externa esté definida y se cumpla." },
+      "7.5": { "capitulo": "7. Apoyo", "titulo": "Información documentada", "verifica": "Que la documentación ambiental esté vigente, controlada y disponible donde se necesita." },
+
+      "8.1": { "capitulo": "8. Operación", "titulo": "Planificación y control operacional", "verifica": "Que existan controles operacionales para los aspectos ambientales significativos y que se apliquen, incluidos los de procesos contratados externamente." },
+      "8.2": { "capitulo": "8. Operación", "titulo": "Preparación y respuesta ante emergencias", "verifica": "Que estén identificadas las situaciones de emergencia ambiental posibles, con respuesta planificada y pruebas periódicas." },
+
+      "9.1": { "capitulo": "9. Evaluación del desempeño", "titulo": "Seguimiento, medición, análisis y evaluación", "verifica": "Que el desempeño ambiental se mida con métodos definidos y que se evalúe periódicamente el cumplimiento de los requisitos legales." },
+      "9.2": { "capitulo": "9. Evaluación del desempeño", "titulo": "Auditoría interna", "verifica": "Que el programa de auditoría ambiental se ejecute y que sus hallazgos se traten." },
+      "9.3": { "capitulo": "9. Evaluación del desempeño", "titulo": "Revisión por la dirección", "verifica": "Que la dirección revise el sistema ambiental y que de ahí salgan decisiones." },
+
+      "10.1": { "capitulo": "10. Mejora", "titulo": "Generalidades", "verifica": "Que se determinen oportunidades de mejora del desempeño ambiental." },
+      "10.2": { "capitulo": "10. Mejora", "titulo": "No conformidad y acción correctiva", "verifica": "Que las no conformidades ambientales se analicen hasta la causa y que se verifique la eficacia de la acción." },
+      "10.3": { "capitulo": "10. Mejora", "titulo": "Mejora continua", "verifica": "Que haya mejora sostenida del desempeño ambiental, no acciones puntuales." }
+    }
+  }
+}

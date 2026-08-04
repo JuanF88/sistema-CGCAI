@@ -3,6 +3,15 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 
+/**
+ * Campo de texto.
+ *
+ * Las fechas no se piden con `type="date"`: usan `DatePicker`, que trae su
+ * propio calendario. El nativo obligaba a llamar a `showPicker()` a mano —el
+ * navegador solo lo abre desde su iconito, y dentro de un panel de `vaul` ni
+ * eso, porque el panel se come la pulsación para poder arrastrarse—, y encima
+ * lo dibujaba el sistema operativo, distinto en cada equipo.
+ */
 const Input = React.forwardRef(function Input({ className, type = 'text', ...props }, ref) {
   return (
     <input

@@ -80,6 +80,7 @@ export default function AuditoriasTimeline({ usuario }) {
             fecha_seguimiento, recomendaciones, auditores_acompanantes, validado,
             dependencia_id,
             dependencias ( nombre, plan_auditoria ( enlace ) ),
+            programa:programa_auditoria_id ( id, nombre, anio, objetivo ),
             plan_informe:planes_auditoria_informe ( archivo_path, enviado_at ),
             fortalezas ( id ),
             oportunidades_mejora ( id ),

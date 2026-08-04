@@ -5,7 +5,16 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'react-toastify'
-import { CalendarRange, CheckCircle2, Download, Edit2, Plus, Trash2, Undo2 } from 'lucide-react'
+import {
+  CalendarRange,
+  CheckCircle2,
+  Download,
+  Edit2,
+  ListChecks,
+  Plus,
+  Trash2,
+  Undo2,
+} from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -48,6 +57,7 @@ import {
   actualizarPrograma,
   crearPrograma,
   eliminarPrograma,
+  generarAuditoriasDelPrograma,
   listarProgramas,
   obtenerPrograma,
 } from '@/features/programa/api/programa-api'
@@ -73,6 +83,12 @@ export default function VistaProgramaAuditoria({ soloLectura = false }) {
   const [aEliminar, setAEliminar] = useState(null)
   const [descargandoId, setDescargandoId] = useState(null)
   const [cambiandoId, setCambiandoId] = useState(null)
+
+  /** Programa cuya generación de auditorías se está confirmando. */
+  const [aGenerar, setAGenerar] = useState(null)
+  const [generando, setGenerando] = useState(false)
+  /** Resultado de la última generación, para contarlo con detalle. */
+  const [resultado, setResultado] = useState(null)
 
   const cargar = async () => {
     try {
@@ -202,6 +218,28 @@ export default function VistaProgramaAuditoria({ soloLectura = false }) {
     }
   }
 
+  /**
+   * Crea las auditorías del programa aprobado.
+   *
+   * El resultado se muestra en un diálogo y no en un aviso: puede traer una
+   * lista de líneas que no se pudieron crear, y eso no se lee en tres segundos.
+   */
+  const generar = async () => {
+    if (!aGenerar) return
+
+    try {
+      setGenerando(true)
+      const res = await generarAuditoriasDelPrograma(aGenerar.id)
+
+      setResultado({ ...res, programa: aGenerar })
+      setAGenerar(null)
+    } catch (error) {
+      toast.error(error.message)
+    } finally {
+      setGenerando(false)
+    }
+  }
+
   const confirmarEliminacion = async () => {
     if (!aEliminar) return
     try {
@@ -319,6 +357,21 @@ export default function VistaProgramaAuditoria({ soloLectura = false }) {
                         {descargandoId === p.id ? 'Generando…' : 'Excel'}
                       </Button>
 
+                      {/* Solo con el programa aprobado: un borrador se sigue
+                          editando y dejaría auditorías colgando de un plan que
+                          va a cambiar. */}
+                      {!soloLectura && p.estado === 'aprobado' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setAGenerar(p)}
+                          title="Crear las auditorías del cronograma"
+                        >
+                          <ListChecks />
+                          Generar auditorías
+                        </Button>
+                      )}
+
                       {!soloLectura && p.estado !== 'archivado' && (
                         <Button
                           variant="outline"
@@ -390,6 +443,96 @@ export default function VistaProgramaAuditoria({ soloLectura = false }) {
         onGuardar={guardar}
         guardando={guardando}
       />
+
+      {/* Confirmar la generación */}
+      <Dialog open={Boolean(aGenerar)} onOpenChange={(o) => (o ? null : setAGenerar(null))}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Generar auditorías</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  Se creará una auditoría por cada dependencia del cronograma de{' '}
+                  <span className="font-medium text-foreground">
+                    {aGenerar?.nombre} ({aGenerar?.anio})
+                  </span>
+                  , con fecha del{' '}
+                  <span className="font-medium text-foreground">
+                    1 de {(aGenerar?.mes_auditoria || '').toLowerCase() || '—'} de {aGenerar?.anio}
+                  </span>
+                  . El primer auditor de cada línea queda como responsable y el resto como
+                  acompañantes.
+                </p>
+                <p>
+                  La fecha exacta se puede ajustar después en «Administrar auditorías». No se envían
+                  correos: el aviso a cada auditor se hace cuando decidas.
+                </p>
+                <p>
+                  Puedes volver a pulsarlo más adelante; solo se crearán las que falten.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAGenerar(null)} disabled={generando}>
+              Cancelar
+            </Button>
+            <Button onClick={generar} disabled={generando}>
+              <ListChecks />
+              {generando ? 'Generando…' : 'Generar auditorías'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resultado de la generación */}
+      <Dialog open={Boolean(resultado)} onOpenChange={(o) => (o ? null : setResultado(null))}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {resultado?.creadas
+                ? `Se crearon ${resultado.creadas} auditoría${resultado.creadas === 1 ? '' : 's'}`
+                : 'No se creó ninguna auditoría'}
+            </DialogTitle>
+            <DialogDescription>
+              {resultado?.programa?.nombre} ({resultado?.programa?.anio}) · fecha {resultado?.fecha}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 text-sm">
+            {resultado?.yaCreadas > 0 && (
+              <p className="text-muted-foreground">
+                {resultado.yaCreadas} dependencia{resultado.yaCreadas === 1 ? '' : 's'} ya tenía
+                {resultado.yaCreadas === 1 ? '' : 'n'} auditoría de este programa y se
+                {resultado.yaCreadas === 1 ? ' omitió' : ' omitieron'}.
+              </p>
+            )}
+
+            {resultado?.problemas?.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="font-medium text-destructive">
+                  {resultado.problemas.length} línea
+                  {resultado.problemas.length === 1 ? '' : 's'} sin crear:
+                </p>
+                <ul className="max-h-56 space-y-1 overflow-y-auto rounded-xl border border-border bg-background p-3 text-xs">
+                  {resultado.problemas.map((problema, i) => (
+                    <li key={i}>· {problema}</li>
+                  ))}
+                </ul>
+                <p className="text-xs text-muted-foreground">
+                  Corrige el cronograma o el catálogo y vuelve a generar; las ya creadas no se
+                  duplican.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setResultado(null)}>Entendido</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(aEliminar)} onOpenChange={(o) => (o ? null : setAEliminar(null))}>
         <DialogContent className="max-w-md">

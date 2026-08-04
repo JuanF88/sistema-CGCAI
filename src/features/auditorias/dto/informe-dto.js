@@ -1,5 +1,11 @@
 import { z } from 'zod'
-import { nullableText, nullableYmdDate, numericId, ymdDate } from '@/lib/dto/common'
+import {
+  nullableNumericId,
+  nullableText,
+  nullableYmdDate,
+  numericId,
+  ymdDate,
+} from '@/lib/dto/common'
 
 /**
  * POST /api/informes
@@ -19,6 +25,14 @@ export const crearInformeSchema = z.object({
   criterios: nullableText(),
   conclusiones: nullableText(),
   recomendaciones: nullableText(),
+
+  /**
+   * Programa que generó la auditoría; `null` si se creó a mano.
+   *
+   * Opcional a propósito: crear una auditoría suelta desde «Nueva auditoría»
+   * seguirá siendo válido, y las que ya existen se quedan en `null`.
+   */
+  programa_auditoria_id: nullableNumericId(),
 })
 
 /** DELETE /api/informes */

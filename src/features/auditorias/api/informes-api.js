@@ -23,3 +23,13 @@ export const eliminarInforme = (informeId) => del('/api/informes', { id: informe
 
 /** GET /api/planesAuditoria */
 export const listarPlanesAuditoria = () => get('/api/planesAuditoria')
+
+/**
+ * POST /api/informes/validar-alineacion
+ *
+ * Revisa contra el objetivo del programa. No guarda nada: es una consulta.
+ *
+ * @param {{objetivo_programa: string, objetivo?: string, conclusiones?: string}} textos
+ * @returns {Promise<{revisiones: Array<{campo: string, veredicto: string, comentario: string, sugerencia: string}>, modelo: string, tokens: {entrada: number, salida: number}}>}
+ */
+export const validarAlineacion = (textos) => post('/api/informes/validar-alineacion', textos)

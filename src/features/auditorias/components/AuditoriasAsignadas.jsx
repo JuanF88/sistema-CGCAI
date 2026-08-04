@@ -85,6 +85,7 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
       nombre,
       plan_auditoria ( enlace )
     ),
+    programa:programa_auditoria_id ( id, nombre, anio, objetivo ),
     fortalezas ( id ),
     oportunidades_mejora ( id ),
     no_conformidades ( id )

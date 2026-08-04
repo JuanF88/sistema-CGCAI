@@ -8,6 +8,7 @@ import AuditoriasAsignadas from '@/features/auditorias/components/AuditoriasAsig
 import CajadeHerramientas from '@/features/herramientas/components/CajadeHerramientas'
 import AuditoriasTimeline from '@/features/auditorias/components/AuditoriasTimeline'
 import MiDashboardAuditor from '@/features/evaluaciones/components/MiDashboardAuditor'
+import MisEvaluaciones from '@/features/evaluaciones/components/MisEvaluaciones'
 
 
 // `setReset` no se usa: el shell del auditor ya alterna `reset` al entrar en
@@ -37,6 +38,9 @@ export default function VistaActual({ usuario, reset }) {
       )}
       {vista === 'mi-dashboard' && (
         <MiDashboardAuditor usuario={usuario} />
+      )}
+      {vista === 'mis-evaluaciones' && (
+        <MisEvaluaciones usuario={usuario} />
       )}
     </>
   )

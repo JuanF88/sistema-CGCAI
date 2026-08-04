@@ -4,6 +4,9 @@ import * as React from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+// Un diálogo puede abrirse **desde dentro** de un panel lateral —la ayuda de los
+// campos del informe, sin ir más lejos—, así que va por encima. Ver `tokens.js`.
+import { Z_DIALOG } from '@/components/ui/tokens'
 
 const Dialog = DialogPrimitive.Root
 const DialogTrigger = DialogPrimitive.Trigger
@@ -15,7 +18,8 @@ const DialogOverlay = React.forwardRef(function DialogOverlay({ className, ...pr
     <DialogPrimitive.Overlay
       ref={ref}
       className={cn(
-        'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm',
+        'fixed inset-0 bg-black/60 backdrop-blur-sm',
+        Z_DIALOG,
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
         className
@@ -35,7 +39,8 @@ const DialogContent = React.forwardRef(function DialogContent(
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
-          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4',
+          'fixed left-1/2 top-1/2 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4',
+          Z_DIALOG,
           'border border-border bg-card p-6 shadow-lg sm:rounded-xl',
           'max-h-[90vh] overflow-y-auto',
           'data-[state=open]:animate-in data-[state=closed]:animate-out',

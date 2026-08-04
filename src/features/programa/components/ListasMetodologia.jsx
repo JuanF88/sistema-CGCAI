@@ -3,9 +3,9 @@
 /**
  * Riesgos, controles y oportunidades del programa.
  *
- * Mismo gesto que los hallazgos del informe de auditoría: los botones arriba,
- * cada uno añade una tarjeta de color con su campo de texto, y la vista salta
- * a la recién creada con el cursor ya dentro.
+ * Mismo gesto que los hallazgos del informe de auditoría: un bloque por tipo con
+ * su botón al final, cada uno añade una tarjeta de color con su campo de texto,
+ * y la vista salta a la recién creada con el cursor ya dentro.
  *
  * El Excel solo dibuja dos filas de cada uno, pero el formato no tiene por qué
  * imponer el límite: se añaden las que hagan falta y la exportación crece.
@@ -111,85 +111,88 @@ export function ListasMetodologia({ listas, onChange }) {
 
   return (
     <div className="space-y-4">
-      {/* Arriba: con la lista larga, tenerlos al final obliga a recorrerla entera. */}
-      <div className="grid gap-2 sm:grid-cols-3">
-        {TIPOS_METODOLOGIA.map((tipo) => (
+      {TIPOS_METODOLOGIA.every((t) => valores(t.key).length === 0) && (
+        <p className="rounded-xl border border-dashed border-border bg-background/60 px-4 py-6 text-center text-xs text-muted-foreground">
+          Todavía no hay riesgos, controles ni oportunidades. Añádelos con los botones de abajo.
+        </p>
+      )}
+
+      {/* Un bloque por tipo, y su botón al final del bloque: al añadir uno, el
+          siguiente botón queda justo debajo de lo que acabas de crear. */}
+      {TIPOS_METODOLOGIA.map((tipo) => (
+        <section key={tipo.key} className="space-y-3">
+          {valores(tipo.key).map((texto, i) => (
+            <article
+              key={`${tipo.key}-${i}`}
+              ref={(el) => {
+                tarjetas.current[`${tipo.key}-${i}`] = el
+              }}
+              className={cn(
+                // `scroll-mt-4`: al saltar hasta ella deja un respiro arriba en
+                // vez de pegarse al borde del panel.
+                'animate-fade-in relative scroll-mt-4 space-y-2 rounded-2xl border border-l-[5px] p-4',
+                'shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:shadow-none',
+                tipo.tarjeta
+              )}
+            >
+              <header className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p
+                    className={cn(
+                      'text-[11px] font-semibold uppercase tracking-[0.14em]',
+                      tipo.rotulo
+                    )}
+                  >
+                    {tipo.emoji} {tipo.singular} #{i + 1}
+                  </p>
+                  <p className="mt-1 max-w-2xl text-xs text-muted-foreground">{tipo.guia}</p>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => eliminar(tipo, i)}
+                  title={`Eliminar ${tipo.singular.toLowerCase()} #${i + 1}`}
+                  className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="sr-only">
+                    Eliminar {tipo.singular.toLowerCase()} #{i + 1}
+                  </span>
+                </Button>
+              </header>
+
+              <Textarea
+                value={texto}
+                onChange={(e) => editar(tipo, i, e.target.value)}
+                rows={4}
+                spellCheck="true"
+                placeholder={`Describe ${tipo.singular.toLowerCase() === 'oportunidad' ? 'la' : 'el'} ${tipo.singular.toLowerCase()}…`}
+                className="bg-background"
+              />
+            </article>
+          ))}
+
           <Button
-            key={tipo.key}
             type="button"
             variant="outline"
             onClick={() => agregar(tipo)}
-            className={cn('h-auto justify-start gap-2 bg-background py-2.5 text-sm', tipo.boton)}
+            className={cn(
+              'h-auto w-full justify-start gap-2 bg-background py-2.5 text-sm',
+              tipo.boton
+            )}
           >
             <Plus />
-            <span className="font-semibold">{tipo.plural}</span>
+            <span className="font-semibold">
+              Añadir {tipo.singular.toLowerCase()}
+            </span>
             <span className="ml-auto text-xs tabular-nums opacity-70">
               {valores(tipo.key).length}
             </span>
           </Button>
-        ))}
-      </div>
-
-      {TIPOS_METODOLOGIA.every((t) => valores(t.key).length === 0) && (
-        <p className="rounded-xl border border-dashed border-border bg-background/60 px-4 py-6 text-center text-xs text-muted-foreground">
-          Todavía no hay riesgos, controles ni oportunidades. Añádelos con los botones de arriba.
-        </p>
-      )}
-
-      {TIPOS_METODOLOGIA.map((tipo) =>
-        valores(tipo.key).map((texto, i) => (
-          <article
-            key={`${tipo.key}-${i}`}
-            ref={(el) => {
-              tarjetas.current[`${tipo.key}-${i}`] = el
-            }}
-            className={cn(
-              // `scroll-mt-4`: al saltar hasta ella deja un respiro arriba en
-              // vez de pegarse al borde del panel.
-              'animate-fade-in relative scroll-mt-4 space-y-2 rounded-2xl border border-l-[5px] p-4',
-              'shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:shadow-none',
-              tipo.tarjeta
-            )}
-          >
-            <header className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p
-                  className={cn(
-                    'text-[11px] font-semibold uppercase tracking-[0.14em]',
-                    tipo.rotulo
-                  )}
-                >
-                  {tipo.emoji} {tipo.singular} #{i + 1}
-                </p>
-                <p className="mt-1 max-w-2xl text-xs text-muted-foreground">{tipo.guia}</p>
-              </div>
-
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => eliminar(tipo, i)}
-                title={`Eliminar ${tipo.singular.toLowerCase()} #${i + 1}`}
-                className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span className="sr-only">
-                  Eliminar {tipo.singular.toLowerCase()} #{i + 1}
-                </span>
-              </Button>
-            </header>
-
-            <Textarea
-              value={texto}
-              onChange={(e) => editar(tipo, i, e.target.value)}
-              rows={4}
-              spellCheck="true"
-              placeholder={`Describe ${tipo.singular.toLowerCase() === 'oportunidad' ? 'la' : 'el'} ${tipo.singular.toLowerCase()}…`}
-              className="bg-background"
-            />
-          </article>
-        ))
-      )}
+        </section>
+      ))}
     </div>
   )
 }

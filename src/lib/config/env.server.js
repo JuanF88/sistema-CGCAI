@@ -35,6 +35,14 @@ const schema = z.object({
   // Cron de alertas
   CRON_SECRET: z.string().optional(),
   ALERTAS_CRON_SECRET: z.string().optional(),
+
+  // Revisión de alineación con IA (opcional: sin clave, el botón avisa y ya).
+  //
+  // Sin prefijo `NEXT_PUBLIC_` a propósito: una clave de API en el bundle del
+  // navegador la lee cualquiera con las herramientas de desarrollador y gasta
+  // el saldo. Solo se usa desde la ruta del servidor.
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_MODEL: z.string().optional(),
 })
 
 let cached = null
@@ -60,6 +68,8 @@ export function getServerEnv() {
     APP_ASSET_BASE_URL: process.env.APP_ASSET_BASE_URL,
     CRON_SECRET: process.env.CRON_SECRET,
     ALERTAS_CRON_SECRET: process.env.ALERTAS_CRON_SECRET,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    OPENAI_MODEL: process.env.OPENAI_MODEL,
   })
 
   if (!result.success) {
@@ -75,6 +85,11 @@ export function getServerEnv() {
 export function isSmtpConfigured() {
   const env = getServerEnv()
   return Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS)
+}
+
+/** ¿Está configurada la revisión de alineación con IA? */
+export function isOpenAiConfigured() {
+  return Boolean(getServerEnv().OPENAI_API_KEY)
 }
 
 /** Secretos válidos para autorizar el cron de alertas. */

@@ -6,6 +6,7 @@
  * Es solo presentación: recibe el estado y lo devuelve por `onFiltro`.
  */
 import { cn } from '@/lib/utils'
+import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
 import { SearchInput } from '@/components/ui/search-input'
 import {
@@ -78,10 +79,10 @@ export function FiltrosAuditorias({
           placeholder="Filtrar por nombre de auditor"
         />
 
-        <Input
-          type="date"
+        <DatePicker
           value={filtros.desde}
-          onChange={(e) => onFiltro('desde', e.target.value)}
+          onChange={(v) => onFiltro('desde', v)}
+          placeholder="Desde…"
           title="Auditorías desde esta fecha"
         />
 

@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { FormDrawer } from '@/components/ui/form-drawer'
 import { FormSection } from '@/components/ui/form-section'
-import { Input } from '@/components/ui/input'
+import { DatePicker } from '@/components/ui/date-picker'
 import { Label } from '@/components/ui/label'
 import { SearchInput } from '@/components/ui/search-input'
 import { EMPTY_STATE } from '@/components/ui/tokens'
@@ -209,11 +209,10 @@ export function ModalCrearAuditoria({
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="crear-fecha">Fecha de auditoría</Label>
-            <Input
+            <DatePicker
               id="crear-fecha"
-              type="date"
               value={valores.fecha_auditoria}
-              onChange={(e) => onCambio('fecha_auditoria', e.target.value)}
+              onChange={(v) => onCambio('fecha_auditoria', v)}
             />
           </div>
         </div>

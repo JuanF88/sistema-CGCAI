@@ -14,7 +14,7 @@ import { FileText, Pencil, Plus, RefreshCw, Sparkles, Trash2 } from 'lucide-reac
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { DatePicker } from '@/components/ui/date-picker'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import DocumentUploadModal from '@/components/ui/DocumentUploadModal'
@@ -171,8 +171,9 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
           `
             id, fecha_auditoria, fecha_seguimiento, validado,
             objetivo, criterios, conclusiones, recomendaciones,
-            asistencia_tipo, usuario_id, dependencia_id,
+            asistencia_tipo, auditores_acompanantes, usuario_id, dependencia_id,
             dependencias:dependencias ( nombre ),
+            programa:programa_auditoria_id ( id, nombre, anio, objetivo ),
             usuarios:usuario_id ( nombre, apellido ),
             plan_informe:planes_auditoria_informe ( archivo_path, enviado_at ),
             fortalezas ( id ),
@@ -347,20 +348,6 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
       setSavingDate(false)
     }
   }, [selected, dateDraft])
-
-  const handleDateKeyDown = useCallback(
-    (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault()
-        saveFechaAuditoria()
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        cancelEditFecha()
-      }
-    },
-    [saveFechaAuditoria, cancelEditFecha]
-  )
 
   /* ── Eliminar ── */
 
@@ -788,6 +775,26 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]">
+        {/*
+          La lista crece con lo que haya y, como mucho, llega hasta donde llega
+          el panel de la auditoría abierta.
+
+          Lo consigue el posicionamiento absoluto: así la lista no cuenta para
+          la altura de la fila. Si contara, una lista larga estiraría la fila y
+          el tope no existiría —la fila mide lo que mida el elemento más alto—.
+          Sacándola del flujo, quien fija el alto es el panel de al lado, y el
+          `h-fit` que ya trae la tarjeta hace que con pocas auditorías ocupe
+          solo lo suyo en vez de estirarse vacía.
+
+          El mínimo es para cuando no hay ninguna auditoría abierta: el aviso
+          de «selecciona una auditoría» es una tarjeta de tres líneas y sin él
+          la lista quedaría reducida a esa altura.
+
+          Debajo de `lg` no aplica nada de esto: las columnas se apilan, no hay
+          panel al lado con el que coincidir, y se mantiene el tope por
+          pantalla de siempre.
+        */}
+        <div className="relative lg:min-h-[26rem]">
         <ListaAuditorias
           titulo="Auditorías"
           auditorias={filtradas}
@@ -796,7 +803,7 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
           loading={loading}
           error={error}
           vacio="Sin resultados."
-          className="max-h-[70vh] overflow-y-auto"
+          className="max-h-[70vh] overflow-y-auto lg:absolute lg:inset-0 lg:max-h-full"
           badges={(a) => (
             <>
               {a.usuarios?.nombre && <BadgeMini>{a.usuarios.nombre}</BadgeMini>}
@@ -805,6 +812,7 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
             </>
           )}
         />
+        </div>
 
         <main className="min-w-0">
           {!selected && !loading && (
@@ -838,12 +846,14 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
                     <span>· Fecha:</span>
                     {editingDate ? (
                       <span className="inline-flex items-center gap-2">
-                        <Input
-                          type="date"
+                        {/* Sin `onKeyDown`: el disparador es un botón y ahí
+                            Enter abre el calendario. Se guarda con el botón de
+                            al lado, que está a la vista. */}
+                        <DatePicker
                           value={dateDraft}
-                          onChange={(e) => setDateDraft(e.target.value)}
-                          onKeyDown={handleDateKeyDown}
+                          onChange={setDateDraft}
                           disabled={savingDate}
+                          limpiable={false}
                           className="h-8 w-40"
                         />
                         <Button

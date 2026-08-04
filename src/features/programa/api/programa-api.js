@@ -21,3 +21,12 @@ export const actualizarPrograma = (id, programa) =>
 
 /** DELETE /api/programa-auditoria?id=… */
 export const eliminarPrograma = (id) => del(`/api/programa-auditoria${queryString({ id })}`)
+
+/**
+ * POST /api/programa-auditoria/generar-auditorias?id=…
+ *
+ * Solo con el programa aprobado. Se puede repetir: crea lo que falte.
+ * @returns {Promise<{creadas: number, yaCreadas: number, fecha: string, problemas: string[]}>}
+ */
+export const generarAuditoriasDelPrograma = (id) =>
+  post(`/api/programa-auditoria/generar-auditorias${queryString({ id })}`)

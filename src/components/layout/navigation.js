@@ -33,8 +33,10 @@ import { ROLES } from '@/lib/auth/roles'
 /** Panel de administración. */
 export const ADMIN_NAV = [
   { key: 'crearInforme', label: 'Inicio', icon: FileText },
-  { key: 'VistaTimeline', label: 'Administrar Auditorías', icon: Home },
+  // Va justo después de Inicio porque es por donde empieza el año: primero se
+  // programa, y de ahí salen las auditorías que se administran debajo.
   { key: 'programaAuditoria', label: 'Programa de Auditoría', icon: CalendarRange },
+  { key: 'VistaTimeline', label: 'Administrar Auditorías', icon: Home },
   {
     key: 'administracion',
     label: 'Administración',
@@ -53,6 +55,7 @@ export const AUDITOR_NAV = [
   { key: 'bienvenida', label: 'Inicio', icon: Home },
   { key: 'timeline', label: 'Auditoría Interna', icon: ClipboardList },
   { key: 'mi-dashboard', label: 'Mi Dashboard', icon: LayoutDashboard },
+  { key: 'mis-evaluaciones', label: 'Mis Evaluaciones', icon: Award },
   { key: 'caja', label: 'Caja de Herramientas', icon: Wrench },
 ]
 

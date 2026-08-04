@@ -7,7 +7,7 @@
  * para el `Combobox`, cada una con lo que hace falta para autocompletar los
  * campos vecinos al elegir (correo, estudios, gestión…).
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { obtenerCatalogosPrograma } from '@/features/programa/api/programa-api'
 
@@ -59,6 +59,16 @@ export function useCatalogosPrograma(activo = true) {
   const [datos, setDatos] = useState(VACIO)
   const [cargando, setCargando] = useState(false)
 
+  /**
+   * Contador que fuerza a volver a pedir los catálogos.
+   *
+   * Hace falta porque desde el cronograma se pueden crear dependencias y
+   * auditores sin cerrar el panel: recién creados no estarían en las listas y
+   * el desplegable seguiría sin ofrecerlos hasta la siguiente apertura.
+   */
+  const [recarga, setRecarga] = useState(0)
+  const recargar = useCallback(() => setRecarga((n) => n + 1), [])
+
   useEffect(() => {
     if (!activo) return
 
@@ -75,7 +85,7 @@ export function useCatalogosPrograma(activo = true) {
     return () => {
       vigente = false
     }
-  }, [activo])
+  }, [activo, recarga])
 
   const opciones = useMemo(() => {
     const { dependencias, usuarios, sugerencias, normas } = datos
@@ -188,5 +198,41 @@ export function useCatalogosPrograma(activo = true) {
     }
   }, [datos])
 
-  return { opciones, cargando, derivarDeDependencia }
+  /**
+   * Las dependencias de un proceso del mapa, para su sección del cronograma.
+   *
+   * Se filtra por `dependencias.gestion`, que es la clave del proceso. Si un
+   * proceso no tiene ninguna dependencia clasificada se devuelven todas: es
+   * mejor poder elegir que quedarse con un desplegable vacío por un dato de
+   * catálogo sin rellenar.
+   */
+  const dependenciasDeProceso = useMemo(() => {
+    const porClave = new Map()
+
+    for (const opcion of opciones.dependencias) {
+      const clave = opcion.datos?.gestion || 'otras'
+      if (!porClave.has(clave)) porClave.set(clave, [])
+      porClave.get(clave).push(opcion)
+    }
+
+    return (clave) => {
+      const propias = porClave.get(clave) ?? []
+      return propias.length ? propias : opciones.dependencias
+    }
+  }, [opciones])
+
+  /** Una persona del catálogo por su nombre, tolerando tildes y mayúsculas. */
+  const personaPorNombre = useMemo(() => {
+    const porNombre = new Map(datos.usuarios.map((u) => [normalizar(u.nombreCompleto), u]))
+    return (nombre) => porNombre.get(normalizar(nombre))
+  }, [datos])
+
+  return {
+    opciones,
+    cargando,
+    recargar,
+    derivarDeDependencia,
+    dependenciasDeProceso,
+    personaPorNombre,
+  }
 }

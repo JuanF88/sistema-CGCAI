@@ -13,12 +13,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { toast } from 'react-toastify'
-import { ArrowLeft, CircleHelp, FileText, Plus, Save, X } from 'lucide-react'
+import { ArrowLeft, CircleHelp, FileText, Lock, Plus, Save, Sparkles, X } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase/client'
+import { validarAlineacion } from '@/features/auditorias/api/informes-api'
 import { enfocarNuevo } from '@/lib/dom/desplazar'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { DatePicker } from '@/components/ui/date-picker'
 import { Field, FieldGrid } from '@/components/ui/field'
 import { FormSection } from '@/components/ui/form-section'
 import { Input, Textarea } from '@/components/ui/input'
@@ -37,7 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { PAGE_SHELL } from '@/components/ui/tokens'
+import { PAGE_SHELL, STATUS_BADGE_TONES } from '@/components/ui/tokens'
 
 /* ------------------------------------------------------------------ *
  * Configuración de los tipos de hallazgo
@@ -211,6 +213,221 @@ function AutoTextarea({ className, value, ...props }) {
       className={cn('max-h-[500px] resize-y overflow-y-auto leading-relaxed', className)}
       {...props}
     />
+  )
+}
+
+/**
+ * El objetivo del programa del que sale la auditoría.
+ *
+ * Va encima del objetivo del informe y **no se precarga en el campo**: el del
+ * programa es general y el de cada auditoría es el suyo. Copiarlo dentro
+ * invitaba a dejarlo tal cual, y entonces las veinte auditorías del año salían
+ * con el mismo objetivo. Aquí se lee, se compara y se escribe el propio.
+ *
+ * Solo aparece si la auditoría se generó desde un programa; las creadas a mano
+ * no tienen ninguno.
+ */
+function ObjetivoDelPrograma({ programa }) {
+  const objetivo = String(programa?.objetivo ?? '').trim()
+  if (!objetivo) return null
+
+  return (
+    <section className="rounded-2xl border border-sky-300/90 bg-sky-50/40 p-4 dark:border-sky-800/70 dark:bg-sky-950/20">
+      <header className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-800 dark:text-sky-300">
+          Objetivo general del programa
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {programa.nombre}
+          {programa.anio ? ` · ${programa.anio}` : ''}
+        </p>
+      </header>
+
+      <p className="mt-2 whitespace-pre-line text-sm leading-relaxed">{objetivo}</p>
+
+      <p className="mt-3 text-xs text-muted-foreground">
+        El objetivo que escribas abajo debe estar alineado con este.
+      </p>
+    </section>
+  )
+}
+
+/* ------------------------------------------------------------------ *
+ * Revisión de alineación con IA
+ * ------------------------------------------------------------------ */
+
+const VEREDICTOS = {
+  alineado: { etiqueta: 'Alineado', tono: 'success' },
+  parcial: { etiqueta: 'Parcialmente alineado', tono: 'warning' },
+  desalineado: { etiqueta: 'Desalineado', tono: 'danger' },
+}
+
+const CAMPO_REVISADO = { objetivo: 'Objetivo', conclusiones: 'Conclusiones' }
+
+/**
+ * Contrasta lo escrito con el objetivo general del programa.
+ *
+ * Es una segunda lectura, no un semáforo: el informe se guarda igual diga lo
+ * que diga. Por eso no toca `errores` ni condiciona el botón de guardar.
+ *
+ * Se pide con un botón y no mientras se teclea: cada revisión es una llamada
+ * de pago, y validar en cada pulsación son cientos por informe además de un
+ * recuadro parpadeando mientras el auditor intenta pensar.
+ *
+ * Solo aparece si la auditoría viene de un programa; sin objetivo general no
+ * hay nada contra lo que comparar.
+ */
+function RevisionAlineacion({ informeId, objetivoPrograma, objetivo, conclusiones }) {
+  const [revisando, setRevisando] = useState(false)
+  const [resultado, setResultado] = useState(null)
+  /** Qué texto exacto se revisó ya, para no pagar dos veces por lo mismo. */
+  const [revisado, setRevisado] = useState(null)
+
+  const texto = String(objetivoPrograma ?? '').trim()
+  const hayQueRevisar = Boolean(String(objetivo ?? '').trim() || String(conclusiones ?? '').trim())
+
+  // El \0 separa los dos campos: sin él, mover una frase del objetivo a las
+  // conclusiones daría la misma clave y parecería que no ha cambiado nada.
+  const clave = `${objetivo ?? ''}\u0000${conclusiones ?? ''}`
+  const sinCambios = Boolean(resultado) && revisado === clave
+
+  if (!texto) return null
+
+  const revisar = async () => {
+    try {
+      setRevisando(true)
+      setResultado(null)
+
+      const data = await validarAlineacion({
+        objetivo_programa: texto,
+        objetivo: objetivo ?? '',
+        conclusiones: conclusiones ?? '',
+        // Con él, el servidor busca en el cronograma los requisitos ISO del
+        // proceso. No se mandan desde aquí: son de un programa aprobado.
+        informe_id: informeId ?? null,
+      })
+
+      setResultado(data)
+      setRevisado(clave)
+    } catch (error) {
+      toast.error(error.message)
+    } finally {
+      setRevisando(false)
+    }
+  }
+
+  return (
+    <section className={cn('rounded-2xl p-4 shadow-sm borde-ia', revisando && 'animate-borde-ia')}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-ia shadow-lg shadow-fuchsia-500/25">
+            {/* Medido sobre el archivo: la marca ocupa 1592 de 3840 px de ancho
+                —el 41 %— centrada en un lienzo 16:9 con márgenes transparentes.
+                Para que se vea a 24 px, la imagen tiene que medir 24/0,41 ≈ 58.
+                Va posicionada en absoluto y no centrada con el grid porque, al
+                ser más ancha que la caja, el navegador cede a alineación
+                «segura» y la empuja a un lado: ese era el descuadre.
+                `brightness-0 invert` la pasa a blanco; en negro se perdía. */}
+            <Image
+              src="/ChatGPT-Logo.png"
+              alt=""
+              width={128}
+              height={72}
+              className="absolute left-1/2 top-1/2 w-[3.6rem] max-w-none -translate-x-1/2 -translate-y-1/2 brightness-0 invert"
+            />
+          </span>
+
+          <div>
+            <p className="bg-gradient-to-r from-violet-600 via-fuchsia-600 to-sky-600 bg-clip-text text-sm font-semibold text-transparent dark:from-violet-300 dark:via-fuchsia-300 dark:to-sky-300">
+              Revisión de alineación
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Contrasta tu objetivo y tus conclusiones con el objetivo general del programa.
+            </p>
+          </div>
+        </div>
+
+        <Button
+          type="button"
+          size="sm"
+          className="border-0 bg-ia text-white shadow-md shadow-fuchsia-500/25 transition hover:brightness-110 disabled:opacity-60 disabled:shadow-none"
+          onClick={revisar}
+          // Sin cambios no se vuelve a llamar: cada revisión se paga, y pulsar
+          // dos veces sobre el mismo texto devuelve lo mismo.
+          disabled={revisando || !hayQueRevisar || sinCambios}
+          title={
+            !hayQueRevisar
+              ? 'Escribe el objetivo o las conclusiones para poder revisarlos'
+              : sinCambios
+                ? 'Este texto ya está revisado. Cámbialo para volver a revisarlo.'
+                : 'Revisar la alineación con el objetivo del programa'
+          }
+        >
+          <Sparkles />
+          {revisando ? 'Revisando…' : sinCambios ? 'Ya revisado' : 'Revisar alineación'}
+        </Button>
+      </div>
+
+      {resultado && (
+        <div className="mt-4 space-y-3">
+          {resultado.revisiones.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No se obtuvo ninguna observación. Vuelve a intentarlo cuando hayas escrito más.
+            </p>
+          )}
+
+          {resultado.revisiones.map((revision) => {
+            const veredicto = VEREDICTOS[revision.veredicto] ?? VEREDICTOS.parcial
+
+            return (
+              <article
+                key={revision.campo}
+                className="rounded-xl border border-border bg-background p-3"
+              >
+                <header className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    {CAMPO_REVISADO[revision.campo] ?? revision.campo}
+                  </span>
+                  <span
+                    className={cn(
+                      'rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                      STATUS_BADGE_TONES[veredicto.tono]
+                    )}
+                  >
+                    {veredicto.etiqueta}
+                  </span>
+                </header>
+
+                {revision.comentario && (
+                  <p className="mt-2 text-sm leading-relaxed">{revision.comentario}</p>
+                )}
+
+                {revision.sugerencia && (
+                  <div className="mt-3 rounded-lg border border-dashed border-border bg-muted/40 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Redacción propuesta
+                    </p>
+                    <p className="mt-1 whitespace-pre-line text-sm leading-relaxed">
+                      {revision.sugerencia}
+                    </p>
+                  </div>
+                )}
+              </article>
+            )
+          })}
+
+          {/* El modelo y los tokens se enseñan a propósito: es la señal de que
+              la revisión salió de verdad hacia el proveedor, y de lo que costó. */}
+          <p className="text-xs text-muted-foreground">
+            Es una ayuda, no una calificación: el informe se guarda igual y la redacción final es
+            tuya.{' '}
+            <span className="tabular-nums opacity-70">
+              {resultado.modelo} · {resultado.tokens.entrada + resultado.tokens.salida} tokens
+            </span>
+          </p>
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -539,6 +756,24 @@ export default function FormularioRegistro({
   const progreso = Math.round((obligatoriosCompletos / OBLIGATORIOS.length) * 100)
   const faltan = OBLIGATORIOS.length - obligatoriosCompletos
 
+  /**
+   * Los acompañantes vienen fijados por el cronograma del programa.
+   *
+   * Quién acompaña cada auditoría se decide al planificar el programa, no al
+   * rellenar el informe; si el auditor pudiera cambiarlo aquí, el informe
+   * dejaría de coincidir con el cronograma aprobado y no habría forma de saber
+   * cuál de los dos es el bueno. Se muestra bloqueado y se cambia donde se
+   * decidió: en el programa.
+   *
+   * Se mira `auditoria` y no `form` a propósito: el estado del formulario se
+   * puede vaciar y eso desbloquearía el campo.
+   *
+   * Si el programa no asignó ninguno, el campo sigue abierto —no hay nada del
+   * programa que proteger y el auditor puede haber ido acompañado igualmente—.
+   */
+  const acompanantesDelPrograma =
+    Boolean(auditoria?.programa?.id) && (auditoria?.auditores_acompanantes?.length ?? 0) > 0
+
   /** Chip de avance «3/4» para la cabecera de una sección. */
   const Avance = ({ hechos, total }) => (
     <span
@@ -605,12 +840,10 @@ export default function FormularioRegistro({
               required
               error={errores.fecha_auditoria}
             >
-              <Input
-                type="date"
+              <DatePicker
                 id="fecha_auditoria"
-                name="fecha_auditoria"
                 value={form.fecha_auditoria}
-                onChange={handleChange}
+                onChange={(v) => setForm((prev) => ({ ...prev, fecha_auditoria: v }))}
               />
             </Field>
 
@@ -621,12 +854,10 @@ export default function FormularioRegistro({
               error={errores.fecha_seguimiento}
               help="Resolución 290 de 2019 de la Universidad del Cauca."
             >
-              <Input
-                type="date"
+              <DatePicker
                 id="fecha_seguimiento"
-                name="fecha_seguimiento"
                 value={form.fecha_seguimiento}
-                onChange={handleChange}
+                onChange={(v) => setForm((prev) => ({ ...prev, fecha_seguimiento: v }))}
               />
             </Field>
 
@@ -655,20 +886,45 @@ export default function FormularioRegistro({
         <FormSection
           tone="optional"
           title="Campos opcionales"
-          description="Puedes dejarlo en blanco si auditaste en solitario."
+          description={
+            acompanantesDelPrograma
+              ? 'Los acompañantes ya vienen asignados desde el cronograma del programa.'
+              : 'Puedes dejarlo en blanco si auditaste en solitario.'
+          }
         >
           <FieldGrid>
             <Field
               label="Auditores acompañantes"
               htmlFor="auditores_acompanantes"
-              help="Separa cada nombre con una coma."
+              help={
+                acompanantesDelPrograma
+                  ? 'Para cambiarlos hay que editar el cronograma del programa.'
+                  : 'Separa cada nombre con una coma.'
+              }
+              action={
+                acompanantesDelPrograma && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    <Lock className="h-3 w-3" aria-hidden="true" />
+                    {auditoria?.programa?.nombre || 'Definido en el programa'}
+                  </span>
+                )
+              }
             >
+              {/* `readOnly` y no `disabled`: se pueden leer y copiar los nombres,
+                  y el valor se sigue enviando al guardar. */}
               <Input
                 id="auditores_acompanantes"
                 name="auditores_acompanantes"
                 value={form.auditores_acompanantes}
                 onChange={handleChange}
                 placeholder="Ana Pérez, Luis Gómez"
+                readOnly={acompanantesDelPrograma}
+                aria-readonly={acompanantesDelPrograma || undefined}
+                className={
+                  acompanantesDelPrograma
+                    ? 'cursor-default bg-muted text-muted-foreground focus-visible:ring-0'
+                    : undefined
+                }
               />
             </Field>
           </FieldGrid>
@@ -685,6 +941,9 @@ export default function FormularioRegistro({
             </>
           }
         >
+          {/* Antes de los campos, porque «objetivo» es el primero de la lista. */}
+          <ObjetivoDelPrograma programa={auditoria?.programa} />
+
           <div className="grid gap-4">
             {CAMPOS_INFORME.map((campo) => (
               <Field
@@ -713,6 +972,15 @@ export default function FormularioRegistro({
               </Field>
             ))}
           </div>
+
+          {/* Después de los campos y no antes: primero se escribe, luego se
+              contrasta. Arriba invitaba a pulsarlo con todo en blanco. */}
+          <RevisionAlineacion
+            informeId={auditoria?.id}
+            objetivoPrograma={auditoria?.programa?.objetivo}
+            objetivo={form.objetivo}
+            conclusiones={form.conclusiones}
+          />
         </FormSection>
 
         {/* ── Hallazgos ── */}
@@ -728,152 +996,154 @@ export default function FormularioRegistro({
             )
           }
         >
-          {/* Los botones van arriba: con muchos hallazgos, tenerlos al final
-              obligaba a recorrer toda la lista para añadir uno más. */}
-          <div className="grid gap-2 sm:grid-cols-3">
-            {TIPOS_HALLAZGO.map((tipo) => (
+          {totalHallazgos === 0 && (
+            <p className="rounded-xl border border-dashed border-border bg-background/60 px-4 py-6 text-center text-xs text-muted-foreground">
+              Todavía no has registrado hallazgos. Añade una fortaleza, una oportunidad de mejora o
+              una no conformidad con los botones de abajo.
+            </p>
+          )}
+
+          {/* Un bloque por tipo, y su botón al final del bloque: al añadir uno,
+              el siguiente botón queda justo debajo de lo que acabas de crear. */}
+          {TIPOS_HALLAZGO.map((tipo) => (
+            <section key={tipo.key} className="space-y-3">
+              {hallazgos[tipo.key].map((hallazgo, i) => (
+                <article
+                  key={`${tipo.key}-${i}`}
+                  ref={(el) => {
+                    tarjetas.current[`${tipo.key}-${i}`] = el
+                  }}
+                  className={cn(
+                    // `scroll-mt-4`: al desplazarse hasta ella deja un respiro
+                    // arriba en vez de pegarse al borde del panel.
+                    'animate-fade-in relative scroll-mt-4 space-y-3 rounded-2xl border border-l-[5px] p-4',
+                    'shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:shadow-none',
+                    tipo.tarjeta
+                  )}
+                >
+                  <header className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p
+                        className={cn(
+                          'text-[11px] font-semibold uppercase tracking-[0.14em]',
+                          tipo.rotulo
+                        )}
+                      >
+                        {tipo.singular} #{i + 1}
+                      </p>
+                      <p className="mt-1 max-w-3xl text-xs text-muted-foreground">{tipo.guia}</p>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-1">
+                      <BotonAyuda
+                        titulo={`Ayuda para ${tipo.singular.toLowerCase()}`}
+                        onClick={() => setAyudaImagen(tipo.ayuda)}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => eliminarHallazgo(tipo.key, i)}
+                        title={`Eliminar ${tipo.singular.toLowerCase()} #${i + 1}`}
+                        className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <X className="h-4 w-4" />
+                        <span className="sr-only">
+                          Eliminar {tipo.singular.toLowerCase()} #{i + 1}
+                        </span>
+                      </Button>
+                    </div>
+                  </header>
+
+                  <FieldGrid>
+                    <SelectCatalogo
+                      id={`${tipo.key}-iso-${i}`}
+                      label="ISO"
+                      value={hallazgo.iso}
+                      placeholder="Seleccionar ISO"
+                      opciones={listaIso}
+                      etiquetaOpcion={(o) => o.iso}
+                      onChange={(isoId) => {
+                        setHallazgos((prev) => {
+                          const lista = [...prev[tipo.key]]
+                          lista[i] = { ...lista[i], iso: isoId, capitulo: '', numeral: '' }
+                          return { ...prev, [tipo.key]: lista }
+                        })
+                        cargarCapitulos(isoId)
+                      }}
+                    />
+
+                    <SelectCatalogo
+                      id={`${tipo.key}-capitulo-${i}`}
+                      label="Capítulo"
+                      value={hallazgo.capitulo}
+                      placeholder="Capítulo"
+                      disabled={!hallazgo.iso}
+                      opciones={listaCapitulos[hallazgo.iso] || []}
+                      etiquetaOpcion={(o) => o.capitulo}
+                      onChange={(capId) => {
+                        setHallazgos((prev) => {
+                          const lista = [...prev[tipo.key]]
+                          lista[i] = { ...lista[i], capitulo: capId, numeral: '' }
+                          return { ...prev, [tipo.key]: lista }
+                        })
+                        cargarNumerales(capId)
+                      }}
+                    />
+
+                    <SelectCatalogo
+                      id={`${tipo.key}-numeral-${i}`}
+                      label="Numeral"
+                      value={hallazgo.numeral}
+                      placeholder="Numeral"
+                      disabled={!hallazgo.capitulo}
+                      opciones={listaNumerales[hallazgo.capitulo] || []}
+                      etiquetaOpcion={(o) => o.numeral}
+                      onChange={(numId) => actualizarHallazgo(tipo.key, i, 'numeral', numId)}
+                    />
+                  </FieldGrid>
+
+                  <div className="grid gap-4">
+                    {tipo.campos.map((campo) => (
+                      <Field
+                        key={campo.name}
+                        label={campo.label}
+                        htmlFor={`${tipo.key}-${campo.name}-${i}`}
+                        error={errores[`${tipo.key}.${i}.${campo.name}`]}
+                      >
+                        <AutoTextarea
+                          id={`${tipo.key}-${campo.name}-${i}`}
+                          value={hallazgo[campo.name] || ''}
+                          onChange={(e) =>
+                            actualizarHallazgo(tipo.key, i, campo.name, e.target.value)
+                          }
+                          className="min-h-[72px] bg-background"
+                        />
+                      </Field>
+                    ))}
+                  </div>
+                </article>
+              ))}
+
               <Button
-                key={tipo.key}
                 type="button"
                 variant="outline"
                 onClick={() => agregarHallazgo(tipo)}
-                className={cn('h-auto justify-start gap-2 bg-background py-2.5 text-sm', tipo.boton)}
+                className={cn(
+                  'h-auto w-full justify-start gap-2 bg-background py-2.5 text-sm',
+                  tipo.boton
+                )}
               >
                 <Plus />
-                <span className="font-semibold">{tipo.plural}</span>
+                <span className="font-semibold">
+                  Añadir {tipo.singular.toLowerCase()}
+                </span>
                 <span className="ml-auto text-xs tabular-nums opacity-70">
                   {hallazgos[tipo.key].length}
                 </span>
               </Button>
-            ))}
-          </div>
-
-          {totalHallazgos === 0 && (
-            <p className="rounded-xl border border-dashed border-border bg-background/60 px-4 py-6 text-center text-xs text-muted-foreground">
-              Todavía no has registrado hallazgos. Usa los botones de arriba para añadir una
-              fortaleza, una oportunidad de mejora o una no conformidad.
-            </p>
-          )}
-
-          {TIPOS_HALLAZGO.map((tipo) =>
-            hallazgos[tipo.key].map((hallazgo, i) => (
-              <article
-                key={`${tipo.key}-${i}`}
-                ref={(el) => {
-                  tarjetas.current[`${tipo.key}-${i}`] = el
-                }}
-                className={cn(
-                  // `scroll-mt-4`: al desplazarse hasta ella deja un respiro
-                  // arriba en vez de pegarse al borde del panel.
-                  'animate-fade-in relative scroll-mt-4 space-y-3 rounded-2xl border border-l-[5px] p-4',
-                  'shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:shadow-none',
-                  tipo.tarjeta
-                )}
-              >
-                <header className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p
-                      className={cn(
-                        'text-[11px] font-semibold uppercase tracking-[0.14em]',
-                        tipo.rotulo
-                      )}
-                    >
-                      {tipo.singular} #{i + 1}
-                    </p>
-                    <p className="mt-1 max-w-3xl text-xs text-muted-foreground">{tipo.guia}</p>
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-1">
-                    <BotonAyuda
-                      titulo={`Ayuda para ${tipo.singular.toLowerCase()}`}
-                      onClick={() => setAyudaImagen(tipo.ayuda)}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => eliminarHallazgo(tipo.key, i)}
-                      title={`Eliminar ${tipo.singular.toLowerCase()} #${i + 1}`}
-                      className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <X className="h-4 w-4" />
-                      <span className="sr-only">
-                        Eliminar {tipo.singular.toLowerCase()} #{i + 1}
-                      </span>
-                    </Button>
-                  </div>
-                </header>
-
-                <FieldGrid>
-                  <SelectCatalogo
-                    id={`${tipo.key}-iso-${i}`}
-                    label="ISO"
-                    value={hallazgo.iso}
-                    placeholder="Seleccionar ISO"
-                    opciones={listaIso}
-                    etiquetaOpcion={(o) => o.iso}
-                    onChange={(isoId) => {
-                      setHallazgos((prev) => {
-                        const lista = [...prev[tipo.key]]
-                        lista[i] = { ...lista[i], iso: isoId, capitulo: '', numeral: '' }
-                        return { ...prev, [tipo.key]: lista }
-                      })
-                      cargarCapitulos(isoId)
-                    }}
-                  />
-
-                  <SelectCatalogo
-                    id={`${tipo.key}-capitulo-${i}`}
-                    label="Capítulo"
-                    value={hallazgo.capitulo}
-                    placeholder="Capítulo"
-                    disabled={!hallazgo.iso}
-                    opciones={listaCapitulos[hallazgo.iso] || []}
-                    etiquetaOpcion={(o) => o.capitulo}
-                    onChange={(capId) => {
-                      setHallazgos((prev) => {
-                        const lista = [...prev[tipo.key]]
-                        lista[i] = { ...lista[i], capitulo: capId, numeral: '' }
-                        return { ...prev, [tipo.key]: lista }
-                      })
-                      cargarNumerales(capId)
-                    }}
-                  />
-
-                  <SelectCatalogo
-                    id={`${tipo.key}-numeral-${i}`}
-                    label="Numeral"
-                    value={hallazgo.numeral}
-                    placeholder="Numeral"
-                    disabled={!hallazgo.capitulo}
-                    opciones={listaNumerales[hallazgo.capitulo] || []}
-                    etiquetaOpcion={(o) => o.numeral}
-                    onChange={(numId) => actualizarHallazgo(tipo.key, i, 'numeral', numId)}
-                  />
-                </FieldGrid>
-
-                <div className="grid gap-4">
-                  {tipo.campos.map((campo) => (
-                    <Field
-                      key={campo.name}
-                      label={campo.label}
-                      htmlFor={`${tipo.key}-${campo.name}-${i}`}
-                      error={errores[`${tipo.key}.${i}.${campo.name}`]}
-                    >
-                      <AutoTextarea
-                        id={`${tipo.key}-${campo.name}-${i}`}
-                        value={hallazgo[campo.name] || ''}
-                        onChange={(e) =>
-                          actualizarHallazgo(tipo.key, i, campo.name, e.target.value)
-                        }
-                        className="min-h-[72px] bg-background"
-                      />
-                    </Field>
-                  ))}
-                </div>
-              </article>
-            ))
-          )}
+            </section>
+          ))}
         </FormSection>
 
         {/* Guardar siempre a la vista: el formulario es largo. */}

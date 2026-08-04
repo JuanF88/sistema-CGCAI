@@ -6,6 +6,7 @@
  * valores por defecto al crear un programa: son los mismos año tras año y
  * reescribirlos a mano es donde se cuelan las erratas. Todos son editables.
  */
+import { PROCESOS_CRONOGRAMA } from '@/lib/catalogos/procesos'
 
 export const CODIGO_FORMATO = 'PE-GS-2.2.1-FOR-7'
 export const VERSION_FORMATO = '11'
@@ -125,7 +126,7 @@ export const PROGRAMA_INICIAL = {
   nomenclatura: NOMENCLATURA_POR_DEFECTO,
   observaciones: '',
   elaborado_por: '',
-  elaborado_cargo: 'Profesionales Universitarios',
+  elaborado_cargo: '',
   revisado_por: '',
   revisado_cargo: 'Director',
   aprobado_por: '',
@@ -133,14 +134,65 @@ export const PROGRAMA_INICIAL = {
   fecha_aprobacion: '',
 }
 
-/** Fila vacía del cronograma. */
-export const CRONOGRAMA_VACIO = {
-  proceso: '',
-  auditado: '',
-  auditores: '',
+/**
+ * Las cuatro semanas del mes de auditoría.
+ *
+ * En el formato son una cuadrícula a la derecha de los requisitos ISO 14001,
+ * bajo el rótulo del mes: una marca por proceso en la semana que le toque.
+ */
+export const SEMANAS = ['1', '2', '3', '4']
+
+/** «1,3» → Set{'1','3'}. */
+export const semanasDe = (texto) =>
+  new Set(
+    String(texto ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  )
+
+/**
+ * Sección vacía del cronograma: un proceso del mapa institucional.
+ *
+ * El formato agrupa el cronograma por proceso: los requisitos ISO y las semanas
+ * se combinan verticalmente en todo el bloque —son los mismos para el proceso
+ * entero— y lo que cambia fila a fila es la dependencia auditada y sus
+ * auditores.
+ */
+export const seccionCronograma = (proceso) => ({
+  proceso_clave: proceso.value,
+  proceso: proceso.label,
   requisitos_9001: '',
   requisitos_14001: '',
+  semanas: '',
+  dependencias: [],
+})
+
+/**
+ * El cronograma arranca con las seis secciones del mapa de procesos.
+ *
+ * Siempre están las seis: no se añaden ni se quitan, porque son el mapa de
+ * procesos de la Universidad y no una lista que se improvise por programa.
+ * Función y no constante para no compartir los arrays entre dos aperturas.
+ */
+export const cronogramaInicial = () => PROCESOS_CRONOGRAMA.map(seccionCronograma)
+
+/**
+ * Una dependencia auditada dentro de una sección.
+ *
+ * `auditor_acompanante` es texto libre y opcional: acompaña a una auditoría
+ * concreta, no al proceso entero, y muchas veces es alguien que no está en el
+ * catálogo de usuarios. En el formato es la «AA» de la nomenclatura.
+ */
+export const DEPENDENCIA_CRONOGRAMA_VACIA = {
+  auditado: '',
+  auditores: '',
+  auditor_acompanante: '',
 }
+
+/** Cuántas dependencias hay en total, que es lo que da contenido al cronograma. */
+export const totalDependenciasCronograma = (cronograma) =>
+  (cronograma ?? []).reduce((n, s) => n + (s.dependencias?.length ?? 0), 0)
 
 /** Fila vacía de la distribución. */
 export const DISTRIBUCION_VACIA = {

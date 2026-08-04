@@ -9,6 +9,7 @@ import { Combobox, ComboboxMultiple } from '@/components/ui/combobox'
 import { Field, FieldGrid } from '@/components/ui/field'
 import { FormDrawer } from '@/components/ui/form-drawer'
 import { FormSection } from '@/components/ui/form-section'
+import { DatePicker } from '@/components/ui/date-picker'
 import { Input, Textarea } from '@/components/ui/input'
 import { HeaderStat, PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
@@ -67,6 +68,7 @@ export default function PreviewContent() {
   const [auditor, setAuditor] = useState('')
   const [correo, setCorreo] = useState('')
   const [requisitos, setRequisitos] = useState('4.1, 9.2')
+  const [fecha, setFecha] = useState('2026-07-27')
 
   // Fuera de `AppShell`, así que el padding lo pone esta página.
   return (
@@ -151,7 +153,7 @@ export default function PreviewContent() {
       >
         <FieldGrid>
           <Field label="Fecha de la auditoría" htmlFor="preview-fecha" required>
-            <Input id="preview-fecha" type="date" defaultValue="2026-07-27" />
+            <DatePicker id="preview-fecha" value={fecha} onChange={setFecha} />
           </Field>
 
           <Field label="Asistencia" htmlFor="preview-asistencia" required>
