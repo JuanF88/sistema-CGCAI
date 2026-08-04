@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getAuthenticatedClient } from '@/lib/authHelper'
-import { createClient } from '@supabase/supabase-js'
+import { requireRole } from '@/lib/api/guard'
+import { ROLES } from '@/lib/auth/roles'
 import {
   toSlugUpper,
   buildPlanPath,
@@ -11,7 +11,7 @@ import {
   buildValidationPath,
   addBusinessDays,
   BUCKETS
-} from '@/hooks/useAuditTimeline'
+} from '@/features/auditorias/hooks/useAuditTimeline'
 
 // Tipos de archivos esperados para cada auditoría (en orden cronológico)
 const ARCHIVOS_ESPERADOS = [
@@ -95,34 +95,14 @@ async function getFileMetadata(supabase, bucket, path) {
 // POST /api/evaluaciones-auditores/calcular-archivos
 // Calcula la nota de archivos para un auditor en un periodo/dependencia
 export async function POST(request) {
-  console.log('\n================================')
-  console.log('🚀 INICIO: Calcular archivos')
-  console.log('================================')
-  
-  const { usuario, error } = await getAuthenticatedClient()
-  
-  if (error) {
-    console.error('❌ Error de autenticación:', error)
-    return NextResponse.json({ error }, { status: 401 })
-  }
+  const guard = await requireRole(ROLES.ADMIN)
+  if (!guard.ok) return guard.response
 
-  if (usuario?.rol !== 'admin') {
-    console.error('❌ Usuario no autorizado:', usuario?.rol)
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
-
-  console.log('✅ Usuario autenticado:', usuario.email)
-
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const supabaseAdmin = guard.admin
 
   try {
     const body = await request.json()
-    console.log('📦 Body recibido:', body)
-    
+
     const { auditor_id, periodo, dependencia_auditada } = body
 
     if (!auditor_id || !periodo || !dependencia_auditada) {

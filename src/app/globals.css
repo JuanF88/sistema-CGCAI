@@ -1,8 +1,11 @@
-/* Tailwind v4 */
+/* Tailwind v4 — `@import "tailwindcss"` sustituye a las directivas
+   `@tailwind base/components/utilities` de la v3. */
 @import "tailwindcss";
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tw-animate-css";
+
+/* El modo oscuro se activa con la clase `.dark`, no por preferencia del SO:
+   toda la UI existente (los CSS modules) está diseñada en claro. */
+@custom-variant dark (&:is(.dark *));
 
 /* ===== Baseline consistente ===== */
 html {
@@ -13,34 +16,273 @@ html {
 
 *, *::before, *::after { box-sizing: border-box; }
 
-/* Colores y fuente base (⚠️ NO sobrescribir --font-poppins) */
+/* ===== Tema (shadcn/ui, base slate) =====
+   Colores semánticos en HSL. Cambiar el look = cambiar estas variables,
+   no las clases de cada componente. `--primary` es el azul de marca CGCAI. */
 :root {
-  --background: #ffffff00;
-  --foreground: #171717;
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+
+  --primary: 221 58% 61%;              /* #6387d6 — azul institucional */
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+
+  --success: 142 71% 45%;
+  --success-foreground: 0 0% 100%;
+
+  --warning: 38 92% 50%;
+  --warning-foreground: 0 0% 100%;
+
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 221 58% 61%;
+
+  --radius: 0.5rem;
+
+  /* Gradiente del header de página — es la seña de identidad del diseño. */
+  --header-from: 229 76% 66%;   /* #667eea */
+  --header-to: 234 37% 46%;     /* #4b54a2 */
+  --header-on: 0 0% 100%;
+
+  /* Panel lateral y fondo del contenido. */
+  --sidebar: 224 100% 31%;          /* #002b9e */
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-action: 218 62% 57%;    /* #4d80d5 — botón cerrar sesión */
+  --app-bg: 210 20% 98%;            /* #f9fafb */
+
+  /* Variables propias del layout, anteriores al tema. */
   --font-sans-fallback: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --sidebar-w: 320px;
 }
 
-/* Tailwind theme inline */
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+
+  --primary: 221 58% 61%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+
+  --destructive: 0 62.8% 45%;
+  --destructive-foreground: 0 0% 100%;
+
+  --success: 142 60% 40%;
+  --success-foreground: 0 0% 100%;
+
+  --warning: 38 80% 45%;
+  --warning-foreground: 0 0% 100%;
+
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 221 58% 61%;
+
+  /* En oscuro el gradiente se apaga para no deslumbrar. */
+  --header-from: 229 45% 42%;
+  --header-to: 234 40% 26%;
+  --header-on: 0 0% 100%;
+
+  --sidebar: 224 60% 16%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-action: 218 45% 42%;
+  --app-bg: 222.2 84% 4.9%;
+}
+
+/* Puente entre las variables y las clases de Tailwind:
+   `--color-primary` habilita `bg-primary`, `text-primary`, `border-primary`… */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-action: hsl(var(--sidebar-action));
+  --color-app: hsl(var(--app-bg));
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
   --font-sans: var(--font-poppins); /* la define next/font en <html> */
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root { --foreground: #ffffff; }
-  input, textarea, select { background-color: #1a1a1a; color: #ffffff; }
-}
-
-/* Animaciones */
+/* Animaciones heredadas */
 @layer utilities {
   .animate-slide-in-left { animation: slideInLeft 0.5s ease-out; }
   .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+  /* La usa el header de página; venía del diseño original. */
+  .animate-slide-down { animation: slideDown 0.5s ease; }
 
   @keyframes slideInLeft { 0%{opacity:0;transform:translateX(-20px);} 100%{opacity:1;transform:translateX(0);} }
   @keyframes fadeIn { 0%{opacity:0;transform:scale(0.95);} 100%{opacity:1;transform:scale(1);} }
+  @keyframes slideDown { 0%{opacity:0;transform:translateY(-12px);} 100%{opacity:1;transform:translateY(0);} }
+}
+
+/* Gradiente del header de página.
+   Va como utilidad propia y no como valor arbitrario de Tailwind
+   (`bg-[linear-gradient(...)]`) porque ahí los `_` dentro de `var()` no se
+   convierten en espacios y la parada de color sale pegada al color. */
+/* Banner institucional de fondo del panel lateral. Va como utilidad para no
+   depender de un valor arbitrario con url() dentro de las clases. */
+@layer utilities {
+  .bg-sidebar-banner {
+    background-image: url('/Banner2.0.png');
+    background-repeat: no-repeat;
+    background-position: center;
+    /* En píxeles y no en porcentaje. Antes era 130 %, que se mide sobre el
+       ancho del elemento: al plegar el panel de 288 a 80 px la imagen se
+       encogía con él y quedaba encuadrada en otra zona del banner, de otro
+       color. 374 px es exactamente ese 130 % del panel desplegado, así que
+       desplegado se ve igual que siempre y plegado se ve el centro de la
+       misma imagen, con los mismos colores. */
+    background-size: 374px auto;
+  }
+
+  /* Fondo animado de la pantalla de login. */
+  .bg-login {
+    background-image:
+      linear-gradient(270deg, #002b9e, rgba(59, 116, 182, 0.9), #002b9e),
+      url('/FondoLogin.png');
+    background-size: 600% 600%, cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    animation: fondoAnimado 20s ease infinite;
+  }
+
+  @keyframes fondoAnimado {
+    0% { background-position: 0% 50%, center; }
+    50% { background-position: 100% 50%, center; }
+    100% { background-position: 0% 50%, center; }
+  }
+}
+
+/* Degradado multicolor de la revisión con IA.
+   Va como utilidad y no como clases sueltas de Tailwind por dos motivos: el
+   fondo mide el triple del ancho —es lo que permite desplazarlo con la
+   animación en vez de animar los colores—, y el borde degradado necesita dos
+   capas de fondo, que en un valor arbitrario de Tailwind es ilegible. */
+@layer utilities {
+  /* El degradado, una sola vez, para que el relleno y el borde no se
+     desincronicen. El verde es el de ChatGPT y lleva una banda plana de doce
+     puntos: sin ella queda como un roce entre el azul y el violeta y no se
+     reconoce. */
+  .bg-ia,
+  .borde-ia {
+    --ia: linear-gradient(
+      110deg,
+      #7c3aed 0%,
+      #d946ef 22%,
+      #0ea5e9 45%,
+      #10a37f 68%,
+      #10a37f 80%,
+      #7c3aed 100%
+    );
+  }
+
+  /* Relleno macizo: la pastilla del logo y el botón. Sin `background-size`,
+     así los cuatro colores caben en un elemento pequeño. */
+  .bg-ia {
+    background-image: var(--ia);
+  }
+
+  /* Solo el borde. El degradado detrás del texto de un informe institucional
+     sería ilegible; en el borde basta para distinguir el bloque de la IA.
+     El truco son las dos capas: el color de la tarjeta ocupa hasta el borde
+     (`padding-box`) y el degradado ocupa el borde entero (`border-box`). */
+  .borde-ia {
+    border: 1.5px solid transparent;
+    background:
+      linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box,
+      var(--ia) border-box;
+  }
+
+  /* Solo mientras se revisa: un borde moviéndose todo el rato al lado de un
+     campo de texto es un distractor permanente. Aquí el degradado se ensancha
+     al triple —es lo que deja sitio para desplazarlo— y vuelve al ancho normal
+     en cuanto termina. */
+  .animate-borde-ia {
+    background-size: auto, 300% 100%;
+    animation: iaGradiente 3s linear infinite;
+  }
+
+  @keyframes iaGradiente {
+    0% { background-position: 0 0, 0% 50%; }
+    100% { background-position: 0 0, 300% 50%; }
+  }
+}
+
+@layer utilities {
+  .bg-page-header {
+    background-image: linear-gradient(
+      135deg,
+      hsl(var(--header-from)) 0%,
+      hsl(var(--header-to)) 100%
+    );
+    box-shadow: 0 10px 40px hsl(var(--header-from) / 0.25);
+  }
 }
 
 @layer utilities {
@@ -52,19 +294,23 @@ html {
 
 /* Usa la var que inyecta next/font, con fallback si faltara */
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
   font-family: var(--font-poppins, var(--font-sans-fallback));
   line-height: 1.5;
 }
 
-/* Inputs claros por defecto */
+/* Inputs claros por defecto.
+   Nota: antes había un bloque `@media (prefers-color-scheme: dark)` que ponía
+   `--foreground: #fff` (texto blanco sobre fondo blanco) y forzaba inputs
+   oscuros dentro de una UI clara. Se retiró: el modo oscuro ahora es opt-in
+   con la clase `.dark`. */
 input, textarea, select {
   color: #171717;
   background-color: #ffffff;
 }
 
-/* Opcional: evita “bold sintético” que cambia métricas en algunos navegadores */
+/* Evita “bold sintético” que cambia métricas en algunos navegadores */
 html, body {
   font-synthesis-weight: none;
   font-synthesis-style: none;

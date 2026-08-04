@@ -1,8 +1,9 @@
-'use client'
-import AdminDashboard from '@/components/admin/AdminDashboard'
+import AdminDashboard from '@/components/layout/AdminDashboard'
+import { requirePageRole } from '@/lib/auth/session'
+import { ROLES } from '@/lib/auth/roles'
 
-export default function Page() {
-  const key = typeof window !== 'undefined' ? window.location.href + Date.now() : 'static'
+export default async function AdminPage() {
+  const usuario = await requirePageRole([ROLES.ADMIN])
 
-  return <AdminDashboard key={key} />
+  return <AdminDashboard usuario={usuario} />
 }

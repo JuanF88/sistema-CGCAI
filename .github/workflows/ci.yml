@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Un push nuevo sobre la misma rama cancela la ejecución anterior.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+
+    env:
+      # El build no necesita credenciales reales: `env.public.js` solo avisa si
+      # faltan y `getServerEnv()` es perezoso. Se ponen valores de relleno para
+      # que la compilación sea determinista y no dependa de secretos.
+      NEXT_PUBLIC_SUPABASE_URL: https://ejemplo.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: clave-de-relleno-para-ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      # Los tres pasos se ejecutan siempre aunque uno falle, para ver todos los
+      # problemas de una vez en lugar de arreglarlos de uno en uno.
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        if: '!cancelled()'
+        run: npm run typecheck
+
+      - name: Build
+        if: '!cancelled()'
+        run: npm run build
+
+      - name: Vulnerabilidades en dependencias de producción
+        if: '!cancelled()'
+        # Informativo: hoy quedan advisories sin arreglo hacia delante
+        # (cadena archiver/glob dentro de exceljs, postcss/sharp dentro de next).
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high

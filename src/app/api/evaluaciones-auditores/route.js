@@ -1,27 +1,14 @@
 import { NextResponse } from 'next/server'
-import { getAuthenticatedClient } from '@/lib/authHelper'
-import { createClient } from '@supabase/supabase-js'
+import { requireRole } from '@/lib/api/guard'
+import { ROLES, EVALUACION_READ_ROLES } from '@/lib/auth/roles'
 
 // GET /api/evaluaciones-auditores
 // Carga evaluaciones basándose en informes_auditoria del periodo
 export async function GET(request) {
-  const { usuario, error } = await getAuthenticatedClient()
-  
-  if (error) {
-    return NextResponse.json({ error }, { status: 401 })
-  }
+  const guard = await requireRole(EVALUACION_READ_ROLES)
+  if (!guard.ok) return guard.response
 
-  // Solo admin puede ver evaluaciones
-  if (usuario?.rol !== 'admin' && usuario?.rol !== 'visualizador') {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
-
-  // Usar service role para consultas
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const supabase = guard.admin
 
   try {
     const { searchParams } = new URL(request.url)
@@ -190,22 +177,10 @@ export async function GET(request) {
 // POST /api/evaluaciones-auditores
 // Crea o actualiza una evaluación
 export async function POST(request) {
-  const { usuario, error } = await getAuthenticatedClient()
-  
-  if (error) {
-    return NextResponse.json({ error }, { status: 401 })
-  }
+  const guard = await requireRole(ROLES.ADMIN)
+  if (!guard.ok) return guard.response
 
-  // Solo admin puede crear evaluaciones
-  if (usuario?.rol !== 'admin') {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
-
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const supabaseAdmin = guard.admin
 
   try {
     const body = await request.json()

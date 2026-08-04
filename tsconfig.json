@@ -32,10 +32,14 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
+    "src/**/*.js",
+    "src/**/*.jsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    ".next",
+    "scripts"
   ]
 }

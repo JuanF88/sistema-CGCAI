@@ -1,27 +1,17 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { requireRole } from '@/lib/api/guard'
+import { ROLES } from '@/lib/auth/roles'
 
-// Cliente con service role para operaciones administrativas
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY
+// Migración puntual: crea en Supabase Auth los usuarios que solo existían en
+// la tabla `usuarios`. Es una operación masiva y destructiva-por-omisión, así
+// que exige sesión de admin.
+export async function POST() {
+  const guard = await requireRole(ROLES.ADMIN)
+  if (!guard.ok) return guard.response
 
-export async function POST(request) {
+  const supabaseAdmin = guard.admin
+
   try {
-    // Verificar que tenemos el service role key
-    if (!supabaseServiceRole) {
-      return NextResponse.json(
-        { error: 'Service role key no configurada' },
-        { status: 500 }
-      )
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRole, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-
     // Contraseña temporal solo para crear usuarios en Auth
     // Los usuarios nunca la usarán - sus contraseñas reales se migran en el primer login
     const TEMP_PASSWORD = 'TEMP_MIGRATION_PASSWORD_' + Math.random().toString(36)
@@ -92,7 +82,7 @@ export async function POST(request) {
 
         // Actualizar la tabla usuarios con el nuevo ID de auth usando SQL directo
         // No podemos usar .update() porque la PK está cacheada
-        const { data: updateData, error: updateError } = await supabaseAdmin.rpc('migrate_user_id', {
+        const { error: updateError } = await supabaseAdmin.rpc('migrate_user_id', {
           old_user_id: usuario.usuario_id,
           new_user_id: authUser.user.id,
         })

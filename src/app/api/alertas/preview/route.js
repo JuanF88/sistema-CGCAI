@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getAuthenticatedClient } from '@/lib/authHelper'
-import { createClient } from '@supabase/supabase-js'
+import { requireRole } from '@/lib/api/guard'
+import { ROLES } from '@/lib/auth/roles'
 import {
   buildDeadlineNotifications,
   buildStorageIndex,
@@ -9,28 +9,13 @@ import {
   getLatestAlertSentAt,
 } from '@/lib/alertas/auditAlertService'
 
-function buildSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
+export async function POST() {
+  const guard = await requireRole(ROLES.ADMIN)
+  if (!guard.ok) return guard.response
 
-export async function POST(request) {
-  const authResult = await getAuthenticatedClient()
-  const usuario = authResult.usuario
-  
-  if (authResult.error) {
-    return NextResponse.json({ error: authResult.error }, { status: 401 })
-  }
-
-  if (usuario?.rol !== 'admin') {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
+  const supabaseAdmin = guard.admin
 
   try {
-    const supabaseAdmin = buildSupabaseAdmin()
     const configs = await getAlertConfigs(supabaseAdmin)
     const processDefinitions = getProcessDefinitions()
     const buckets = processDefinitions.map((item) => item.bucket)
@@ -64,7 +49,6 @@ export async function POST(request) {
     for (const notification of notifications) {
       const auditor = notification.audit
       const processLabel = notification.processDefinition.label
-      const dueDateText = notification.dueDate?.toISOString().slice(0, 10) || 'Por definir'
       const dependencyName = auditor?.dependencia_nombre || auditor?.dependencias?.nombre || 'Dependencia'
 
       const existingSentAt = await getLatestAlertSentAt(supabaseAdmin, {

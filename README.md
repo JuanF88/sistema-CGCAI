@@ -1,93 +1,116 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sistema CGCAI — Auditorías Internas
 
-## Getting Started
+Sistema de gestión de auditorías internas del Centro de Gestión de la Calidad y
+Acreditación Institucional. Next.js 16 (App Router) + Supabase, desplegado en Vercel.
 
-First, run the development server:
+## Arranque
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Necesitas un `.env.local` con las variables de la sección siguiente.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Comando | Qué hace |
+|---|---|
+| `npm run dev` | servidor de desarrollo (Turbopack) |
+| `npm run build` | build de producción |
+| `npm run start` | sirve el build |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run migrate:files` | renombra archivos históricos en Storage |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-## Modulo de Mensajeria por Correo
-
-El proyecto incluye un modulo de notificaciones por correo basado en SMTP (compatible con Gmail + App Password).
-
-### Variables de entorno
-
-Agrega estas variables en tu archivo `.env.local`:
+## Variables de entorno
 
 ```bash
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...        # secreta, solo servidor
+
+# Correo (SMTP, compatible con Gmail + App Password)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=tu_correo@gmail.com
-SMTP_PASS=tu_app_password_de_gmail
+SMTP_PASS=tu_app_password
 SMTP_FROM="CGCAI <tu_correo@gmail.com>"
 APP_LOGIN_URL=https://sistema-cgcai.vercel.app/
-# Opcional: base publica para assets en correo (logo)
-APP_ASSET_BASE_URL=https://sistema-cgcai.vercel.app
+APP_ASSET_BASE_URL=https://sistema-cgcai.vercel.app   # opcional, logos del correo
+
+# Cron de alertas (define al menos una)
+CRON_SECRET=...
+ALERTAS_CRON_SECRET=...
 ```
 
-### Flujo actual
+## Estructura
 
-- Al crear un usuario desde `POST /api/usuarios`, se intenta enviar automaticamente el correo con credenciales.
-- Si SMTP no esta configurado o falla el envio, el usuario igual se crea y la API retorna el estado de notificacion en el campo `notification`.
+```
+src/app/        rutas (páginas delgadas) y Route Handlers
+src/features/   un módulo por dominio, cada uno con api/ types/ dto/ components/
+src/components/ layout/ (shell por rol + navigation.js) y ui/ (primitivos shadcn)
+src/lib/        config/, supabase/, api/, auth/, dto/, excel/, notifications/
+src/proxy.js    protección de rutas por rol
+sql/            migraciones y políticas RLS
+docs/           documentación
+scripts/        utilidades de mantenimiento
+```
 
-### Ubicacion del modulo
+Detalle completo en **[`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md)**.
 
-- `src/lib/notifications/emailClient.js`
-- `src/lib/notifications/templates.js`
-- `src/lib/notifications/index.js`
+### Reglas que no se negocian
 
-## Cron automatico de alertas
+- Los componentes **nunca llaman `fetch` directamente**: usan
+  `features/<dominio>/api/`.
+- Las rutas de API validan la entrada con **Zod** (`features/<dominio>/dto/`) y van
+  envueltas en `withRoute` + `requireRole`.
+- Nadie lee `process.env` directamente: pasa por `lib/config/`.
+- En código nuevo **no se escribe CSS suelto**: Tailwind + primitivos de
+  `components/ui` + tokens de `components/ui/tokens.js`.
+- Los ítems de menú se agregan en `components/layout/navigation.js`, no en el shell.
 
-Se configuro un cron diario para ejecutar automaticamente el endpoint de alertas:
+## Roles
 
-- Archivo: `vercel.json`
-- Ruta ejecutada: `/api/alertas/ejecutar`
-- Frecuencia actual: `0 14 * * *` (todos los dias a las 9:00 a. m. hora Colombia, 14:00 UTC)
+| Rol | Ruta | Puede |
+|---|---|---|
+| `admin` | `/admin` | todo: auditorías, usuarios, hallazgos, evaluaciones, alertas, estadísticas |
+| `auditor` | `/auditor` | sus auditorías, informes, su dashboard, caja de herramientas |
+| `visualizador` | `/visualizador` | solo lectura de malla, auditorías, hallazgos y estadísticas |
 
-### Variables de entorno necesarias (Vercel)
+El acceso lo aplica `src/proxy.js` en el servidor. Las rutas de API lo verifican
+otra vez con `requireRole()` de `src/lib/api/guard.js`.
 
-Define al menos una de estas variables con el mismo valor del secreto del cron:
+## Notificaciones por correo
 
-- `CRON_SECRET`
-- `ALERTAS_CRON_SECRET`
+Módulo SMTP en `src/lib/notifications/`. Se usa al crear un usuario
+(credenciales), al asignar una auditoría y en las alertas de vencimiento.
+Si SMTP no está configurado la operación no falla: la API devuelve el estado en
+el campo `notification`.
 
-El endpoint valida el token recibido por `Authorization: Bearer <secret>` o `x-cron-secret`.
+## Cron de alertas
 
-### Prueba manual
-
-Puedes probar desde terminal con:
+`vercel.json` ejecuta `/api/alertas/ejecutar` todos los días a las `0 14 * * *`
+UTC (9:00 a. m. en Colombia). El endpoint acepta el secreto por
+`Authorization: Bearer <secreto>` o `x-cron-secret`, y como alternativa una
+sesión de admin (así se dispara a mano desde el panel de alertas).
 
 ```bash
 curl -X POST "https://TU_DOMINIO/api/alertas/ejecutar" \
-	-H "Authorization: Bearer TU_SECRETO"
+  -H "Authorization: Bearer TU_SECRETO"
 ```
+
+## Importar encuestas de evaluación
+
+La importación (`Evaluación de Auditores → Importar encuestas`) acepta **solo
+`.xlsx`**. El formato antiguo `.xls` no está soportado: si aparece uno, hay que
+abrirlo en Excel y volver a guardarlo como `.xlsx`. La exportación de Google Forms
+ya genera `.xlsx`.
+
+## Notas de seguridad
+
+- `usuarios.password` sigue guardándose en texto plano por el login legacy.
+  La API ya no la expone. Procedimiento de retirada en
+  **[`docs/MIGRACION-PASSWORDS.md`](docs/MIGRACION-PASSWORDS.md)**.
+- Advisories transitivos que quedan abiertos y por qué, en los pendientes de
+  `docs/ARQUITECTURA.md`.

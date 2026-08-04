@@ -1,34 +1,20 @@
 import { NextResponse } from 'next/server'
-import { getAuthenticatedClient } from '@/lib/authHelper'
-import { createClient } from '@supabase/supabase-js'
+import { requireRole } from '@/lib/api/guard'
+import { withRoute } from '@/lib/api/handler'
+import { ROLES } from '@/lib/auth/roles'
 import { sendCredentialsEmail } from '@/lib/notifications'
+import { enviarCredencialesSchema } from '@/features/usuarios/dto/usuario-dto'
 
-export async function POST(request) {
-  const { usuario, error } = await getAuthenticatedClient()
-
-  if (error) {
-    return NextResponse.json({ error }, { status: 401 })
-  }
-
-  if (usuario?.rol !== 'admin') {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
+export const POST = withRoute(async (request) => {
+  const guard = await requireRole(ROLES.ADMIN)
+  if (!guard.ok) return guard.response
 
   try {
-    const body = await request.json()
-    const { usuario_id } = body || {}
+    const { usuario_id } = enviarCredencialesSchema.parse(await request.json())
 
-    if (!usuario_id) {
-      return NextResponse.json({ error: 'usuario_id es obligatorio.' }, { status: 400 })
-    }
-
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
-
-    const { data: userData, error: dbError } = await supabaseAdmin
+    // `password` solo se lee aquí, en el servidor, para poder enviarlo por
+    // correo. Nunca sale por la API.
+    const { data: userData, error: dbError } = await guard.admin
       .from('usuarios')
       .select('usuario_id, nombre, apellido, email, password, estado')
       .eq('usuario_id', usuario_id)
@@ -63,6 +49,7 @@ export async function POST(request) {
 
     return NextResponse.json({ ok: false, notification: result }, { status: 400 })
   } catch (err) {
-    return NextResponse.json({ error: err?.message || 'Error interno del servidor.' }, { status: 500 })
+    // Los errores de validación los traduce `withRoute`; el resto se re-lanza.
+    throw err
   }
-}
+})

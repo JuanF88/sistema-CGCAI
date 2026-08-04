@@ -98,7 +98,7 @@ async function processBucket(bucketName) {
 
       try {
         // 4. Copiar archivo al nuevo nombre
-        const { data: copyData, error: copyError } = await supabase
+        const { error: copyError } = await supabase
           .storage
           .from(bucketName)
           .copy(oldName, newName)

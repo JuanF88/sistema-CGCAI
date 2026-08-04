@@ -1,39 +1,30 @@
-import { createServerClient } from '@supabase/ssr'
-import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { supabaseAdmin } from '@/lib/supabase/admin'
+import { toErrorResponse } from '@/lib/api/handler'
+import { loginSchema } from '@/features/auth/dto/login-dto'
+
+/**
+ * Campos del usuario que devolvemos al cliente. Nunca incluye `password`,
+ * que sigue existiendo solo para el camino de login legacy.
+ */
+const USUARIO_PUBLIC_FIELDS =
+  'usuario_id, nombre, apellido, email, rol, estado, auth_user_id, tipo_personal, dependencia_id, estudios, tipo_estudio, celular'
+
+/** Quita `password` antes de enviar el usuario al cliente. */
+const sanitizeUsuario = (usuario) => {
+  if (!usuario) return usuario
+  const rest = { ...usuario }
+  delete rest.password
+  return rest
+}
 
 export async function POST(request) {
   try {
-    const { email, password } = await request.json()
+    const { email, password } = loginSchema.parse(await request.json())
 
-    const cookieStore = await cookies()
-    
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      {
-        cookies: {
-          get(name) {
-            return cookieStore.get(name)?.value
-          },
-          set(name, value, options) {
-            try {
-              cookieStore.set({ name, value, ...options })
-            } catch (error) {
-              // Cookies can only be set in Server Actions or Route Handlers
-            }
-          },
-          remove(name, options) {
-            try {
-              cookieStore.set({ name, value: '', ...options })
-            } catch (error) {
-              // Cookies can only be set in Server Actions or Route Handlers
-            }
-          },
-        },
-      }
-    )
+    const supabase = await createSupabaseServerClient()
+    const admin = supabaseAdmin()
 
     // PASO 1: Intentar login con Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -43,22 +34,11 @@ export async function POST(request) {
 
     // Si el login con Supabase Auth funciona, proceder normalmente
     if (!authError && authData.user) {
-      // Obtener datos del usuario desde tabla usuarios
-      // Usamos service role temporalmente para bypass RLS durante login
-      const supabaseAdmin = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL,
-        process.env.SUPABASE_SERVICE_ROLE_KEY,
-        {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-          },
-        }
-      )
-
-      const { data: usuario, error: usuarioError } = await supabaseAdmin
+      // La tabla `usuarios` está bajo RLS, así que leemos el perfil con
+      // service-role para poder resolver el rol durante el login.
+      const { data: usuario, error: usuarioError } = await admin
         .from('usuarios')
-        .select('*')
+        .select(USUARIO_PUBLIC_FIELDS)
         .eq('auth_user_id', authData.user.id)
         .eq('estado', 'activo')
         .single()
@@ -87,20 +67,11 @@ export async function POST(request) {
       })
     }
 
-    // PASO 2: Si falla, intentar con contraseña antigua (migración gradual)
-    // Usamos service role para bypass RLS
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
-
-    const { data: usuarioLegacy, error: legacyError } = await supabaseAdmin
+    // PASO 2: Si falla, intentar con contraseña antigua (migración gradual).
+    // ⚠️ Camino legacy: compara contra `usuarios.password` en texto plano.
+    // Se mantiene hasta que todos los usuarios tengan `auth_user_id`; ver
+    // docs/MIGRACION-PASSWORDS.md para el procedimiento de retirada.
+    const { data: usuarioLegacy, error: legacyError } = await admin
       .from('usuarios')
       .select('*')
       .eq('email', email)
@@ -125,7 +96,7 @@ export async function POST(request) {
     // PASO 3: Login antiguo exitoso - migrar contraseña a Supabase Auth
     if (usuarioLegacy.auth_user_id) {
       // Actualizar contraseña en Supabase Auth
-      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      const { error: updateError } = await admin.auth.admin.updateUserById(
         usuarioLegacy.auth_user_id,
         { password: password }
       )
@@ -146,7 +117,7 @@ export async function POST(request) {
       return NextResponse.json({
         success: true,
         user: { id: usuarioLegacy.auth_user_id || usuarioLegacy.usuario_id, email: usuarioLegacy.email },
-        usuario: usuarioLegacy,
+        usuario: sanitizeUsuario(usuarioLegacy),
         legacy: true,
       })
     }
@@ -154,16 +125,13 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       user: finalAuthData.user,
-      usuario: usuarioLegacy,
+      usuario: sanitizeUsuario(usuarioLegacy),
       migrated: true, // Indica que se migró la contraseña
       session: finalAuthData.session, // Devolver la sesión
     })
 
   } catch (error) {
-    console.error('Error en login:', error)
-    return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500 }
-    )
+    // Un ZodError sale como 400 con el detalle de los campos; el resto como 500.
+    return toErrorResponse(error)
   }
 }

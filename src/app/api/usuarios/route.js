@@ -1,278 +1,170 @@
-import { NextResponse } from 'next/server'
-import { getAuthenticatedClient } from '@/lib/authHelper'
-import { createClient } from '@supabase/supabase-js'
+import { requireRole } from '@/lib/api/guard'
+import { withRoute } from '@/lib/api/handler'
+import {
+  ConflictError,
+  fromPostgresError,
+  NotFoundError,
+  ValidationError,
+} from '@/lib/api/errors'
+import { created, json, ok } from '@/lib/api/response'
+import { ROLES } from '@/lib/auth/roles'
 import { sendCredentialsEmail } from '@/lib/notifications'
+import {
+  actualizarUsuarioSchema,
+  crearUsuarioSchema,
+  usuarioIdSchema,
+} from '@/features/usuarios/dto/usuario-dto'
 
-export async function GET(request) {
-  const { usuario, error } = await getAuthenticatedClient()
-  
-  if (error) {
-    return NextResponse.json({ error }, { status: 401 })
-  }
+/**
+ * Campos que devolvemos al cliente.
+ * Nunca incluye `password`: esa columna solo existe para el login legacy
+ * (ver docs/MIGRACION-PASSWORDS.md).
+ */
+const CAMPOS =
+  'usuario_id, nombre, apellido, email, rol, estado, auth_user_id, tipo_personal, dependencia_id, estudios, tipo_estudio, celular'
 
-  // Solo admins pueden listar usuarios
-  if (usuario?.rol !== 'admin') {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
+const parseId = (request) =>
+  usuarioIdSchema.parse(new URL(request.url).searchParams.get('id'))
 
-  // Usar service role para consultas (bypass RLS temporal)
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+// GET /api/usuarios?rol=auditor
+export const GET = withRoute(async (request) => {
+  const guard = await requireRole(ROLES.ADMIN)
+  if (!guard.ok) return guard.response
 
-  const { searchParams } = new URL(request.url)
-  const rol = searchParams.get('rol')
+  const rol = new URL(request.url).searchParams.get('rol')
 
-  let query = supabase
-    .from('usuarios')
-    .select('usuario_id, nombre, apellido, email, rol, password, estado, auth_user_id, tipo_personal, dependencia_id, estudios, tipo_estudio, celular')
+  let query = guard.admin.from('usuarios').select(CAMPOS)
+  if (rol) query = query.eq('rol', rol)
 
-  if (rol) {
-    query = query.eq('rol', rol)
-  }
+  const { data, error } = await query
+  if (error) throw fromPostgresError(error)
 
-  const { data, error: dbError } = await query
+  return json(data ?? [])
+})
 
-  if (dbError) {
-    console.error('Error al obtener usuarios:', dbError.message)
-    return NextResponse.json({ error: dbError.message }, { status: 500 })
-  }
+// POST /api/usuarios — crea en Supabase Auth y en la tabla `usuarios`.
+export const POST = withRoute(async (request) => {
+  const guard = await requireRole(ROLES.ADMIN)
+  if (!guard.ok) return guard.response
 
-  return NextResponse.json(data)
-}
+  const admin = guard.admin
+  const { sendCredentials, ...usuario } = crearUsuarioSchema.parse(await request.json())
 
-// POST /api/usuarios  -> crea (solo admin)
-export async function POST(req) {
-  const { usuario, error } = await getAuthenticatedClient()
-  
-  if (error) {
-    return NextResponse.json({ error }, { status: 401 })
-  }
-
-  // Solo admins pueden crear usuarios
-  if (usuario?.rol !== 'admin') {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
-
-  // Usar service role para insertar (bypass RLS)
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-
-  try {
-    const body = await req.json()
-    const {
-      nombre,
-      apellido,
-      email,
-      password,
-      rol,
-      sendCredentials = false,
-      estado = 'activo',
-      tipo_personal = null,
-      dependencia_id = null,
-      estudios = null,
-      tipo_estudio = null,
-      celular = null,
-    } = body
-
-    if (!email || !rol || !password) {
-      return NextResponse.json({ error: 'Email, rol y contraseña son obligatorios.' }, { status: 400 })
-    }
-
-    // PASO 1: Crear usuario en Supabase Auth
-    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // Confirmar email automáticamente
-    })
-
-    if (authError) {
-      console.error('Error al crear usuario en Auth:', authError)
-      if (authError.message.includes('already registered')) {
-        return NextResponse.json({ error: 'Este correo ya está registrado en el sistema.' }, { status: 409 })
-      }
-      return NextResponse.json({ error: authError.message }, { status: 500 })
-    }
-
-    // PASO 2: Insertar en tabla usuarios con el auth_user_id
-    const { data, error: dbError } = await supabaseAdmin
-      .from('usuarios')
-      .insert({ 
-        nombre, 
-        apellido, 
-        email, 
-        password, 
-        rol, 
-        estado,
-        tipo_personal,
-        dependencia_id: dependencia_id || null,
-        estudios,
-        tipo_estudio,
-        celular,
-        auth_user_id: authUser.user.id // ← CLAVE: vincular con Supabase Auth
-      })
-      .select('usuario_id, nombre, apellido, email, rol, estado, auth_user_id, tipo_personal, dependencia_id, estudios, tipo_estudio, celular')
-      .single()
-
-    if (dbError) {
-      // Si falla la inserción en la tabla, eliminar el usuario de Auth para mantener consistencia
-      await supabaseAdmin.auth.admin.deleteUser(authUser.user.id)
-      
-      // 23505 = unique_violation
-      if (dbError.code === '23505') {
-        const msg = dbError.message || ''
-        if (msg.includes('usuarios_email_rol_key')) {
-          return NextResponse.json({ error: 'Ya existe un usuario con ese correo y ese rol.' }, { status: 409 })
-        }
-        if (msg.includes('usuarios_email_password_key')) {
-          return NextResponse.json({ error: 'Para ese correo, la contraseña ya está en uso. Usa una diferente.' }, { status: 409 })
-        }
-        return NextResponse.json({ error: 'Registro duplicado.' }, { status: 409 })
-      }
-      return NextResponse.json({ error: dbError.message }, { status: 500 })
-    }
-
-    let notification = null
-
-    if (sendCredentials) {
-      const emailResult = await sendCredentialsEmail({
-        nombre,
-        apellido,
-        email,
-        password,
-      })
-
-      notification = {
-        channel: 'email',
-        type: 'credentials_created_user',
-        ...emailResult,
-      }
-    }
-
-    return NextResponse.json({ ...data, notification }, { status: 201 })
-  } catch (error) {
-    console.error('Error en POST /api/usuarios:', error)
-    return NextResponse.json({ error: 'Error interno del servidor.' }, { status: 500 })
-  }
-}
-
-// PUT /api/usuarios?id=123  -> actualiza (solo admin)
-export async function PUT(req) {
-  const { usuario, error: authError } = await getAuthenticatedClient()
-  
-  if (authError) {
-    return NextResponse.json({ error: authError }, { status: 401 })
-  }
-
-  // Solo admins pueden actualizar usuarios
-  if (usuario?.rol !== 'admin') {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
-
-  // Usar service role para actualizar (bypass RLS)
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-
-  const { searchParams } = new URL(req.url)
-  const id = searchParams.get('id')
-  if (!id) return NextResponse.json({ error: 'Falta id.' }, { status: 400 })
-
-  let body = {}
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'JSON inválido.' }, { status: 400 })
-  }
-
-  // Solo permitimos actualizar campos existentes
-  const update = {}
-  ;['nombre', 'apellido', 'email', 'password', 'rol', 'estado', 'tipo_personal', 'dependencia_id', 'estudios', 'tipo_estudio', 'celular'].forEach((k) => {
-    if (k in body && body[k] !== undefined) update[k] = body[k]
+  // PASO 1: crear en Supabase Auth.
+  const { data: authUser, error: authError } = await admin.auth.admin.createUser({
+    email: usuario.email,
+    password: usuario.password,
+    email_confirm: true,
   })
 
-  if ('dependencia_id' in update) {
-    update.dependencia_id = update.dependencia_id || null
+  if (authError) {
+    if (authError.message.includes('already registered')) {
+      throw new ConflictError('Este correo ya está registrado en el sistema.')
+    }
+    throw new Error(authError.message)
   }
+
+  // PASO 2: insertar en la tabla, vinculando con el usuario de Auth.
+  const { data, error: dbError } = await admin
+    .from('usuarios')
+    .insert({ ...usuario, auth_user_id: authUser.user.id })
+    .select(CAMPOS)
+    .single()
+
+  if (dbError) {
+    // Si falla la tabla, deshacemos el usuario de Auth para no dejar huérfanos.
+    await admin.auth.admin.deleteUser(authUser.user.id)
+    throw fromPostgresError(dbError)
+  }
+
+  let notification = null
+
+  if (sendCredentials) {
+    const emailResult = await sendCredentialsEmail({
+      nombre: usuario.nombre,
+      apellido: usuario.apellido,
+      email: usuario.email,
+      password: usuario.password,
+    })
+
+    notification = {
+      channel: 'email',
+      type: 'credentials_created_user',
+      ...emailResult,
+    }
+  }
+
+  return created({ ...data, notification })
+})
+
+// PUT /api/usuarios?id=123
+export const PUT = withRoute(async (request) => {
+  const guard = await requireRole(ROLES.ADMIN)
+  if (!guard.ok) return guard.response
+
+  const admin = guard.admin
+  const id = parseId(request)
+  const dto = actualizarUsuarioSchema.parse(await request.json())
+
+  // Solo los campos que realmente llegaron: `undefined` significa "no tocar".
+  const update = Object.fromEntries(
+    Object.entries(dto).filter(([, value]) => value !== undefined)
+  )
 
   if (Object.keys(update).length === 0) {
-    return NextResponse.json({ error: 'No hay campos para actualizar.' }, { status: 400 })
+    throw new ValidationError('No hay campos para actualizar.')
   }
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await admin
     .from('usuarios')
     .update(update)
     .eq('usuario_id', id)
-    .select('usuario_id, nombre, apellido, email, rol, estado, auth_user_id, tipo_personal, dependencia_id, estudios, tipo_estudio, celular')
+    .select(CAMPOS)
     .single()
 
-  if (error) {
-    if (error.code === '23505') {
-      const msg = error.message || ''
-      if (msg.includes('usuarios_email_rol_key')) {
-        return NextResponse.json({ error: 'Ya existe un usuario con ese correo y ese rol.' }, { status: 409 })
-      }
-      if (msg.includes('usuarios_email_password_key')) {
-        return NextResponse.json({ error: 'Para ese correo, la contraseña ya está en uso. Usa una diferente.' }, { status: 409 })
-      }
-      return NextResponse.json({ error: 'Registro duplicado.' }, { status: 409 })
+  if (error) throw fromPostgresError(error)
+  if (!data) throw new NotFoundError('Usuario no encontrado.')
+
+  // Si el admin cambió la contraseña, hay que reflejarlo también en Supabase
+  // Auth. Sin esto el usuario solo podría entrar por el camino legacy.
+  if (update.password && data.auth_user_id) {
+    const { error: authUpdateError } = await admin.auth.admin.updateUserById(
+      data.auth_user_id,
+      { password: update.password }
+    )
+
+    if (authUpdateError) {
+      console.error(
+        '[PUT /api/usuarios] contraseña actualizada en la tabla pero no en Auth:',
+        authUpdateError.message
+      )
+      return json({
+        ...data,
+        warning:
+          'El usuario se actualizó, pero la contraseña no pudo sincronizarse con Supabase Auth.',
+      })
     }
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-  if (!data) return NextResponse.json({ error: 'Usuario no encontrado.' }, { status: 404 })
-
-  return NextResponse.json(data)
-}
-
-
-export async function DELETE(request) {
-  const { usuario, error: authError } = await getAuthenticatedClient()
-  
-  if (authError) {
-    return NextResponse.json({ error: authError }, { status: 401 })
   }
 
-  // Solo admins pueden eliminar usuarios
-  if (usuario?.rol !== 'admin') {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
+  return json(data)
+})
 
-  // Usar service role para eliminar (bypass RLS)
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+// DELETE /api/usuarios?id=123
+export const DELETE = withRoute(async (request) => {
+  const guard = await requireRole(ROLES.ADMIN)
+  if (!guard.ok) return guard.response
 
-  const { searchParams } = new URL(request.url)
-  const id = Number(searchParams.get('id'))
+  const id = parseId(request)
 
-  if (!id) {
-    return NextResponse.json({ error: 'ID de usuario no proporcionado' }, { status: 400 })
-  }
-
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await guard.admin
     .from('usuarios')
     .delete()
     .eq('usuario_id', id)
     .select('usuario_id')
     .maybeSingle()
 
-  if (error) {
-    const status = /foreign key/i.test(error.message) ? 409 : 500
-    return NextResponse.json({ error: error.message }, { status })
-  }
+  if (error) throw fromPostgresError(error)
+  if (!data) throw new NotFoundError('Usuario no encontrado')
 
-  if (!data) {
-    return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
-  }
-
-  return NextResponse.json({ ok: true, deleted: data })
-}
+  return ok({ ok: true, deleted: data })
+})

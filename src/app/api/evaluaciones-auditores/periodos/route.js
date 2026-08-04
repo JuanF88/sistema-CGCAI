@@ -1,26 +1,14 @@
 import { NextResponse } from 'next/server'
-import { getAuthenticatedClient } from '@/lib/authHelper'
-import { createClient } from '@supabase/supabase-js'
+import { requireRole } from '@/lib/api/guard'
+import { EVALUACION_READ_ROLES } from '@/lib/auth/roles'
 
 // GET /api/evaluaciones-auditores/periodos
 // Obtiene los períodos (año-semestre) que tienen datos
-export async function GET(request) {
-  const { usuario, error } = await getAuthenticatedClient()
-  
-  if (error) {
-    return NextResponse.json({ error }, { status: 401 })
-  }
+export async function GET() {
+  const guard = await requireRole(EVALUACION_READ_ROLES)
+  if (!guard.ok) return guard.response
 
-  // Solo admin y visualizador
-  if (usuario?.rol !== 'admin' && usuario?.rol !== 'visualizador') {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const supabase = guard.admin
 
   try {
     // Obtener períodos únicos de encuestas_auditores

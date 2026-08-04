@@ -1,8 +1,9 @@
-'use client'
-import AuditorDashboard from '@/components/auditor/AuditorDashboard'
+import AuditorDashboard from '@/components/layout/AuditorDashboard'
+import { requirePageRole } from '@/lib/auth/session'
+import { ROLES } from '@/lib/auth/roles'
 
-export default function Page() {
-  const key = typeof window !== 'undefined' ? window.location.href + Date.now() : 'static'
+export default async function AuditorPage() {
+  const usuario = await requirePageRole([ROLES.AUDITOR])
 
-  return <AuditorDashboard key={key} />
+  return <AuditorDashboard usuario={usuario} />
 }

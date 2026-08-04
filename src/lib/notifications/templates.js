@@ -132,12 +132,14 @@ export function buildProfessionalTemplateFromText({ subject, text, intro, nombre
   })
 }
 
+// Nota: quien llama también envía `fechaSeguimiento`, pero la plantilla no la
+// muestra. Se deja fuera a propósito para no cambiar el correo que se envía
+// hoy; añadir esa fila es un cambio de contenido, no de refactor.
 export function buildAuditAssignmentTemplate({
   nombre,
   apellido,
   dependencia,
   fechaAuditoria,
-  fechaSeguimiento,
   loginUrl,
 }) {
   const nombreCompleto = `${nombre || ''} ${apellido || ''}`.trim() || 'Auditor'

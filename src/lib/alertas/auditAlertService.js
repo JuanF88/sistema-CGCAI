@@ -86,7 +86,7 @@ export function diffInBusinessDays(from, to) {
   const start = startOfDay(from)
   const end = startOfDay(to)
   const step = end >= start ? 1 : -1
-  let current = new Date(start)
+  const current = new Date(start)
   let count = 0
 
   while ((step > 0 && current < end) || (step < 0 && current > end)) {
@@ -180,7 +180,7 @@ export function shouldTriggerAlert({ daysLeft, alertType, config }) {
   return false
 }
 
-export function buildAlertMessage({ processLabel, alertType, daysLeft, dueDate, audit, dependencyName }) {
+export function buildAlertMessage({ processLabel, alertType, dueDate, audit, dependencyName }) {
   const dueDateText = dueDate ? formatYMD(dueDate) : 'Sin fecha'
   const dependency = dependencyName || 'la dependencia asignada'
 
