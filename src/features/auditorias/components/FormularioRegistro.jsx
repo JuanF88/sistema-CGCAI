@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { toast } from 'react-toastify'
-import { ArrowLeft, CircleHelp, FileText, Lock, Plus, Save, Sparkles, X } from 'lucide-react'
+import { ArrowLeft, CircleHelp, Lock, Plus, Save, Sparkles, X } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase/client'
 import { validarAlineacion } from '@/features/auditorias/api/informes-api'
@@ -265,6 +265,20 @@ const VEREDICTOS = {
 const CAMPO_REVISADO = { objetivo: 'Objetivo', conclusiones: 'Conclusiones' }
 
 /**
+ * Qué es lo que devuelve la IA en cada campo, que no es lo mismo.
+ *
+ * En las conclusiones propone un texto listo para pegar. En el objetivo, no:
+ * da pautas de lo que le falta para que lo redacte el auditor. Un objetivo es
+ * la decisión de qué se va a auditar, y esa la toma quien audita; recibirlo
+ * escrito invita a pegarlo sin pensar y a que las veinte auditorías del año
+ * acaben con el mismo párrafo.
+ */
+const TITULO_SUGERENCIA = {
+  objetivo: 'Qué le falta para estar alineado',
+  conclusiones: 'Redacción propuesta',
+}
+
+/**
  * Contrasta lo escrito con el objetivo general del programa.
  *
  * Es una segunda lectura, no un semáforo: el informe se guarda igual diga lo
@@ -405,7 +419,7 @@ function RevisionAlineacion({ informeId, objetivoPrograma, objetivo, conclusione
                 {revision.sugerencia && (
                   <div className="mt-3 rounded-lg border border-dashed border-border bg-muted/40 p-3">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      Redacción propuesta
+                      {TITULO_SUGERENCIA[revision.campo] ?? 'Sugerencia'}
                     </p>
                     <p className="mt-1 whitespace-pre-line text-sm leading-relaxed">
                       {revision.sugerencia}
@@ -793,7 +807,6 @@ export default function FormularioRegistro({
       {/* En un drawer la cabecera la pone el propio panel. */}
       {!embebido && (
         <PageHeader
-          icon={<FileText />}
           title={auditoria ? 'Informe de auditoría' : 'Nuevo informe de auditoría'}
           subtitle={
             auditoria

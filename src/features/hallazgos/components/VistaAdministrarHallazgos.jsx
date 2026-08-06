@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PageHeader } from '@/components/ui/page-header'
-import { StatCard } from '@/components/ui/stat-card'
+import { InfoCard } from '@/components/ui/info-card'
 import {
   Select,
   SelectContent,
@@ -891,7 +891,6 @@ const {
   return (
     <div className={PAGE_SHELL}>
       <PageHeader
-        icon="📊"
         title="Reporte de Hallazgos"
         subtitle="Análisis y seguimiento de hallazgos de auditoría"
         actions={
@@ -920,26 +919,29 @@ const {
 
       {/* KPIs */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-        <StatCard icon="📊" tone="blue" label="Hallazgos filtrados" value={stats.total} />
-        <StatCard
-          icon="✅"
+        <InfoCard tone="blue" label="Hallazgos filtrados" value={stats.total} />
+        <InfoCard
           tone="green"
           label="Fortalezas"
-          value={`${stats.fortalezas} · ${pct(stats.fortalezas)}%`}
+          value={stats.fortalezas}
+          total={stats.total}
+          percent={pct(stats.fortalezas)}
         />
-        <StatCard
-          icon="💡"
+        <InfoCard
           tone="orange"
           label="Oportunidades"
-          value={`${stats.oportunidades} · ${pct(stats.oportunidades)}%`}
+          value={stats.oportunidades}
+          total={stats.total}
+          percent={pct(stats.oportunidades)}
         />
-        <StatCard
-          icon="⚠️"
+        <InfoCard
           tone="pink"
           label="No conformidades"
-          value={`${stats.noConformidades} · ${pct(stats.noConformidades)}%`}
+          value={stats.noConformidades}
+          total={stats.total}
+          percent={pct(stats.noConformidades)}
         />
-        <StatCard icon="🔍" tone="purple" label="Registrados en total" value={stats.registrados} />
+        <InfoCard tone="purple" label="Registrados en total" value={stats.registrados} />
       </section>
 
       {/* Filtros */}

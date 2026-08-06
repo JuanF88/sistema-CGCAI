@@ -25,7 +25,8 @@ import {
 import { PAGE_SHELL, SECTION_CARD } from '@/components/ui/tokens'
 import { anioPorDefecto } from '@/lib/fechas/anio'
 import { useAnioInicial } from '@/hooks/useAnioInicial'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+import { Cargando } from '@/components/ui/loader'
 
 const MODOS = [
   { key: 'general', label: 'Consolidado general' },
@@ -487,7 +488,6 @@ export default function VistaDashboardAuditores() {
   return (
     <div className={PAGE_SHELL}>
       <PageHeader
-        icon="🎛️"
         title="Dashboard de Auditores"
         subtitle="Historial completo, evaluaciones y métricas de desempeño"
         actions={
@@ -509,11 +509,15 @@ export default function VistaDashboardAuditores() {
       )}
 
       {cargando && (
-        <p className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
-          {modoVista === 'general'
-            ? 'Cargando análisis general…'
-            : 'Cargando dashboard por auditor…'}
-        </p>
+        <div className="rounded-lg border border-border bg-card">
+          <Cargando
+            mensaje={
+              modoVista === 'general'
+                ? 'Cargando análisis general…'
+                : 'Cargando dashboard por auditor…'
+            }
+          />
+        </div>
       )}
 
       {modoVista === 'general' && !loadingGeneral && resumenGeneral && (

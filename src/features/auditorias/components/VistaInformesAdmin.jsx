@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { RefreshCw } from 'lucide-react'
+import {
+  LayoutGrid,
+  RefreshCw,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Cargando } from '@/components/ui/loader'
 import { PageHeader } from '@/components/ui/page-header'
-import { STAT_TONES } from '@/components/ui/stat-card'
+import { InfoCard } from '@/components/ui/info-card'
 import {
   Select,
   SelectContent,
@@ -248,6 +252,23 @@ export default function AuditoriasMallaControl() {
     return { ...t, pct }
   }, [filtered])
 
+  /**
+   * Las ocho métricas de la cabecera, en el orden del ciclo de la auditoría.
+   *
+   * `sinPorcentaje` es solo para el total: es el denominador de las otras
+   * siete, así que un «16/16 · 100 %» no diría nada.
+   */
+  const KPIS = [
+    { key: 'total',      label: 'Total auditorías',   tono: 'blue',   sinPorcentaje: true },
+    { key: 'plan',       label: 'Planes',             tono: 'purple' },
+    { key: 'asistencia', label: 'Asistencias',        tono: 'green' },
+    { key: 'evaluacion', label: 'Evaluaciones',       tono: 'orange' },
+    { key: 'acta',       label: 'Actas',              tono: 'cyan' },
+    { key: 'actaComp',   label: 'Actas compromiso',   tono: 'pink' },
+    { key: 'informeOk',  label: 'Informes completos', tono: 'teal' },
+    { key: 'validado',   label: 'Validados',          tono: 'indigo' },
+  ]
+
   const columns = [
     { key: 'plan',       title: 'Plan' },
     { key: 'asistencia', title: 'Asistencia' },
@@ -261,7 +282,6 @@ export default function AuditoriasMallaControl() {
   return (
     <div className={PAGE_SHELL}>
       <PageHeader
-        icon="🎯"
         title="Centro de Control de Auditorías"
         subtitle="Monitoreo en tiempo real del estado de todas las auditorías"
         actions={
@@ -296,86 +316,37 @@ export default function AuditoriasMallaControl() {
         }
       />
 
-      {/* KPIs */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
-          <KpiCard 
-            icon="📊" 
-            label="Total Auditorías" 
-            value={kpis.total} 
-            color="blue"
+      {/* KPIs.
+          La escalera de columnas llega a ocho solo en 2xl (1536 px). Antes
+          saltaba a ocho en xl (1280): en un portátil de 1366 eso dejaba 127 px
+          por tarjeta y las etiquetas largas se salían. */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8">
+        {KPIS.map(({ key, label, tono, sinPorcentaje }) => (
+          <InfoCard
+            key={key}
+
+            label={label}
+            tone={tono}
+            value={kpis[key]}
+            total={sinPorcentaje ? undefined : kpis.total}
+            percent={sinPorcentaje ? undefined : kpis.pct(kpis[key])}
+            hint={sinPorcentaje ? 'En el periodo seleccionado' : undefined}
           />
-          <KpiCard 
-            icon="📋" 
-            label="Planes" 
-            value={kpis.plan}
-            total={kpis.total}
-            percent={kpis.pct(kpis.plan)}
-            color="purple"
-          />
-          <KpiCard 
-            icon="✓" 
-            label="Asistencias" 
-            value={kpis.asistencia}
-            total={kpis.total}
-            percent={kpis.pct(kpis.asistencia)}
-            color="green"
-          />
-          <KpiCard 
-            icon="📝" 
-            label="Evaluaciones" 
-            value={kpis.evaluacion}
-            total={kpis.total}
-            percent={kpis.pct(kpis.evaluacion)}
-            color="orange"
-          />
-          <KpiCard 
-            icon="📄" 
-            label="Actas" 
-            value={kpis.acta}
-            total={kpis.total}
-            percent={kpis.pct(kpis.acta)}
-            color="cyan"
-          />
-          <KpiCard 
-            icon="📑" 
-            label="Actas Compromiso" 
-            value={kpis.actaComp}
-            total={kpis.total}
-            percent={kpis.pct(kpis.actaComp)}
-            color="pink"
-          />
-          <KpiCard 
-            icon="✅" 
-            label="Informes Completos" 
-            value={kpis.informeOk}
-            total={kpis.total}
-            percent={kpis.pct(kpis.informeOk)}
-            color="teal"
-          />
-          <KpiCard 
-            icon="🎯" 
-            label="Validados" 
-            value={kpis.validado}
-            total={kpis.total}
-            percent={kpis.pct(kpis.validado)}
-            color="indigo"
-          />
+        ))}
       </section>
 
       {/* Malla de control por dependencia */}
       <section className={cn(SECTION_CARD, 'overflow-hidden')}>
         <header className="border-b border-border p-4">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <span aria-hidden="true">🎯</span>
-            Malla de Control por Dependencia
+            <LayoutGrid className="h-4 w-4 text-primary" aria-hidden="true" />
+            Malla de control por dependencia
           </h3>
-          <p className="text-xs text-muted-foreground">
-            Seguimiento detallado del progreso de cada dependencia
-          </p>
+
         </header>
 
         {loading && (
-          <p className="p-8 text-center text-sm text-muted-foreground">Cargando datos…</p>
+          <Cargando mensaje="Cargando datos…" />
         )}
 
         {error && (
@@ -394,24 +365,27 @@ export default function AuditoriasMallaControl() {
         {!loading && !error && matrix.length > 0 && (
           <div className="overflow-x-auto">
             <div className="min-w-[1100px]">
-              {/* Cabecera */}
+              {/* Cabecera.
+                  La celda fija llevaba `bg-muted/60`, translúcido: al
+                  desplazar, las columnas de debajo se veían a través del
+                  nombre de la dependencia. Va opaca, con `bg-muted` sobre el
+                  fondo de la tarjeta, y con borde derecho para que se lea como
+                  una columna anclada y no como un solape. */}
               <div className="grid grid-cols-[minmax(220px,1.6fr)_140px_repeat(7,minmax(96px,1fr))] border-b border-border bg-muted/60">
-                <div className="sticky left-0 z-10 bg-muted/60 px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  🏢 Dependencia
+                <div className="sticky left-0 z-20 border-r border-border bg-muted px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Dependencia
                 </div>
                 <div className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  📈 Avance
+                  Avance
                 </div>
-                {['📋 Plan', '✓ Asistencia', '📝 Evaluación', '📄 Acta', '📑 Carta Comp.', '✅ Informe', '🎯 Validado'].map(
-                  (h) => (
-                    <div
-                      key={h}
-                      className="px-2 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                    >
-                      {h}
-                    </div>
-                  )
-                )}
+                {columns.map((col) => (
+                  <div
+                    key={col.key}
+                    className="px-2 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    {col.title}
+                  </div>
+                ))}
               </div>
 
               {/* Filas */}
@@ -423,10 +397,13 @@ export default function AuditoriasMallaControl() {
                     key={row.depId}
                     className="grid grid-cols-[minmax(220px,1.6fr)_140px_repeat(7,minmax(96px,1fr))] border-b border-border transition-colors last:border-0 hover:bg-muted/40"
                   >
-                    <div className="sticky left-0 z-10 flex flex-col justify-center bg-card px-3 py-2.5">
+                    {/* `group-hover` no vale aquí: al fijar la columna hay que
+                        repintar su fondo, y `hover:bg-muted/40` de la fila no
+                        la alcanza porque este fondo es opaco y va encima. */}
+                    <div className="sticky left-0 z-10 flex flex-col justify-center border-r border-border bg-card px-3 py-2.5">
                       <span className="text-sm font-medium leading-tight">{row.depName}</span>
                       <span className="text-xs text-muted-foreground">
-                        {row.total} auditorías
+                        {row.total} {row.total === 1 ? 'auditoría' : 'auditorías'}
                       </span>
                     </div>
 
@@ -491,52 +468,6 @@ export default function AuditoriasMallaControl() {
 }
 
 /* ===== Subcomponentes UI ===== */
-
-/** Tarjeta de KPI con barra de avance opcional. */
-function KpiCard({ icon, label, value, total, percent, color = 'blue' }) {
-  return (
-    <article
-      className={cn(
-        'flex items-center gap-3 rounded-xl border border-border border-l-4 bg-card p-3.5 shadow-sm',
-        'transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md',
-        STAT_TONES[color]?.bar ?? STAT_TONES.blue.bar
-      )}
-    >
-      <span
-        className={cn(
-          'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl',
-          STAT_TONES[color]?.chip ?? STAT_TONES.blue.chip
-        )}
-        aria-hidden="true"
-      >
-        {icon}
-      </span>
-
-      <div className="min-w-0 flex-1">
-        <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">
-          {label}
-        </p>
-        <p className="text-xl font-extrabold leading-none tabular-nums">
-          {total ? `${value}/${total}` : value}
-        </p>
-
-        {percent !== undefined && (
-          <div className="mt-1.5 flex items-center gap-2">
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary transition-[width] duration-500"
-                style={{ width: `${percent}%` }}
-              />
-            </div>
-            <span className="text-[0.7rem] font-semibold tabular-nums text-muted-foreground">
-              {percent}%
-            </span>
-          </div>
-        )}
-      </div>
-    </article>
-  )
-}
 
 /** Color de fondo de una celda del heatmap según su porcentaje. */
 function heatClass(pct) {

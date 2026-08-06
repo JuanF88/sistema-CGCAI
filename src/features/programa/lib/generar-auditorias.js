@@ -28,7 +28,7 @@ const partir = (texto) =>
     .filter(Boolean)
 
 /**
- * Primer día del mes de auditoría del programa, en `YYYY-MM-DD`.
+ * Primer día del primer mes del programa, en `YYYY-MM-DD`.
  *
  * El cronograma solo llega al mes —la cuadrícula marca semanas, no días—, así
  * que la auditoría se programa el día 1 y la fecha exacta se ajusta después
@@ -46,7 +46,9 @@ export function fechaDelPrograma(programa) {
   const anio = Number(programa?.anio)
   if (!Number.isInteger(anio) || anio < 2000 || anio > 2100) return null
 
-  const indice = MESES.findIndex((mes) => normalizar(mes) === normalizar(programa?.mes_auditoria))
+  // El primer mes del rango: la auditoría se fecha al arranque del programa,
+  // y quien la ejecute ajusta la fecha real desde «Administrar auditorías».
+  const indice = MESES.findIndex((mes) => normalizar(mes) === normalizar(programa?.mes_inicio))
   if (indice < 0) return null
 
   return `${anio}-${String(indice + 1).padStart(2, '0')}-01`
@@ -77,7 +79,7 @@ export function planDeGeneracion(
 
   if (!fecha) {
     problemas.push(
-      'El programa no tiene un mes de auditoría válido; sin él no se puede fijar la fecha.'
+      'El programa no tiene un mes de inicio válido; sin él no se puede fijar la fecha.'
     )
     return { fecha: null, filas, problemas, yaCreadas }
   }
@@ -104,17 +106,19 @@ export function planDeGeneracion(
         continue
       }
 
-      // El primero es el líder; una auditoría necesita un responsable concreto.
+      // El líder, que es el responsable de la auditoría. El formulario ya solo
+      // deja poner uno; se sigue tomando el primero por si queda algún programa
+      // guardado antes con varios.
       const lider = usuarioPorNombre(nombres[0])
       if (!lider) {
         problemas.push(`«${nombres[0]}» (${auditado}) no está entre los usuarios del sistema.`)
         continue
       }
 
-      // El resto de auditores y el acompañante de texto libre van juntos: la
-      // columna de la auditoría es una lista de nombres, no de ids.
-      const acompanantes = [...nombres.slice(1), String(linea.auditor_acompanante ?? '').trim()]
-        .filter(Boolean)
+      // Acompañantes: los del campo propio, más los auditores de sobra que
+      // pudiera arrastrar un programa antiguo. La columna de la auditoría es
+      // una lista de nombres, no de ids.
+      const acompanantes = [...nombres.slice(1), ...partir(linea.auditor_acompanante)]
 
       filas.push({
         usuario_id: lider.usuario_id,

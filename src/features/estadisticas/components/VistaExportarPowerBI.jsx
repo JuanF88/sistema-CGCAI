@@ -306,7 +306,6 @@ export default function VistaExportarPowerBI() {
   return (
     <div className={PAGE_SHELL}>
       <PageHeader
-        icon="📊"
         title="Exportar Datos para Power BI"
         subtitle="Genera el archivo Excel con los datos actualizados de la base de datos"
         actions={

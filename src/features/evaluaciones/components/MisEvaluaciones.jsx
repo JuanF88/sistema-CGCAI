@@ -11,7 +11,7 @@
  * a un auditor a leer únicamente lo suyo.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Award, ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
+import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
 
 import { obtenerDashboardAuditor } from '@/features/evaluaciones/api/evaluaciones-api'
 import { RUBRICA_CRITERIOS, colorNota } from '@/features/evaluaciones/lib/rubrica'
@@ -28,7 +28,8 @@ import {
 } from '@/components/ui/select'
 import { EMPTY_STATE, PAGE_SHELL, SECTION_CARD, STATUS_BADGE_TONES } from '@/components/ui/tokens'
 import { cn } from '@/lib/utils'
-import { useAnioInicial } from '@/hooks/useAnioInicial'
+import { useAnioInicial } from '@/hooks/useAnioInicial'
+import { Cargando } from '@/components/ui/loader'
 
 const nota = (valor) => (typeof valor === 'number' ? valor.toFixed(2) : '—')
 
@@ -248,7 +249,6 @@ export default function MisEvaluaciones({ usuario }) {
   return (
     <div className={PAGE_SHELL}>
       <PageHeader
-        icon={<Award />}
         title="Mis evaluaciones"
         subtitle="El detalle de cómo se evaluó cada una de tus auditorías, criterio por criterio."
         actions={
@@ -293,7 +293,11 @@ export default function MisEvaluaciones({ usuario }) {
         </p>
       )}
 
-      {cargando && <div className={cn(SECTION_CARD, EMPTY_STATE)}>Cargando tus evaluaciones…</div>}
+      {cargando && (
+        <div className={SECTION_CARD}>
+          <Cargando mensaje="Cargando tus evaluaciones…" />
+        </div>
+      )}
 
       {!cargando && !error && visibles.length === 0 && (
         <div className={cn(SECTION_CARD, EMPTY_STATE)}>

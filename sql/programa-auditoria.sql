@@ -47,7 +47,12 @@ CREATE TABLE IF NOT EXISTS programas_auditoria (
   oportunidades     text[] NOT NULL DEFAULT '{}',
 
   -- Cronograma
-  mes_auditoria     text,   -- p. ej. «SEPTIEMBRE»
+  --
+  -- El programa abarca un rango de meses dentro del año, de `mes_inicio` a
+  -- `mes_fin`, ambos incluidos. Con uno solo los dos valores coinciden. De aquí
+  -- salen las semanas del cronograma: cuatro por mes, numeradas de corrido.
+  mes_inicio        text,   -- p. ej. «SEPTIEMBRE»
+  mes_fin           text,   -- p. ej. «OCTUBRE»
 
   -- Pie del formato
   nomenclatura      text,
@@ -388,3 +393,43 @@ CREATE INDEX IF NOT EXISTS informes_programa_auditoria_idx
 -- Comprobación: cuántas auditorías vienen de un programa y cuántas son previas.
 --   SELECT coalesce(programa_auditoria_id::text, 'a mano') AS origen, count(*)
 --     FROM informes_auditoria GROUP BY 1 ORDER BY 2 DESC;
+
+-- ------------------------------------------------------------
+-- Migración: mes único → rango de meses
+--
+-- Antes había una sola columna `mes_auditoria`. Ahora el programa puede abarcar
+-- varios meses, y el Excel dibuja cuatro semanas por cada uno.
+--
+-- El bloque es idempotente y no pierde nada: crea las dos columnas, copia el
+-- mes que hubiera a los dos extremos del rango —un programa de un solo mes
+-- sigue siendo exactamente eso— y solo entonces retira la columna vieja. En una
+-- base recién creada con el CREATE TABLE de arriba no hace nada.
+-- ------------------------------------------------------------
+ALTER TABLE programas_auditoria
+  ADD COLUMN IF NOT EXISTS mes_inicio text,
+  ADD COLUMN IF NOT EXISTS mes_fin    text;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_name = 'programas_auditoria' AND column_name = 'mes_auditoria'
+  ) THEN
+    EXECUTE $sql$
+      UPDATE programas_auditoria
+         SET mes_inicio = COALESCE(mes_inicio, mes_auditoria),
+             mes_fin    = COALESCE(mes_fin,    mes_auditoria)
+       WHERE mes_auditoria IS NOT NULL
+    $sql$;
+  END IF;
+END $$;
+
+ALTER TABLE programas_auditoria DROP COLUMN IF EXISTS mes_auditoria;
+
+COMMENT ON COLUMN programas_auditoria.mes_inicio IS
+  'Primer mes del programa, en mayúsculas y sin tildes decorativas: «SEPTIEMBRE».';
+COMMENT ON COLUMN programas_auditoria.mes_fin IS
+  'Último mes del programa, incluido. Igual a mes_inicio si dura un solo mes.';
+
+-- Comprobación: qué rango tiene cada programa.
+--   SELECT anio, nombre, mes_inicio, mes_fin FROM programas_auditoria ORDER BY anio DESC;

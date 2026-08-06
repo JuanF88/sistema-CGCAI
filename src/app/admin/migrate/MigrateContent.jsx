@@ -6,7 +6,7 @@ import { AlertTriangle, CheckCircle2, Info, Rocket, XCircle } from 'lucide-react
 import { migrarUsuariosAAuth } from '@/features/auth/api/auth-api'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/ui/page-header'
-import { StatCard } from '@/components/ui/stat-card'
+import { InfoCard } from '@/components/ui/info-card'
 import { PAGE_SHELL, SECTION_CARD } from '@/components/ui/tokens'
 import { cn } from '@/lib/utils'
 
@@ -78,7 +78,6 @@ export default function MigrateContent() {
   return (
     <div className={cn(PAGE_SHELL, 'mx-auto min-h-screen max-w-5xl bg-app p-5 sm:p-6 lg:p-8')}>
       <PageHeader
-        icon="🔐"
         title="Migración de usuarios a Supabase Auth"
         subtitle="Operación puntual. Léela entera antes de ejecutarla."
       />
@@ -129,10 +128,10 @@ export default function MigrateContent() {
           </p>
 
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatCard icon="👥" tone="blue" label="Procesados" value={resultado.resumen.total} />
-            <StatCard icon="✅" tone="green" label="Migrados" value={resultado.resumen.exitosos} />
-            <StatCard icon="↩️" tone="gray" label="Omitidos" value={resultado.resumen.omitidos} />
-            <StatCard icon="⚠️" tone="orange" label="Errores" value={resultado.resumen.errores} />
+            <InfoCard tone="blue" label="Procesados" value={resultado.resumen.total} />
+            <InfoCard tone="green" label="Migrados" value={resultado.resumen.exitosos} />
+            <InfoCard tone="gray" label="Omitidos" value={resultado.resumen.omitidos} />
+            <InfoCard tone="orange" label="Errores" value={resultado.resumen.errores} />
           </div>
 
           <div className="grid gap-3 lg:grid-cols-3">

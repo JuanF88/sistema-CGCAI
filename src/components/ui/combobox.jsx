@@ -65,21 +65,36 @@ export function Combobox({
   const [filtrando, setFiltrando] = useState(false)
 
   const contenedor = useRef(null)
+  const lista = useRef(null)
   const listaId = `${useId()}-lista`
 
-  const sugerencias = useMemo(() => {
-    if (!filtrando) return options.slice(0, maximo)
+  // Se guarda cuántas coinciden en total, no solo las que se pintan: la lista
+  // se corta en `maximo` y, sin decir cuántas quedan fuera, el usuario cree que
+  // no hay más.
+  const { sugerencias, coincidencias } = useMemo(() => {
+    const q = filtrando ? normalizar(value) : ''
 
-    const q = normalizar(value)
-    if (!q) return options.slice(0, maximo)
+    const casan = q
+      ? options.filter(
+          (o) =>
+            normalizar(o.label ?? o.value).includes(q) || normalizar(o.description).includes(q)
+        )
+      : options
 
-    return options
-      .filter(
-        (o) =>
-          normalizar(o.label ?? o.value).includes(q) || normalizar(o.description).includes(q)
-      )
-      .slice(0, maximo)
+    return { sugerencias: casan.slice(0, maximo), coincidencias: casan.length }
   }, [options, value, filtrando, maximo])
+
+  /**
+   * Que el resaltado se vea al moverse con el teclado.
+   *
+   * En la lista caben siete opciones y puede haber cincuenta: sin esto, bajar
+   * con la flecha más allá de la séptima resaltaba opciones fuera de la vista
+   * y parecía que la lista se acababa ahí.
+   */
+  useEffect(() => {
+    if (!abierto) return
+    lista.current?.children[resaltado]?.scrollIntoView({ block: 'nearest' })
+  }, [abierto, resaltado])
 
   // Cerrar al pulsar fuera.
   useEffect(() => {
@@ -178,14 +193,20 @@ export function Combobox({
       </button>
 
       {abierto && (
-        <ul
-          id={listaId}
-          role="listbox"
+        <div
           className={cn(
-            'absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-border',
-            'bg-popover p-1 text-popover-foreground shadow-md'
+            'absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border',
+            'bg-popover text-popover-foreground shadow-md'
           )}
         >
+          {/* 20rem son unas siete opciones de dos renglones. Eran 15rem —cinco
+              justas— y con 319 numerales parecía que solo había cinco. */}
+          <ul
+            id={listaId}
+            role="listbox"
+            ref={lista}
+            className="max-h-[20rem] overflow-y-auto p-1"
+          >
           {sugerencias.length === 0 && (
             <li className="px-2 py-3 text-center text-xs text-muted-foreground">{vacio}</li>
           )}
@@ -226,7 +247,14 @@ export function Combobox({
               </li>
             )
           })}
-        </ul>
+          </ul>
+
+          {coincidencias > sugerencias.length && (
+            <p className="border-t border-border px-3 py-1.5 text-center text-[0.7rem] text-muted-foreground">
+              {sugerencias.length} de {coincidencias}. Escribe para afinar la búsqueda.
+            </p>
+          )}
+        </div>
       )}
     </div>
   )

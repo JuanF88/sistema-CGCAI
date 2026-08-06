@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { SearchInput } from '@/components/ui/search-input'
 import { PageHeader } from '@/components/ui/page-header'
-import { StatCard } from '@/components/ui/stat-card'
+import { InfoCard } from '@/components/ui/info-card'
 import {
   Table,
   TableBody,
@@ -29,7 +29,8 @@ import {
   TABLE_CONTAINER,
   TABLE_TOOLBAR,
 } from '@/components/ui/tokens'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/loader'
 
 const CAPITULO_TITULOS = {
   1: 'NO APLICA',
@@ -67,6 +68,16 @@ const formatCapitulo = (cap) => {
     return `${n}: ${CAPITULO_TITULOS[n]}`
   }
   return String(cap)
+}
+
+/** El aro pequeño y su texto, para la fila de una tabla que está cargando. */
+function FilaCargando({ texto }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Spinner size="sm" />
+      {texto}
+    </span>
+  )
 }
 
 export default function VistaPlanMejoraAdmin() {
@@ -285,7 +296,6 @@ export default function VistaPlanMejoraAdmin() {
   return (
     <div className={PAGE_SHELL}>
       <PageHeader
-        icon="📄"
         title="Plan de Mejora General"
         subtitle="Consolidado de Oportunidades de Mejora y No Conformidades por auditoría"
         actions={
@@ -301,10 +311,10 @@ export default function VistaPlanMejoraAdmin() {
       />
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard icon="🗂️" tone="blue" label="Planes generados" value={stats.totalPlanes} />
-        <StatCard icon="🧩" tone="green" label="Hallazgos totales" value={stats.totalHallazgos} />
-        <StatCard icon="✅" tone="cyan" label="Oportunidades" value={stats.totalOm} />
-        <StatCard icon="⚠️" tone="orange" label="No conformidades" value={stats.totalNc} />
+        <InfoCard tone="blue" label="Planes generados" value={stats.totalPlanes} />
+        <InfoCard tone="green" label="Hallazgos totales" value={stats.totalHallazgos} />
+        <InfoCard tone="cyan" label="Oportunidades" value={stats.totalOm} />
+        <InfoCard tone="orange" label="No conformidades" value={stats.totalNc} />
       </section>
 
       <section className={TABLE_CONTAINER}>
@@ -336,7 +346,9 @@ export default function VistaPlanMejoraAdmin() {
           </TableHeader>
 
           <TableBody>
-            {loading && <TableEmpty colSpan={7}>Cargando plan de mejora general…</TableEmpty>}
+            {loading && <TableEmpty colSpan={7}>
+                <FilaCargando texto="Cargando plan de mejora general…" />
+              </TableEmpty>}
 
             {!loading && paginacion.total === 0 && (
               <TableEmpty colSpan={7}>

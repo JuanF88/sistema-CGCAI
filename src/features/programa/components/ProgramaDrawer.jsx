@@ -7,7 +7,7 @@
  * distribución—, así que el panel se organiza en pestañas en vez de un scroll
  * de varias pantallas.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarRange, FileText, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'react-toastify'
 
@@ -24,10 +24,10 @@ import {
   DEPENDENCIA_CRONOGRAMA_VACIA,
   MESES,
   PROGRAMA_INICIAL,
-  SEMANAS,
   cronogramaInicial,
   seccionCronograma,
   semanasDe,
+  semanasDelPrograma,
   totalDependenciasCronograma,
 } from '@/features/programa/lib/formato'
 import { distribucionDesdeCronograma } from '@/features/programa/lib/distribucion'
@@ -110,7 +110,10 @@ const formInicial = () => ({
  * mismo proceso; se dejan como están y se ven en el formulario.
  */
 function conLasSeisSecciones(guardado) {
-  const secciones = [...(guardado ?? [])].map((s) => ({ ...s, dependencias: s.dependencias ?? [] }))
+  const secciones = [...(guardado ?? [])].map((s) => ({
+    ...s,
+    dependencias: (s.dependencias ?? []).map(unSoloLider),
+  }))
   const presentes = new Set(secciones.map((s) => s.proceso_clave).filter(Boolean))
 
   const faltantes = PROCESOS_CRONOGRAMA.filter((p) => !presentes.has(p.value)).map(
@@ -122,13 +125,44 @@ function conLasSeisSecciones(guardado) {
   return [...secciones, ...faltantes]
 }
 
+/** «Ana Pérez, Luis Gómez» → ['Ana Pérez', 'Luis Gómez']. */
+const partir = (texto) =>
+  String(texto ?? '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean)
+
+/**
+ * Una línea con un solo auditor líder.
+ *
+ * La columna `auditores` guardaba una lista, y hasta ahora el formulario
+ * dejaba poner varios. Es un error: la auditoría se crea a nombre de **una**
+ * persona —la responsable—, y los demás la acompañan. Los programas guardados
+ * antes con dos o tres nombres se reparten solos al abrirlos: el primero se
+ * queda de líder y el resto pasan a acompañantes, sin perder a nadie.
+ */
+function unSoloLider(dependencia) {
+  const nombres = partir(dependencia.auditores)
+  if (nombres.length < 2) return dependencia
+
+  const acompanantes = partir(dependencia.auditor_acompanante)
+
+  return {
+    ...dependencia,
+    auditores: nombres[0],
+    auditor_acompanante: [...nombres.slice(1), ...acompanantes].join(', '),
+  }
+}
+
 /**
  * La cuadrícula de semanas del cronograma.
  *
- * Cuatro botones y no un desplegable: son cuatro opciones fijas, se marcan
- * varias a la vez y así se parece a la cuadrícula que se ve en el Excel.
+ * Botones y no un desplegable: son pocas opciones, se marcan varias a la vez y
+ * así se parece a la cuadrícula que se ve en el Excel. Van agrupadas por mes
+ * porque el programa puede abarcar varios y «Semana 6» a secas no dice de qué
+ * mes es; la numeración de dentro sí es corrida, que es como se guardan.
  */
-function SelectorSemanas({ id, value, onChange }) {
+function SelectorSemanas({ id, value, semanas, onChange }) {
   const marcadas = semanasDe(value)
 
   const alternar = (semana) => {
@@ -136,29 +170,57 @@ function SelectorSemanas({ id, value, onChange }) {
     if (siguiente.has(semana)) siguiente.delete(semana)
     else siguiente.add(semana)
 
-    // Se reconstruye desde `SEMANAS` para que siempre queden en orden.
-    onChange(SEMANAS.filter((s) => siguiente.has(s)).join(','))
+    // Se reconstruye desde la lista para que siempre queden en orden.
+    onChange(semanas.map((s) => s.id).filter((s) => siguiente.has(s)).join(','))
   }
 
-  return (
-    <div id={id} className="flex flex-wrap gap-2">
-      {SEMANAS.map((semana) => {
-        const activa = marcadas.has(semana)
+  if (!semanas.length) {
+    return (
+      <p id={id} className="text-sm text-muted-foreground">
+        Elige antes el rango de meses en la cabecera.
+      </p>
+    )
+  }
 
-        return (
-          <Button
-            key={semana}
-            type="button"
-            variant={activa ? 'default' : 'outline'}
-            size="sm"
-            aria-pressed={activa}
-            onClick={() => alternar(semana)}
-            className="min-w-[6.5rem]"
-          >
-            Semana {semana}
-          </Button>
-        )
-      })}
+  // Un grupo por mes, en el orden en que vienen.
+  const porMes = semanas.reduce((grupos, semana) => {
+    const ultimo = grupos[grupos.length - 1]
+    if (ultimo?.mes === semana.mes) ultimo.semanas.push(semana)
+    else grupos.push({ mes: semana.mes, semanas: [semana] })
+    return grupos
+  }, [])
+
+  return (
+    <div id={id} className="flex flex-wrap gap-x-6 gap-y-3">
+      {porMes.map((grupo) => (
+        <div key={grupo.mes} className="flex flex-col gap-1.5">
+          {porMes.length > 1 && (
+            <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">
+              {grupo.mes}
+            </span>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            {grupo.semanas.map(({ id: clave, numero }) => {
+              const activa = marcadas.has(clave)
+
+              return (
+                <Button
+                  key={clave}
+                  type="button"
+                  variant={activa ? 'default' : 'outline'}
+                  size="sm"
+                  aria-pressed={activa}
+                  onClick={() => alternar(clave)}
+                  className="min-w-[6.5rem]"
+                >
+                  Semana {numero}
+                </Button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -173,7 +235,7 @@ function SelectorSemanas({ id, value, onChange }) {
 function SeccionCronograma({
   seccion,
   indice,
-  mes,
+  semanas,
   opciones,
   dependenciasDeProceso,
   marcarErrores,
@@ -227,14 +289,15 @@ function SeccionCronograma({
         </Field>
 
         <Field
-          label={`Semanas${mes ? ` de ${mes.toLowerCase()}` : ''}`}
+          label="Semanas"
           htmlFor={`cr-semanas-${indice}`}
-          help="Las cuatro columnas a la derecha de los requisitos ISO 14001."
+          help="Las columnas a la derecha de los requisitos ISO 14001, cuatro por cada mes del rango."
           wide
         >
           <SelectorSemanas
             id={`cr-semanas-${indice}`}
             value={seccion.semanas}
+            semanas={semanas}
             onChange={(valor) => onChange({ semanas: valor })}
           />
         </Field>
@@ -296,10 +359,13 @@ function SeccionCronograma({
                 />
               </Field>
 
+              {/* Uno solo: la auditoría se crea a nombre de una persona, que es
+                  la responsable ante el auditado. Quien más participe va abajo,
+                  como acompañante. */}
               <Field
-                label="Auditor(es)"
+                label="Auditor líder"
                 htmlFor={`cr-auditores-${indice}-${i}`}
-                help="Añade los que hagan falta"
+                help="Uno por dependencia; es a quien se le asigna la auditoría"
                 action={
                   <BotonMas
                     title="Crear un auditor nuevo"
@@ -307,7 +373,7 @@ function SeccionCronograma({
                   />
                 }
               >
-                <ComboboxMultiple
+                <Combobox
                   id={`cr-auditores-${indice}-${i}`}
                   value={dep.auditores ?? ''}
                   options={opciones.auditores}
@@ -316,21 +382,21 @@ function SeccionCronograma({
                 />
               </Field>
 
-              {/* Texto libre y no un desplegable: suele ser alguien que no está
-                  en el catálogo de usuarios. Es la «AA» de la nomenclatura. */}
+              {/* Admite a los del catálogo y a quien no esté en él —basta con
+                  escribirlo y pulsar Enter—: muchas veces acompaña alguien que
+                  no es usuario del sistema. Es la «AA» de la nomenclatura. */}
               <Field
-                label="Auditor acompañante"
+                label="Auditores acompañantes"
                 htmlFor={`cr-acomp-${indice}-${i}`}
-                help="Opcional. Texto libre; sale como «AA:» junto a los auditores."
+                help="Opcional; los que hagan falta. Salen como «AA:» junto al líder."
                 wide
               >
-                <Input
+                <ComboboxMultiple
                   id={`cr-acomp-${indice}-${i}`}
                   value={dep.auditor_acompanante ?? ''}
-                  onChange={(e) =>
-                    cambiarDependencia(i, { auditor_acompanante: e.target.value })
-                  }
-                  placeholder="Nombre de quien acompaña"
+                  options={opciones.auditores}
+                  onChange={(valor) => cambiarDependencia(i, { auditor_acompanante: valor })}
+                  placeholder="Busca o escribe un nombre…"
                 />
               </Field>
             </FieldGrid>
@@ -364,9 +430,9 @@ function SeccionCronograma({
           const nombre =
             [creado.nombre, creado.apellido].filter(Boolean).join(' ').trim() || creado.email
 
-          const actuales = String(dependencias[alta.linea]?.auditores ?? '').trim()
+          // Sustituye al líder en vez de añadirse a una lista: solo hay uno.
           cambiarDependencia(alta.linea, {
-            auditores: actuales ? `${actuales}, ${nombre}` : nombre,
+            auditores: nombre,
           })
           onCatalogoCambiado()
         }}
@@ -458,6 +524,35 @@ export function ProgramaDrawer({ open, onOpenChange, programa, onGuardar, guarda
       ...prev,
       ...(typeof campoOParche === 'string' ? { [campoOParche]: valor } : campoOParche),
     }))
+
+  /**
+   * El mes final no puede ser anterior al inicial: el programa vive dentro de
+   * un año y un rango que dé la vuelta al calendario es una errata. En vez de
+   * dejar elegirlo y protestar después, la lista solo ofrece de ahí en adelante
+   * —lo mismo que comprueba el DTO al guardar—.
+   */
+  const opcionesMesFin = useMemo(() => {
+    const desde = MESES.indexOf(form.mes_inicio)
+    return (desde < 0 ? MESES : MESES.slice(desde)).map((value) => ({ value }))
+  }, [form.mes_inicio])
+
+  /**
+   * Al cambiar el mes de inicio, el final le sigue si se quedaría antes.
+   *
+   * Un rango vacío no significa nada, y quien programa un solo mes espera que
+   * los dos campos digan lo mismo sin tener que tocar el segundo.
+   */
+  const cambiarMesInicio = (valor) => {
+    const desde = MESES.indexOf(valor)
+    const hasta = MESES.indexOf(form.mes_fin)
+    set({ mes_inicio: valor, mes_fin: hasta < desde ? valor : form.mes_fin })
+  }
+
+  /** Las semanas del rango, que son las que se pueden marcar por proceso. */
+  const semanas = useMemo(
+    () => semanasDelPrograma({ mes_inicio: form.mes_inicio, mes_fin: form.mes_fin }),
+    [form.mes_inicio, form.mes_fin]
+  )
 
   /**
    * Al crear, la cabecera es el primer paso de dos.
@@ -594,13 +689,28 @@ export function ProgramaDrawer({ open, onOpenChange, programa, onGuardar, guarda
                 />
               </Field>
 
-              <Field label="Mes de auditoría" htmlFor="pa-mes">
+              <Field label="Mes de inicio" htmlFor="pa-mes-inicio">
                 <Combobox
-                  id="pa-mes"
-                  value={form.mes_auditoria ?? ''}
+                  id="pa-mes-inicio"
+                  value={form.mes_inicio ?? ''}
                   options={OPCIONES_MES}
-                  onChange={(valor) => set('mes_auditoria', valor)}
+                  onChange={cambiarMesInicio}
                   placeholder="Selecciona el mes"
+                />
+              </Field>
+
+              <Field
+                label="Mes final"
+                htmlFor="pa-mes-fin"
+                help="El programa puede abarcar varios meses; el cronograma dibuja cuatro semanas por cada uno."
+              >
+                <Combobox
+                  id="pa-mes-fin"
+                  value={form.mes_fin ?? ''}
+                  options={opcionesMesFin}
+                  onChange={(valor) => set('mes_fin', valor)}
+                  placeholder="Selecciona el mes"
+                  disabled={!form.mes_inicio}
                 />
               </Field>
 
@@ -790,7 +900,7 @@ export function ProgramaDrawer({ open, onOpenChange, programa, onGuardar, guarda
               key={`${seccion.proceso_clave ?? seccion.proceso}-${indice}`}
               seccion={seccion}
               indice={indice}
-              mes={form.mes_auditoria}
+              semanas={semanas}
               opciones={opciones}
               dependenciasDeProceso={dependenciasDeProceso}
               marcarErrores={intentado}

@@ -4,7 +4,8 @@ import { useState, useEffect, Suspense } from 'react'
 
 import AppShell, { avatarFor } from '@/components/layout/AppShell'
 import { AUDITOR_NAV } from '@/components/layout/navigation'
-import VistaActual from '@/components/layout/VistaActual'
+import VistaActual from '@/components/layout/VistaActual'
+import { Cargando } from '@/components/ui/loader'
 
 // `usuario` llega ya verificado desde el Server Component de la ruta
 // (`src/app/auditor/page.js`), no desde localStorage.
@@ -48,7 +49,7 @@ export default function AuditorDashboard({ usuario }) {
       avatarSrc={avatarSrc}
       onAvatarError={() => setAvatarSrc('/avatares/Silueta.png')}
     >
-      <Suspense fallback={<p className="p-6">Cargando vista…</p>}>
+      <Suspense fallback={<Cargando mensaje="Cargando vista…" />}>
         <VistaActual
           usuario={usuario}
           reset={resetAuditorias}

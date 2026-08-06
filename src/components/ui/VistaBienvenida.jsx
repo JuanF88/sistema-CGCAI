@@ -9,6 +9,7 @@
  */
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
+import { CircleCheckBig, FileSearch, Hourglass, Inbox } from 'lucide-react'
 import Slider from 'react-slick'
 import 'slick-carousel/slick/slick.css'
 import 'slick-carousel/slick/slick-theme.css'
@@ -63,74 +64,96 @@ const CAMPOS_PROGRESO = [
 ]
 
 /**
- * Tarjetas del resumen. Los tonos son los pastel del diseño original, con su
- * equivalente en oscuro.
+ * Tarjetas del resumen.
+ *
+ * Los tonos siguen siendo los del diseño original, pero ya no tiñen la tarjeta
+ * entera: cuatro fondos de color seguidos compiten entre sí y ninguno destaca.
+ * El color queda en el icono, en el número y en la barra, que es donde informa.
  */
 const TARJETAS = [
   {
     key: 'pendientes',
     label: 'Pendientes',
-    icono: '📋',
+    Icono: Inbox,
     ayuda: 'Sin empezar',
-    clases:
-      'border-l-rose-400 bg-rose-50 dark:border-l-rose-500 dark:bg-rose-950/30 [&_dd]:text-rose-700 dark:[&_dd]:text-rose-200',
-    chip: 'bg-rose-100 text-rose-600 dark:bg-rose-900/60 dark:text-rose-200',
+    color: 'text-rose-500',
+    cifra: 'text-rose-600 dark:text-rose-300',
+    barra: 'bg-rose-500',
   },
   {
     key: 'enProceso',
     label: 'En proceso',
-    icono: '⏳',
+    Icono: Hourglass,
     ayuda: 'Informe a medias',
-    clases:
-      'border-l-amber-400 bg-amber-50 dark:border-l-amber-500 dark:bg-amber-950/30 [&_dd]:text-amber-700 dark:[&_dd]:text-amber-200',
-    chip: 'bg-amber-100 text-amber-600 dark:bg-amber-900/60 dark:text-amber-200',
+    color: 'text-amber-500',
+    cifra: 'text-amber-600 dark:text-amber-300',
+    barra: 'bg-amber-500',
   },
   {
     key: 'porValidar',
     label: 'Por validar',
-    icono: '🔍',
+    Icono: FileSearch,
     ayuda: 'Falta el PDF firmado',
-    clases:
-      'border-l-violet-400 bg-violet-50 dark:border-l-violet-500 dark:bg-violet-950/30 [&_dd]:text-violet-700 dark:[&_dd]:text-violet-200',
-    chip: 'bg-violet-100 text-violet-600 dark:bg-violet-900/60 dark:text-violet-200',
+    color: 'text-violet-500',
+    cifra: 'text-violet-600 dark:text-violet-300',
+    barra: 'bg-violet-500',
   },
   {
     key: 'completadas',
     label: 'Completadas',
-    icono: '✅',
+    Icono: CircleCheckBig,
     ayuda: 'Validadas',
-    clases:
-      'border-l-emerald-400 bg-emerald-50 dark:border-l-emerald-500 dark:bg-emerald-950/30 [&_dd]:text-emerald-700 dark:[&_dd]:text-emerald-200',
-    chip: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/60 dark:text-emerald-200',
+    color: 'text-emerald-500',
+    cifra: 'text-emerald-600 dark:text-emerald-300',
+    barra: 'bg-emerald-500',
   },
 ]
 
-/** Tarjeta grande del resumen: icono, cifra y etiqueta. */
-function TarjetaResumen({ tarjeta, valor }) {
+/**
+ * Tarjeta del resumen: etiqueta, cifra y qué parte del total representa.
+ *
+ * La barra no es decoración: sin ella un «3» no dice si es de tres o de
+ * treinta. Con cero auditorías asignadas se queda a cero en lugar de dividir
+ * por cero.
+ */
+function TarjetaResumen({ tarjeta, valor, total }) {
+  const { Icono } = tarjeta
+  const porcentaje = total > 0 ? Math.round((valor / total) * 100) : 0
+
   return (
     <article
       className={cn(
-        'flex min-h-[168px] flex-col items-center justify-center gap-2 rounded-2xl border border-border border-l-[6px] p-6 text-center shadow-md',
-        'transition-all duration-300 hover:-translate-y-1 hover:shadow-xl',
-        tarjeta.clases
+        'flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm',
+        'transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md'
       )}
     >
-      <span
-        className={cn(
-          'flex h-14 w-14 items-center justify-center rounded-2xl text-3xl',
-          tarjeta.chip
-        )}
-        aria-hidden="true"
-      >
-        {tarjeta.icono}
-      </span>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-semibold uppercase leading-tight tracking-wide text-muted-foreground">
+          {tarjeta.label}
+        </p>
+        <Icono className={cn('h-5 w-5 shrink-0', tarjeta.color)} aria-hidden="true" />
+      </div>
 
-      <dl className="flex flex-col items-center">
-        <dd className="text-5xl font-extrabold leading-none tabular-nums">{valor}</dd>
-        <dt className="mt-2 text-base font-semibold text-foreground">{tarjeta.label}</dt>
+      <dl>
+        <dt className="sr-only">{tarjeta.label}</dt>
+        <dd className={cn('text-4xl font-bold leading-none tabular-nums', tarjeta.cifra)}>
+          {valor}
+        </dd>
       </dl>
 
-      <p className="text-xs text-muted-foreground">{tarjeta.ayuda}</p>
+      <div className="flex items-center gap-2">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+          <div
+            className={cn('h-full rounded-full transition-[width] duration-500', tarjeta.barra)}
+            style={{ width: `${porcentaje}%` }}
+          />
+        </div>
+        <span className="w-9 shrink-0 text-right text-[0.7rem] font-semibold tabular-nums text-muted-foreground">
+          {porcentaje}%
+        </span>
+      </div>
+
+      <p className="text-xs leading-tight text-muted-foreground">{tarjeta.ayuda}</p>
     </article>
   )
 }
@@ -246,9 +269,14 @@ export default function VistaBienvenida({ usuario }) {
         </div>
 
         {!isAdmin && (
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-5">
             {TARJETAS.map((tarjeta) => (
-              <TarjetaResumen key={tarjeta.key} tarjeta={tarjeta} valor={conteos[tarjeta.key]} />
+              <TarjetaResumen
+                key={tarjeta.key}
+                tarjeta={tarjeta}
+                valor={conteos[tarjeta.key]}
+                total={auditorias.length}
+              />
             ))}
           </div>
         )}

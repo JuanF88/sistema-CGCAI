@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { DatePicker } from '@/components/ui/date-picker'
 import { PageHeader } from '@/components/ui/page-header'
-import { StatCard } from '@/components/ui/stat-card'
+import { InfoCard } from '@/components/ui/info-card'
 import DocumentUploadModal from '@/components/ui/DocumentUploadModal'
 import { FormDrawer } from '@/components/ui/form-drawer'
 import {
@@ -716,7 +716,6 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
   return (
     <div className={PAGE_SHELL}>
       <PageHeader
-        icon="📋"
         title="Administrar auditorías"
         subtitle="Gestión y seguimiento del proceso de auditoría"
         actions={
@@ -753,23 +752,26 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon="📊" label="Total auditorías" value={kpis.total} tone="blue" />
-        <StatCard
-          icon="📄"
+        <InfoCard label="Total auditorías" value={kpis.total} tone="blue" />
+        <InfoCard
           label="Planes enviados"
-          value={`${kpis.plan} · ${pct(kpis.plan)}%`}
+          value={kpis.plan}
+          total={kpis.total}
+          percent={pct(kpis.plan)}
           tone="purple"
         />
-        <StatCard
-          icon="✍️"
+        <InfoCard
           label="Informes completos"
-          value={`${kpis.informe} · ${pct(kpis.informe)}%`}
+          value={kpis.informe}
+          total={kpis.total}
+          percent={pct(kpis.informe)}
           tone="green"
         />
-        <StatCard
-          icon="✅"
+        <InfoCard
           label="Validados"
-          value={`${kpis.val} · ${pct(kpis.val)}%`}
+          value={kpis.val}
+          total={kpis.total}
+          percent={pct(kpis.val)}
           tone="indigo"
         />
       </div>

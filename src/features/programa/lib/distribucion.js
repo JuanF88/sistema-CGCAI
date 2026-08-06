@@ -6,10 +6,11 @@
  * demás sale del catálogo (correo y estudios del auditor, gestor de calidad de
  * la dependencia), así que teclearlo solo servía para que discrepara.
  *
- * Una fila por **auditor y dependencia**: en el formato la columna de auditor es
- * una sola persona, de modo que una dependencia con dos auditores ocupa dos
- * filas. Una dependencia sin auditor asignado también sale: es justo la que hay
- * que ver para saber que falta.
+ * Una fila por **auditor y dependencia**. Desde que el cronograma admite un
+ * solo auditor líder por dependencia son la misma cosa, pero el bucle se queda:
+ * los programas guardados antes pueden traer dos nombres y cada uno tiene que
+ * ocupar su fila, que es como lo pide el formato. Una dependencia sin auditor
+ * asignado también sale: es justo la que hay que ver para saber que falta.
  *
  * Lo que el sistema no sabe —coordinador, alterno, facultad, decanatura y
  * decano— se deja vacío. No hay ningún vínculo en la base entre una dependencia

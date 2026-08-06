@@ -72,7 +72,8 @@ Escribe como un auditor con experiencia, no como un corrector de estilo: usa el 
 Recibes además el marco de referencia con el que se juzgan los informes en esta institución. Aplícalo: distingue objetivo de alcance, exige que las conclusiones se apoyen en los hallazgos y respondan al objetivo, y respeta el significado que la institución da a corrección, acción correctiva, monitoreo, seguimiento y evaluación.
 
 Recibes también el formato institucional del informe, con ejemplos reales de informes ya aprobados. Úsalo así:
-- Toda sugerencia que escribas debe estar redactada en ese formato: infinitivos para el objetivo, conclusiones numeradas y en tercera persona. Es lo que el auditor va a pegar en el formulario.
+- La sugerencia de conclusiones va redactada en ese formato: numeradas y en tercera persona. Es lo que el auditor va a pegar en el formulario.
+- Para el objetivo, el formato es el criterio con el que juzgas y lo que citas al orientar —infinitivo, sin numerales, alcance acotado—, no algo que tengas que redactar tú.
 - No copies los ejemplos ni los cites; solo fijan el registro. No inventes cifras, porcentajes ni evidencias que el auditor no haya escrito: si su texto necesita un dato que no está, pide el dato en el comentario y deja un hueco marcado en la sugerencia.
 - El formato por sí solo no cambia el veredicto: unas conclusiones sin numerar pueden estar perfectamente alineadas. Sí lo cambia lo que el formato existe para garantizar; en particular, unas conclusiones que no se pronuncian sobre el logro de los objetivos de la auditoría no responden al objetivo y no pueden ser "alineado".
 - Cuando el veredicto no sea "alineado", el comentario empieza por la razón de fondo. Lo que sea solo de formato va al final y dicho como tal.
@@ -97,7 +98,12 @@ Veredictos:
 - "parcial": es de verdad un objetivo —o unas conclusiones— de auditoría, redactado como tal, pero deja fuera parte del propósito o añade algo ajeno. No uses "parcial" por cortesía ni para suavizar: si el texto no llega a ser un objetivo, es "desalineado".
 - "desalineado": trata de otra cosa, o no es un objetivo ni unas conclusiones.
 
-Sé breve y concreto. El comentario, una o dos frases, dirigido al auditor y en segunda persona. Si el veredicto es "desalineado" porque el campo no está redactado, dilo sin rodeos en vez de comentar la suposición que harías. La sugerencia solo cuando el veredicto no sea "alineado": una reformulación lista para pegar en el campo, en el registro formal institucional. Si el veredicto es "alineado", deja la sugerencia vacía.
+Sé breve y concreto. El comentario, una o dos frases, dirigido al auditor y en segunda persona. Si el veredicto es "desalineado" porque el campo no está redactado, dilo sin rodeos en vez de comentar la suposición que harías.
+
+La sugerencia solo cuando el veredicto no sea "alineado"; si es "alineado", déjala vacía. Y NO es lo mismo según el campo:
+
+- OBJETIVO: no escribas un objetivo. Escribe de dos a cuatro pautas sobre lo que le falta al texto que el auditor ya tiene, una por línea y empezando cada una con "- ". Cada pauta señala algo concreto que añadir, acotar o quitar, y por qué: qué propósito del objetivo general no se reconoce en su texto, qué requisito asignado queda fuera del alcance que declara, qué le falta para ser verificable (proceso, dependencia, periodo, criterio de evaluación), qué sobra por pertenecer al alcance y no al objetivo. Habla de SU texto, no de uno ideal. Nunca entregues una frase que se pueda pegar tal cual en el campo: el objetivo lo redacta el auditor, tú le dices qué tiene que resolver.
+- CONCLUSIONES: sí, una reformulación lista para pegar, numerada y en tercera persona, en el registro formal institucional.
 
 Responde únicamente con un objeto JSON con esta forma exacta:
 {"revisiones":[{"campo":"objetivo","veredicto":"alineado","comentario":"...","sugerencia":""}]}
@@ -250,42 +256,59 @@ export async function revisarAlineacion({
     throw errorDeApi(respuesta.status, cuerpo)
   }
 
+  const tokens = {
+    entrada: cuerpo?.usage?.prompt_tokens ?? 0,
+    salida: cuerpo?.usage?.completion_tokens ?? 0,
+  }
+
+  /**
+   * Los fallos de aquí abajo ya están pagados: el modelo respondió, aunque lo
+   * que devolvió no sirva. Se le cuelgan los tokens al error para que el
+   * registro los contabilice y le descuente cupo a la auditoría; si no, un
+   * bucle de respuestas vacías saldría gratis para el tope y caro para la
+   * cuenta.
+   */
+  const yaPagado = (error) => Object.assign(error, { tokens })
+
   const contenido = cuerpo?.choices?.[0]?.message?.content
 
   if (!contenido) {
     // Pasa cuando el techo de salida se consume sin llegar a escribir nada.
-    throw new DomainError('El modelo no devolvió ninguna revisión. Inténtalo de nuevo.', {
-      status: 502,
-      code: 'IA_VACIO',
-    })
+    throw yaPagado(
+      new DomainError('El modelo no devolvió ninguna revisión. Inténtalo de nuevo.', {
+        status: 502,
+        code: 'IA_VACIO',
+      })
+    )
   }
 
   let crudo
   try {
     crudo = JSON.parse(contenido)
   } catch {
-    throw new DomainError('El modelo devolvió una respuesta que no se pudo leer.', {
-      status: 502,
-      code: 'IA_FORMATO',
-    })
+    throw yaPagado(
+      new DomainError('El modelo devolvió una respuesta que no se pudo leer.', {
+        status: 502,
+        code: 'IA_FORMATO',
+      })
+    )
   }
 
   const validado = respuestaSchema.safeParse(crudo)
   if (!validado.success) {
     console.error('[ia] veredicto con forma inesperada:', contenido)
-    throw new DomainError('El modelo devolvió una revisión con un formato inesperado.', {
-      status: 502,
-      code: 'IA_FORMATO',
-    })
+    throw yaPagado(
+      new DomainError('El modelo devolvió una revisión con un formato inesperado.', {
+        status: 502,
+        code: 'IA_FORMATO',
+      })
+    )
   }
 
   return {
     revisiones: validado.data.revisiones,
     modelo: cuerpo?.model ?? modelo,
     // Se devuelve para poder vigilar el gasto desde el propio sistema.
-    tokens: {
-      entrada: cuerpo?.usage?.prompt_tokens ?? 0,
-      salida: cuerpo?.usage?.completion_tokens ?? 0,
-    },
+    tokens,
   }
 }

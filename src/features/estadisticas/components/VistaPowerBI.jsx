@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Download, Zap } from 'lucide-react'
+import { Download } from 'lucide-react'
 import { saveAs } from 'file-saver'
 import ExcelJS from 'exceljs'
 import { toast } from 'react-toastify'
@@ -310,7 +310,6 @@ export default function VistaPowerBI({ hideMainHeader = false }) {
     <div className={PAGE_SHELL}>
       {!hideMainHeader && (
         <PageHeader
-          icon={<Zap />}
           title="Estadísticas Power BI"
           subtitle="Dashboard interactivo de análisis de auditorías"
         />

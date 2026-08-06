@@ -14,7 +14,15 @@ import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { toast } from 'react-toastify'
 
-import { CODIGO_FORMATO, SEMANAS, TITULO_FORMATO, VERSION_FORMATO, semanasDe } from './formato'
+import {
+  CODIGO_FORMATO,
+  SEMANAS_POR_MES,
+  TITULO_FORMATO,
+  VERSION_FORMATO,
+  mesesDelPrograma,
+  semanasDe,
+  semanasDelPrograma,
+} from './formato'
 
 /* ── Estilos ── */
 
@@ -59,21 +67,124 @@ function escribir(ws, dir, valor, { combinar, etiqueta, titulo, centrar, wrap = 
 
 /* ── Hoja 1: Programa AI Estratégico ── */
 
-const ANCHOS_PROGRAMA = [25, 15, 51, 47, 31, 26, 5, 16, 18, 2, 2, 15, 7, 5]
+/**
+ * Las seis columnas de contenido, A a F: proceso, auditado, auditores y los dos
+ * bloques de requisitos ISO. Los anchos vienen del Excel institucional.
+ */
+const ANCHOS_CONTENIDO = [25, 15, 51, 47, 31, 26]
 
 /**
- * Las cuatro semanas del cronograma, en pares de columnas.
- *
- * Son los mismos rangos del formato original: G:H, I:J, K:L y M:N a la derecha
- * de los requisitos ISO 14001. Los anchos vienen del Excel institucional, por
- * eso las cuatro parejas no miden lo mismo.
+ * Lo que ocupa **un** mes de cronograma: cuatro semanas de dos columnas cada
+ * una. Con un solo mes son las G:H, I:J, K:L y M:N del formato original, con
+ * sus anchos originales —por eso las cuatro parejas no miden lo mismo—; cada
+ * mes de más repite el bloque a la derecha.
  */
-const COLUMNAS_SEMANA = [
-  ['G', 'H'],
-  ['I', 'J'],
-  ['K', 'L'],
-  ['M', 'N'],
-]
+const ANCHOS_MES = [5, 16, 18, 2, 2, 15, 7, 5]
+
+/** Cuántas columnas ocupa una semana. Dos, como en el formato. */
+const COLUMNAS_POR_SEMANA = 2
+
+/**
+ * Alto de la fila de firmas del pie, en puntos.
+ *
+ * Es una fila vacía entre el rótulo (ELABORACIÓN / REVISIÓN / APROBACIÓN) y el
+ * nombre del responsable: el hueco donde se firma cuando el formato se imprime.
+ */
+const ALTO_FIRMAS = 24
+
+/**
+ * El escudo de la Universidad, para la celda LOGO del encabezado.
+ *
+ * Es una copia recortada y reducida de `logo-universidad.png` —el original son
+ * 2048×2048 y medio mega, y se incrusta entero en cada archivo que se exporta—.
+ * Se generó con:
+ *
+ *   sharp('public/logo-universidad.png')
+ *     .trim().resize({ width: 320, height: 320, fit: 'inside' })
+ *     .png({ compressionLevel: 9, palette: true })
+ *     .toFile('public/logo-universidad-excel.png')
+ *
+ * El recorte quita el margen transparente, que es lo que deja la proporción
+ * 208×320 y permite encajarlo en la celda sin aire de sobra alrededor.
+ */
+const RUTA_LOGO = '/logo-universidad-excel.png'
+
+/**
+ * Tamaño y posición del escudo dentro de A1:A2, en píxeles y en fracción de
+ * celda. Mantiene la proporción del recorte (208×320) y queda centrado: la
+ * celda mide unos 180 px de ancho por 107 de alto.
+ */
+const LOGO = {
+  tl: { col: 0.33, row: 0.08 },
+  ext: { width: 62, height: 96 },
+  editAs: 'oneCell',
+}
+
+/**
+ * Descarga el escudo para incrustarlo.
+ *
+ * Devuelve `null` si falla: el programa se exporta igual con la celda rotulada
+ * «LOGO», que es como salía antes. Un archivo sin escudo es mejor que ningún
+ * archivo.
+ */
+async function cargarLogo() {
+  try {
+    const respuesta = await fetch(RUTA_LOGO)
+    if (!respuesta.ok) return null
+    return await respuesta.arrayBuffer()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Índice de columna (1 = A) → letra. Hace falta más allá de la Z: un programa
+ * de tres meses llega a la columna 30, que es «AD».
+ */
+function letraColumna(indice) {
+  let n = indice
+  let letra = ''
+  while (n > 0) {
+    const resto = (n - 1) % 26
+    letra = String.fromCharCode(65 + resto) + letra
+    n = Math.floor((n - 1) / 26)
+  }
+  return letra
+}
+
+/**
+ * La geometría de la hoja, que depende de cuántos meses abarque el programa.
+ *
+ * Todo lo que en el formato llegaba hasta la N —el título, los recursos, la
+ * nomenclatura, el pie— llega hasta `fin`, que se corre a la derecha con cada
+ * mes añadido. Sin meses no hay cuadrícula y la hoja se queda en las catorce
+ * columnas de siempre, para que un programa sin fechas no salga mutilado.
+ */
+function geometria(programa) {
+  const meses = mesesDelPrograma(programa)
+  const semanas = semanasDelPrograma(programa)
+  const mesesDibujados = meses.length || 1
+
+  const anchos = [...ANCHOS_CONTENIDO]
+  for (let i = 0; i < mesesDibujados; i++) anchos.push(...ANCHOS_MES)
+
+  // Cada semana, sus dos columnas: la primera es donde se escribe la «X».
+  const columnasDeSemana = semanas.map((semana, i) => {
+    const primera = ANCHOS_CONTENIDO.length + 1 + i * COLUMNAS_POR_SEMANA
+    return {
+      ...semana,
+      desde: letraColumna(primera),
+      hasta: letraColumna(primera + COLUMNAS_POR_SEMANA - 1),
+    }
+  })
+
+  return {
+    meses,
+    anchos,
+    columnasDeSemana,
+    fin: letraColumna(anchos.length),
+  }
+}
 
 /**
  * Reparte un texto en dos mitades por líneas.
@@ -85,17 +196,21 @@ const COLUMNAS_SEMANA = [
 /**
  * La celda AUDITOR(ES) de una línea del cronograma.
  *
- * El formato no tiene columna para el acompañante —las catorce están
- * repartidas—, pero sí lo nombra en la nomenclatura del pie: «AA: Auditor
- * Acompañante». Así que va en la misma celda, en un segundo renglón y con esa
- * misma marca, en vez de inventar una columna que descuadraría la hoja.
+ * Arriba el líder, que es de quien es la auditoría. Debajo los acompañantes,
+ * uno por renglón y con la marca «AA:» de la nomenclatura del pie: el formato
+ * no tiene columna para ellos —las catorce están repartidas—, así que van en
+ * la misma celda en vez de inventar una columna que descuadraría la hoja.
  */
 function celdaAuditores(dep) {
-  const auditores = String(dep.auditores ?? '').trim()
-  const acompanante = String(dep.auditor_acompanante ?? '').trim()
+  const lider = String(dep.auditores ?? '').trim()
 
-  if (!acompanante) return auditores
-  return auditores ? `${auditores}\nAA: ${acompanante}` : `AA: ${acompanante}`
+  const acompanantes = String(dep.auditor_acompanante ?? '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean)
+    .map((nombre) => `AA: ${nombre}`)
+
+  return [lider, ...acompanantes].filter(Boolean).join('\n')
 }
 
 function partirEnDos(texto) {
@@ -106,17 +221,28 @@ function partirEnDos(texto) {
   return [lineas.slice(0, corte).join('\n'), lineas.slice(corte).join('\n')]
 }
 
-function hojaPrograma(wb, programa) {
+function hojaPrograma(wb, programa, logo) {
   const ws = wb.addWorksheet('Programa AI Estratégico', {
     pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
   })
-  ws.columns = ANCHOS_PROGRAMA.map((width) => ({ width }))
 
-  // Encabezado institucional
-  escribir(ws, 'A1', 'LOGO', { combinar: 'A1:A2', etiqueta: true })
-  escribir(ws, 'B1', TITULO_FORMATO, { combinar: 'B1:N2', titulo: true })
-  ws.getRow(1).height = 22
-  ws.getRow(2).height = 22
+  const { meses, anchos, columnasDeSemana, fin } = geometria(programa)
+  ws.columns = anchos.map((width) => ({ width }))
+
+  // Encabezado institucional.
+  //
+  // Sin escudo la celda se queda rotulada «LOGO» y con el gris de etiqueta, que
+  // es como salía antes; con él va en blanco, porque el gris detrás de un PNG
+  // transparente se ve como una mancha. Los altos son los del formato original
+  // y le dan al escudo sus 107 px de caja.
+  escribir(ws, 'A1', logo ? '' : 'LOGO', { combinar: 'A1:A2', etiqueta: !logo })
+  escribir(ws, 'B1', TITULO_FORMATO, { combinar: `B1:${fin}2`, titulo: true })
+  ws.getRow(1).height = 24
+  ws.getRow(2).height = 56
+
+  if (logo) {
+    ws.addImage(wb.addImage({ buffer: logo, extension: 'png' }), LOGO)
+  }
 
   escribir(ws, 'A3', `Código: ${programa.codigo_formato || CODIGO_FORMATO}`, {
     combinar: 'A3:D3',
@@ -126,23 +252,23 @@ function hojaPrograma(wb, programa) {
     combinar: 'F3:H3',
     etiqueta: true,
   })
-  escribir(ws, 'I3', programa.nombre || '', { combinar: 'I3:N3', etiqueta: true })
+  escribir(ws, 'I3', programa.nombre || '', { combinar: `I3:${fin}3`, etiqueta: true })
 
   // Objetivo
   escribir(ws, 'A4', 'OBJETIVO PROGRAMA', { etiqueta: true })
-  escribir(ws, 'B4', programa.objetivo, { combinar: 'B4:N4' })
+  escribir(ws, 'B4', programa.objetivo, { combinar: `B4:${fin}4` })
   ws.getRow(4).height = 90
 
   // Alcance + recursos
   escribir(ws, 'A5', 'ALCANCE PROGRAMA', { combinar: 'A5:A7', etiqueta: true })
   escribir(ws, 'B5', programa.alcance, { combinar: 'B5:F7' })
-  escribir(ws, 'G5', 'RECURSOS', { combinar: 'G5:N5', etiqueta: true })
+  escribir(ws, 'G5', 'RECURSOS', { combinar: `G5:${fin}5`, etiqueta: true })
   escribir(ws, 'G6', 'Talento Humano', { combinar: 'G6:H6', etiqueta: true })
   escribir(ws, 'I6', 'Financiero', { combinar: 'I6:K6', etiqueta: true })
-  escribir(ws, 'L6', 'Tecnológico', { combinar: 'L6:N6', etiqueta: true })
+  escribir(ws, 'L6', 'Tecnológico', { combinar: `L6:${fin}6`, etiqueta: true })
   escribir(ws, 'G7', programa.recurso_humano, { combinar: 'G7:H7' })
   escribir(ws, 'I7', programa.recurso_financiero, { combinar: 'I7:K7' })
-  escribir(ws, 'L7', programa.recurso_tecnologico, { combinar: 'L7:N7' })
+  escribir(ws, 'L7', programa.recurso_tecnologico, { combinar: `L7:${fin}7` })
   ws.getRow(6).height = 18
   ws.getRow(7).height = 60
 
@@ -150,7 +276,7 @@ function hojaPrograma(wb, programa) {
   const [criteriosIzq, criteriosDer] = partirEnDos(programa.criterios)
   escribir(ws, 'A8', 'CRITERIOS', { etiqueta: true })
   escribir(ws, 'B8', criteriosIzq, { combinar: 'B8:D8' })
-  escribir(ws, 'E8', criteriosDer, { combinar: 'E8:N8' })
+  escribir(ws, 'E8', criteriosDer, { combinar: `E8:${fin}8` })
   ws.getRow(8).height = 120
 
   // Metodología + riesgos / controles / oportunidades
@@ -185,7 +311,7 @@ function hojaPrograma(wb, programa) {
     const f = primera + i
     escribir(ws, `E${f}`, riesgos[i] ?? '', { combinar: `E${f}:F${f}` })
     escribir(ws, `H${f}`, controles[i] ?? '', { combinar: `H${f}:I${f}` })
-    escribir(ws, `L${f}`, oportunidades[i] ?? '', { combinar: `L${f}:N${f}` })
+    escribir(ws, `L${f}`, oportunidades[i] ?? '', { combinar: `L${f}:${fin}${f}` })
     ws.getRow(f).height = 70
   }
 
@@ -201,12 +327,12 @@ function hojaPrograma(wb, programa) {
   )
 
   if (filasCronograma.length) {
-    escribir(ws, `A${fila}`, 'CRONOGRAMA', { combinar: `A${fila}:N${fila}`, etiqueta: true })
+    escribir(ws, `A${fila}`, 'CRONOGRAMA', { combinar: `A${fila}:${fin}${fila}`, etiqueta: true })
     fila++
 
     // Encabezado a dos alturas, como el formato: las cinco columnas de datos
-    // ocupan las dos filas, y bajo el rótulo del mes se abre la cuadrícula de
-    // semanas.
+    // ocupan las dos filas, y bajo el rótulo de cada mes se abre su cuadrícula
+    // de semanas.
     const alto = fila
     const bajo = fila + 1
 
@@ -225,17 +351,35 @@ function hojaPrograma(wb, programa) {
       etiqueta: true,
     })
 
-    escribir(ws, `G${alto}`, `MES DE AUDITORIA: ${programa.mes_auditoria || ''}`.trim(), {
-      combinar: `G${alto}:N${alto}`,
-      etiqueta: true,
-    })
+    if (columnasDeSemana.length) {
+      // Un rótulo por mes sobre sus cuatro semanas. Con un mes solo se conserva
+      // el texto del formato original; con varios, cada bloque lleva su nombre,
+      // porque el «MES DE AUDITORIA:» delante de cada uno no cabría.
+      meses.forEach((mes, i) => {
+        const delMes = columnasDeSemana.slice(i * SEMANAS_POR_MES, (i + 1) * SEMANAS_POR_MES)
+        if (!delMes.length) return
 
-    COLUMNAS_SEMANA.forEach(([desde, hasta], i) => {
-      escribir(ws, `${desde}${bajo}`, `Semana ${SEMANAS[i]}`, {
-        combinar: `${desde}${bajo}:${hasta}${bajo}`,
+        const rotulo = meses.length === 1 ? `MES DE AUDITORIA: ${mes}` : mes
+        escribir(ws, `${delMes[0].desde}${alto}`, rotulo, {
+          combinar: `${delMes[0].desde}${alto}:${delMes[delMes.length - 1].hasta}${alto}`,
+          etiqueta: true,
+        })
+      })
+
+      columnasDeSemana.forEach(({ desde, hasta, numero }) => {
+        escribir(ws, `${desde}${bajo}`, `Semana ${numero}`, {
+          combinar: `${desde}${bajo}:${hasta}${bajo}`,
+          etiqueta: true,
+        })
+      })
+    } else {
+      // Un programa sin meses: el bloque se deja rotulado y vacío, en vez de un
+      // hueco sin bordes al final de cada fila.
+      escribir(ws, `G${alto}`, 'MES DE AUDITORIA', {
+        combinar: `G${alto}:${fin}${bajo}`,
         etiqueta: true,
       })
-    })
+    }
 
     ws.getRow(alto).height = 30
     ws.getRow(bajo).height = 18
@@ -263,8 +407,8 @@ function hojaPrograma(wb, programa) {
       })
 
       const marcadas = semanasDe(seccion.semanas)
-      COLUMNAS_SEMANA.forEach(([desde, hasta], i) => {
-        escribir(ws, `${desde}${primeraFila}`, marcadas.has(SEMANAS[i]) ? 'X' : '', {
+      columnasDeSemana.forEach(({ desde, hasta, id }) => {
+        escribir(ws, `${desde}${primeraFila}`, marcadas.has(id) ? 'X' : '', {
           combinar: `${desde}${primeraFila}:${hasta}${ultimaFila}`,
           centrar: 'center',
         })
@@ -274,9 +418,10 @@ function hojaPrograma(wb, programa) {
         escribir(ws, `C${fila}`, dep.auditado)
         escribir(ws, `D${fila}`, celdaAuditores(dep))
 
-        // Con acompañante la celda ocupa dos renglones y, con el alto fijo, el
-        // segundo se quedaba cortado.
-        ws.getRow(fila).height = dep.auditor_acompanante ? 44 : 30
+        // La celda crece con cada acompañante; con el alto fijo, del segundo
+        // renglón en adelante se quedaba cortado.
+        const renglones = celdaAuditores(dep).split('\n').length
+        ws.getRow(fila).height = renglones > 1 ? 16 + 14 * renglones : 30
         fila++
       }
     }
@@ -284,38 +429,46 @@ function hojaPrograma(wb, programa) {
 
   // Pie
   escribir(ws, `A${fila}`, 'NOMENCLATURA', { combinar: `A${fila}:B${fila}`, etiqueta: true })
-  escribir(ws, `C${fila}`, programa.nomenclatura, { combinar: `C${fila}:N${fila}` })
+  escribir(ws, `C${fila}`, programa.nomenclatura, { combinar: `C${fila}:${fin}${fila}` })
   fila++
 
   escribir(ws, `A${fila}`, 'OBSERVACIONES', { combinar: `A${fila}:B${fila}`, etiqueta: true })
-  escribir(ws, `C${fila}`, programa.observaciones, { combinar: `C${fila}:N${fila}` })
+  escribir(ws, `C${fila}`, programa.observaciones, { combinar: `C${fila}:${fin}${fila}` })
   ws.getRow(fila).height = 40
   fila++
 
   escribir(ws, `A${fila}`, 'ELABORACIÓN', { combinar: `A${fila}:D${fila}`, etiqueta: true })
   escribir(ws, `E${fila}`, 'REVISIÓN', { combinar: `E${fila}:G${fila}`, etiqueta: true })
-  escribir(ws, `H${fila}`, 'APROBACIÓN', { combinar: `H${fila}:N${fila}`, etiqueta: true })
+  escribir(ws, `H${fila}`, 'APROBACIÓN', { combinar: `H${fila}:${fin}${fila}`, etiqueta: true })
+  fila++
+
+  // Espacio de firmas: una fila vacía entre el rótulo y el nombre del
+  // responsable, para firmar encima del nombre como en el formato impreso.
+  escribir(ws, `A${fila}`, '', { combinar: `A${fila}:D${fila}` })
+  escribir(ws, `E${fila}`, '', { combinar: `E${fila}:G${fila}` })
+  escribir(ws, `H${fila}`, '', { combinar: `H${fila}:${fin}${fila}` })
+  ws.getRow(fila).height = ALTO_FIRMAS
   fila++
 
   escribir(ws, `A${fila}`, 'Funcionarios Responsables:', { combinar: `A${fila}:B${fila}` })
   escribir(ws, `C${fila}`, programa.elaborado_por, { combinar: `C${fila}:D${fila}` })
   escribir(ws, `E${fila}`, programa.revisado_por, { combinar: `E${fila}:G${fila}` })
-  escribir(ws, `H${fila}`, programa.aprobado_por, { combinar: `H${fila}:N${fila}` })
+  escribir(ws, `H${fila}`, programa.aprobado_por, { combinar: `H${fila}:${fin}${fila}` })
   fila++
 
+  // Solo elaboración lleva el rótulo «Cargo:». Revisión y aprobación imprimen
+  // lo que se haya escrito, tal cual, o nada.
   escribir(ws, `A${fila}`, `Cargo: ${programa.elaborado_cargo || ''}`, {
     combinar: `A${fila}:D${fila}`,
   })
-  escribir(ws, `E${fila}`, `Cargo: ${programa.revisado_cargo || ''}`, {
-    combinar: `E${fila}:G${fila}`,
-  })
-  escribir(ws, `H${fila}`, programa.aprobado_cargo, { combinar: `H${fila}:N${fila}` })
+  escribir(ws, `E${fila}`, programa.revisado_cargo, { combinar: `E${fila}:G${fila}` })
+  escribir(ws, `H${fila}`, programa.aprobado_cargo, { combinar: `H${fila}:${fin}${fila}` })
   fila++
 
   escribir(ws, `A${fila}`, '', { combinar: `A${fila}:D${fila}` })
   escribir(ws, `E${fila}`, '', { combinar: `E${fila}:G${fila}` })
   escribir(ws, `H${fila}`, `FECHA: ${programa.fecha_aprobacion || ''}`, {
-    combinar: `H${fila}:N${fila}`,
+    combinar: `H${fila}:${fin}${fila}`,
     etiqueta: true,
   })
 
@@ -400,15 +553,18 @@ const nombreArchivo = (programa) =>
 /**
  * Arma el libro, sin descargarlo.
  *
- * Separado de la descarga para poder comprobarlo fuera del navegador.
+ * Separado de la descarga para poder comprobarlo fuera del navegador; el
+ * escudo entra como parámetro por lo mismo, para no depender de `fetch`.
+ *
  * @param {Object} programa Cabecera con `cronograma` y `distribucion`
+ * @param {ArrayBuffer|null} [logo] Escudo institucional ya descargado
  */
-export function construirLibroPrograma(programa) {
+export function construirLibroPrograma(programa, logo = null) {
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Sistema CGCAI'
   wb.created = new Date()
 
-  hojaPrograma(wb, programa)
+  hojaPrograma(wb, programa, logo)
 
   // La distribución es opcional: sin asignaciones se omite la hoja entera. Una
   // hoja con solo los encabezados y ninguna fila, en un archivo que se entrega,
@@ -424,7 +580,8 @@ export function construirLibroPrograma(programa) {
  */
 export async function exportarProgramaExcel(programa) {
   try {
-    const buffer = await construirLibroPrograma(programa).xlsx.writeBuffer()
+    const libro = construirLibroPrograma(programa, await cargarLogo())
+    const buffer = await libro.xlsx.writeBuffer()
     saveAs(
       new Blob([buffer], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

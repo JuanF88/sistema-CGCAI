@@ -117,7 +117,7 @@ export const GET = withRoute(async (request) => {
 
   const { data, error } = await guard.admin
     .from('programas_auditoria')
-    .select('id, anio, nombre, estado, mes_auditoria, updated_at')
+    .select('id, anio, nombre, estado, mes_inicio, mes_fin, updated_at')
     .order('anio', { ascending: false })
     .order('nombre', { ascending: true })
 

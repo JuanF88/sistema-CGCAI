@@ -43,6 +43,26 @@ const schema = z.object({
   // el saldo. Solo se usa desde la ruta del servidor.
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().optional(),
+
+  // Facturación de OpenAI (todo opcional: sin esto el panel de uso enseña
+  // tokens y nada más, que es lo que ya sabe por sí mismo).
+  //
+  // `OPENAI_ADMIN_KEY` es una clave de organización (`sk-admin-…`), distinta de
+  // la de uso: la crea un propietario de la cuenta y sirve para leer el gasto
+  // real facturado. Es MÁS PODEROSA que la normal, así que se declara aparte y
+  // se usa solo en la ruta de administración. Si no está, no pasa nada.
+  OPENAI_ADMIN_KEY: z.string().optional(),
+
+  // Precio del modelo en dólares por millón de tokens, para estimar el coste
+  // sin llamar a nadie. No traen valor por defecto a propósito: un precio
+  // inventado en un panel de gasto es peor que no tener precio. Se copian de
+  // la página de precios de OpenAI para el modelo que esté en OPENAI_MODEL.
+  OPENAI_PRECIO_ENTRADA_USD: z.coerce.number().nonnegative().optional(),
+  OPENAI_PRECIO_SALIDA_USD: z.coerce.number().nonnegative().optional(),
+
+  // Presupuesto de la IA en dólares. El panel no enseña cuánto se ha gastado
+  // en dinero, sino qué parte de esto se lleva consumido.
+  OPENAI_PRESUPUESTO_USD: z.coerce.number().positive().optional(),
 })
 
 let cached = null
@@ -70,6 +90,10 @@ export function getServerEnv() {
     ALERTAS_CRON_SECRET: process.env.ALERTAS_CRON_SECRET,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     OPENAI_MODEL: process.env.OPENAI_MODEL,
+    OPENAI_ADMIN_KEY: process.env.OPENAI_ADMIN_KEY,
+    OPENAI_PRECIO_ENTRADA_USD: process.env.OPENAI_PRECIO_ENTRADA_USD,
+    OPENAI_PRECIO_SALIDA_USD: process.env.OPENAI_PRECIO_SALIDA_USD,
+    OPENAI_PRESUPUESTO_USD: process.env.OPENAI_PRESUPUESTO_USD,
   })
 
   if (!result.success) {

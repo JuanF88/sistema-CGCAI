@@ -53,7 +53,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { SearchInput } from '@/components/ui/search-input'
 import { PageHeader } from '@/components/ui/page-header'
-import { StatCard } from '@/components/ui/stat-card'
+import { InfoCard } from '@/components/ui/info-card'
 import { ViewToggle } from '@/components/ui/view-toggle'
 import { ExportableChartCard } from '@/components/ui/chart-card'
 import {
@@ -486,7 +486,6 @@ export default function VistaEstadisticas({ headerExtra = null, hideMainHeader =
     <div className={PAGE_SHELL}>
       {!hideMainHeader && (
         <PageHeader
-          icon="📈"
           title="Estadísticas avanzadas"
           subtitle="Panel interactivo de análisis con visualizaciones personalizables"
           actions={
@@ -615,11 +614,11 @@ export default function VistaEstadisticas({ headerExtra = null, hideMainHeader =
 
       {/* ── KPIs ── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard icon="📊" label="Total hallazgos" value={totalHallazgos} tone="indigo" />
-        <StatCard icon="✅" label="Fortalezas" value={totalFortalezas} tone="green" />
-        <StatCard icon="⚠️" label="Oportunidades" value={totalOportunidades} tone="pink" />
-        <StatCard icon="❌" label="No conformidades" value={totalNoConformidades} tone="purple" />
-        <StatCard icon="🏢" label="Dependencias" value={dependenciasFiltradas.length} tone="gray" />
+        <InfoCard label="Total hallazgos" value={totalHallazgos} tone="indigo" />
+        <InfoCard label="Fortalezas" value={totalFortalezas} tone="green" />
+        <InfoCard label="Oportunidades" value={totalOportunidades} tone="pink" />
+        <InfoCard label="No conformidades" value={totalNoConformidades} tone="purple" />
+        <InfoCard label="Dependencias" value={dependenciasFiltradas.length} tone="gray" />
       </div>
 
       {/* ── Resumen ── */}

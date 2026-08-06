@@ -340,7 +340,6 @@ export default function AuditoriasTimeline({ usuario }) {
   return (
     <div className={PAGE_SHELL}>
       <PageHeader
-        icon="📅"
         title="Timeline de auditorías"
         subtitle="Seguimiento detallado de etapas y plazos de cada auditoría"
         actions={

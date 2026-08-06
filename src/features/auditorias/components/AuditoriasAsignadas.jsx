@@ -12,14 +12,15 @@ import { Button } from '@/components/ui/button'
 import DocumentUploadModal from '@/components/ui/DocumentUploadModal'
 import { FormDrawer } from '@/components/ui/form-drawer'
 import { PageHeader } from '@/components/ui/page-header'
-import { StatCard } from '@/components/ui/stat-card'
+import { InfoCard } from '@/components/ui/info-card'
 import {
   EMPTY_STATE,
   PAGE_SHELL,
   SECTION_CARD,
   STATUS_BADGE_TONES,
 } from '@/components/ui/tokens'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+import { Cargando } from '@/components/ui/loader'
 
 export default function AuditoriasAsignadas({ usuario, reset }) {
   const router = useRouter() // 👈 NUEVO
@@ -499,7 +500,7 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
   // 🚪 Gate de render cuando venimos con ?informeId=...
   if (directId) {
     if (loadingDirect) {
-      return <p className="p-6 text-sm text-muted-foreground">Cargando formulario…</p>
+      return <Cargando mensaje="Cargando formulario…" />
     }
 
     // Antes esto era un `if` vacío: si el id no existía o no era del usuario,
@@ -529,16 +530,15 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
   return (
     <div className={PAGE_SHELL}>
       <PageHeader
-        icon="📋"
         title="Auditorías Internas"
         subtitle="Gestiona y realiza el seguimiento de tus auditorías asignadas"
       />
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard icon="📋" tone="orange" label="Pendientes" value={pendientes} />
-        <StatCard icon="🛠️" tone="blue" label="En proceso" value={agrupadas.enProceso.length} />
-        <StatCard icon="📥" tone="purple" label="Por validar" value={agrupadas.porValidar.length} />
-        <StatCard icon="✅" tone="green" label="Completadas" value={agrupadas.completadas.length} />
+        <InfoCard tone="orange" label="Pendientes" value={pendientes} />
+        <InfoCard tone="blue" label="En proceso" value={agrupadas.enProceso.length} />
+        <InfoCard tone="purple" label="Por validar" value={agrupadas.porValidar.length} />
+        <InfoCard tone="green" label="Completadas" value={agrupadas.completadas.length} />
       </section>
 
       <div className="grid gap-4 xl:grid-cols-2">

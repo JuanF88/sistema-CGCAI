@@ -7,6 +7,7 @@
  * en las etiquetas de la parte de abajo, que llegan por `badges`.
  */
 import { cn } from '@/lib/utils'
+import { Cargando } from '@/components/ui/loader'
 import { EMPTY_STATE, SECTION_CARD, STATUS_BADGE_TONES } from '@/components/ui/tokens'
 import { fmt, parseYMD } from '@/features/auditorias/hooks/useAuditTimeline'
 
@@ -49,7 +50,7 @@ export function ListaAuditorias({
         {titulo}
       </h2>
 
-      {loading && <p className="py-6 text-center text-sm text-muted-foreground">Cargando…</p>}
+      {loading && <Cargando mensaje="Cargando auditorías…" className="min-h-0 py-6" />}
 
       {error && (
         <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">

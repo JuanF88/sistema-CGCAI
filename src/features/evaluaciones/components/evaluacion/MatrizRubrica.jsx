@@ -17,7 +17,8 @@ import {
   notaDeCalificaciones,
 } from '@/features/evaluaciones/lib/rubrica'
 
-import { InfoBox } from './InfoBox'
+import { InfoBox } from './InfoBox'
+import { Cargando } from '@/components/ui/loader'
 
 /** Guía de niveles del criterio bajo el cursor, anclada junto a la celda. */
 function GuiaCriterio({ tooltip }) {
@@ -94,7 +95,9 @@ export function MatrizRubrica({
       </InfoBox>
 
       {loading ? (
-        <p className={cn(SECTION_CARD, EMPTY_STATE)}>Cargando evaluaciones…</p>
+        <div className={SECTION_CARD}>
+        <Cargando mensaje="Cargando evaluaciones…" />
+      </div>
       ) : vacio ? (
         <p className={cn(SECTION_CARD, EMPTY_STATE)}>
           No hay evaluaciones registradas para este periodo. Se crean automáticamente al importar

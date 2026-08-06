@@ -10,12 +10,19 @@
  * gastar el saldo de la cuenta.
  *
  * `requireAuth` y no `requireRole`: quien rellena el informe es el auditor.
+ *
+ * Cada pulsación queda registrada en `ia_revisiones` y cada auditoría tiene un
+ * tope de diez. Ni el contador ni lo que queda se le enseñan al auditor: no es
+ * una cuota que deba administrar mientras escribe, es un tope de gasto. Solo
+ * se entera si lo agota, y entonces el mensaje lo dice claro.
  */
 import { requireAuth } from '@/lib/api/guard'
 import { withRoute } from '@/lib/api/handler'
+import { DomainError } from '@/lib/api/errors'
 import { json } from '@/lib/api/response'
 import { contextoNormativo } from '@/lib/catalogos/iso'
 import { revisarAlineacion } from '@/lib/ia/alineacion'
+import { LIMITE_REVISIONES_IA, registrarRevision, revisionesUsadas } from '@/lib/ia/registro'
 import { revisarAlineacionSchema } from '@/features/auditorias/dto/alineacion-dto'
 
 /** Sin tildes ni mayúsculas: el cronograma se escribe a mano. */
@@ -79,14 +86,53 @@ export const POST = withRoute(async (request) => {
 
   const dto = revisarAlineacionSchema.parse(await request.json())
 
+  const comun = { informeId: dto.informe_id, usuarioId: guard.usuario?.usuario_id }
+
+  // Se comprueba y luego se llama, sin bloqueo de por medio: dos clics
+  // simultáneos podrían colarse por el hueco. No merece una transacción —el
+  // botón se deshabilita mientras revisa y el tope es un presupuesto, no una
+  // norma— y el registro deja constancia de las dos igualmente.
+  if ((await revisionesUsadas(guard.admin, dto.informe_id)) >= LIMITE_REVISIONES_IA) {
+    await registrarRevision(guard.admin, { ...comun, estado: 'bloqueada' })
+
+    throw new DomainError(
+      `Esta auditoría ya agotó las ${LIMITE_REVISIONES_IA} revisiones con IA disponibles.`,
+      { status: 429, code: 'IA_CUPO' }
+    )
+  }
+
   const requisitos = await requisitosDeLaAuditoria(guard.admin, dto.informe_id)
+  const inicio = Date.now()
 
-  const resultado = await revisarAlineacion({
-    objetivoPrograma: dto.objetivo_programa,
-    objetivo: dto.objetivo,
-    conclusiones: dto.conclusiones,
-    requisitos,
-  })
+  try {
+    const resultado = await revisarAlineacion({
+      objetivoPrograma: dto.objetivo_programa,
+      objetivo: dto.objetivo,
+      conclusiones: dto.conclusiones,
+      requisitos,
+    })
 
-  return json(resultado)
+    await registrarRevision(guard.admin, {
+      ...comun,
+      estado: 'ok',
+      modelo: resultado.modelo,
+      tokens: resultado.tokens,
+      duracionMs: Date.now() - inicio,
+      veredictos: resultado.revisiones,
+    })
+
+    return json(resultado)
+  } catch (error) {
+    // `error.tokens` lo pone la librería cuando el modelo llegó a responder:
+    // eso ya está pagado y sí descuenta cupo. Una clave mal puesta no.
+    await registrarRevision(guard.admin, {
+      ...comun,
+      estado: 'error',
+      codigoError: error?.code ?? null,
+      tokens: error?.tokens,
+      duracionMs: Date.now() - inicio,
+    })
+
+    throw error
+  }
 })

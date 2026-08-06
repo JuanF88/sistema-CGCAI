@@ -41,7 +41,6 @@ export default function CajaHerramientas() {
   return (
     <div className={`${PAGE_SHELL}`}>
       <PageHeader
-        icon="🧰"
         title="Caja de Herramientas"
         subtitle="Accede a recursos y documentación para tu trabajo"
       />

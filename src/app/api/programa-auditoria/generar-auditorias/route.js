@@ -5,10 +5,11 @@
  * cronograma, y las deja marcadas con `programa_auditoria_id` para saber de
  * dónde vienen.
  *
- * No manda correos. `POST /api/informes` avisa al auditor de cada asignación,
- * pero aquí se crean muchas de golpe y treinta correos disparados por un clic no
- * es algo que deba pasar sin que nadie lo haya pedido. Las auditorías quedan
- * visibles en «Administrar auditorías» para avisar cuando se decida.
+ * Avisa a cada auditor, igual que `POST /api/informes` al crear una a mano.
+ * La diferencia es que aquí salen muchas de un clic, así que el envío va
+ * detrás de un interruptor —`NOTIFICAR_GENERACION_AUDITORIAS`— y por defecto
+ * está apagado: se resuelve a quién se avisaría y se devuelve la lista, sin
+ * mandar nada. Ver `avisos-generacion.js`.
  */
 import { requireRole } from '@/lib/api/guard'
 import { withRoute } from '@/lib/api/handler'
@@ -17,6 +18,10 @@ import { json } from '@/lib/api/response'
 import { ROLES } from '@/lib/auth/roles'
 import { programaIdSchema } from '@/features/programa/dto/programa-dto'
 import { planDeGeneracion } from '@/features/programa/lib/generar-auditorias'
+import {
+  avisarAsignaciones,
+  destinatariosDeLote,
+} from '@/features/programa/lib/avisos-generacion'
 
 /** Sin tildes ni mayúsculas, para casar nombres escritos a mano. */
 const normalizar = (texto) =>
@@ -49,7 +54,7 @@ export const POST = withRoute(async (request) => {
     .from('programas_auditoria')
     .select(
       `
-        id, anio, nombre, estado, mes_auditoria,
+        id, anio, nombre, estado, mes_inicio, mes_fin,
         cronograma:programa_auditoria_cronograma (
           orden,
           proceso,
@@ -73,7 +78,10 @@ export const POST = withRoute(async (request) => {
 
   const [dependencias, usuarios, existentes] = await Promise.all([
     db.from('dependencias').select('dependencia_id, nombre'),
-    db.from('usuarios').select('usuario_id, nombre, apellido').eq('estado', 'activo'),
+    // `email` y `estado` son para el aviso: sin ellos no se sabe a quién se
+    // puede escribir. El filtro de activos ya estaba; el estado se pide igual
+    // para que el aviso pueda decir por qué se saltó a alguien.
+    db.from('usuarios').select('usuario_id, nombre, apellido, email, estado').eq('estado', 'activo'),
     db.from('informes_auditoria').select('dependencia_id').eq('programa_auditoria_id', id),
   ])
 
@@ -106,5 +114,15 @@ export const POST = withRoute(async (request) => {
     creadas = data?.length ?? 0
   }
 
-  return json({ creadas, yaCreadas, fecha, problemas })
+  // Los avisos van después del insert y no antes: si el insert falla no se ha
+  // avisado de nada, y si el correo falla las auditorías siguen creadas.
+  const avisos = await avisarAsignaciones(
+    destinatariosDeLote(
+      filas,
+      new Map((usuarios.data ?? []).map((u) => [u.usuario_id, u])),
+      new Map((dependencias.data ?? []).map((d) => [d.dependencia_id, d]))
+    )
+  )
+
+  return json({ creadas, yaCreadas, fecha, problemas, avisos })
 })

@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'react-toastify'
-import { Building2, Edit2, Plus, Trash2 } from 'lucide-react'
+import { Edit2, Plus, Trash2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Field, FieldGrid } from '@/components/ui/field'
@@ -45,7 +45,7 @@ import {
 import { DataTablePagination } from '@/components/ui/data-table-pagination'
 import { usePagination } from '@/components/ui/use-pagination'
 import { PageHeader } from '@/components/ui/page-header'
-import { StatCard } from '@/components/ui/stat-card'
+import { InfoCard } from '@/components/ui/info-card'
 import {
   PAGE_SHELL,
   STATUS_BADGE_TONES,
@@ -64,13 +64,24 @@ import {
 // La columna se llama `gestion` y sus valores no cambian; en pantalla son
 // «procesos», con el nombre que les da el formato de auditoría. La lista es
 // compartida con el cronograma del programa, que tiene una sección por proceso.
-import { PROCESOS, procesoDe } from '@/lib/catalogos/procesos'
+import { PROCESOS, procesoDe } from '@/lib/catalogos/procesos'
+import { Spinner } from '@/components/ui/loader'
 
 const FORM_INICIAL = { dependencia_id: null, nombre: '', gestion: 'otras' }
 
 /** Sin acentos y en minúsculas, para buscar y ordenar de forma estable. */
 const normalize = (s) =>
   (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+
+/** El aro pequeño y su texto, para la fila de una tabla que está cargando. */
+function FilaCargando({ texto }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Spinner size="sm" />
+      {texto}
+    </span>
+  )
+}
 
 export default function VistaAdministrarDependencias({ headerActions = null }) {
   const [dependencias, setDependencias] = useState([])
@@ -192,7 +203,6 @@ export default function VistaAdministrarDependencias({ headerActions = null }) {
   return (
     <div className={PAGE_SHELL}>
       <PageHeader
-        icon={<Building2 />}
         title="Administrar Dependencias"
         subtitle="Dependencias y el proceso institucional al que pertenece cada una"
         actions={
@@ -209,13 +219,14 @@ export default function VistaAdministrarDependencias({ headerActions = null }) {
         }
       />
 
-      {/* KPIs por proceso */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
-        <StatCard icon="🏢" tone="blue" label="Total" value={stats.total} />
+      {/* KPIs por proceso.
+          Ocho columnas solo a partir de 2xl (1536 px): en xl (1280) quedaban a
+          127 px y los nombres de proceso no cabían. */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8">
+        <InfoCard tone="blue" label="Total" value={stats.total} />
         {PROCESOS.map((g) => (
-          <StatCard
-            key={g.value}
-            icon={g.emoji}
+          <InfoCard
+            key={g.value}
             tone={g.tono}
             label={g.corto}
             value={stats.porGestion[g.value] ?? 0}
@@ -247,7 +258,9 @@ export default function VistaAdministrarDependencias({ headerActions = null }) {
           </TableHeader>
 
           <TableBody>
-            {cargando && <TableEmpty colSpan={4}>Cargando dependencias…</TableEmpty>}
+            {cargando && <TableEmpty colSpan={4}>
+              <FilaCargando texto="Cargando dependencias…" />
+            </TableEmpty>}
 
             {!cargando && paginacion.total === 0 && (
               <TableEmpty colSpan={4}>

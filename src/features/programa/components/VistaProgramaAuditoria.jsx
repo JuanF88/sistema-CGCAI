@@ -6,7 +6,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'react-toastify'
 import {
-  CalendarRange,
   CheckCircle2,
   Download,
   Edit2,
@@ -20,7 +19,7 @@ import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/ui/page-header'
-import { StatCard } from '@/components/ui/stat-card'
+import { InfoCard } from '@/components/ui/info-card'
 import { SearchInput } from '@/components/ui/search-input'
 import {
   Dialog,
@@ -61,14 +60,79 @@ import {
   listarProgramas,
   obtenerPrograma,
 } from '@/features/programa/api/programa-api'
-import { exportarProgramaExcel } from '@/features/programa/lib/exportar-programa'
+import { exportarProgramaExcel } from '@/features/programa/lib/exportar-programa'
+import { rangoDeMeses } from '@/features/programa/lib/formato'
 import { useAnioInicial } from '@/hooks/useAnioInicial'
-import { ProgramaDrawer } from './ProgramaDrawer'
+import { ProgramaDrawer } from './ProgramaDrawer'
+import { Spinner } from '@/components/ui/loader'
 
 const TONO_ESTADO = {
   borrador: 'neutral',
   aprobado: 'success',
   archivado: 'warning',
+}
+
+/**
+ * Qué pasó con los avisos a los auditores.
+ *
+ * El modo importa y se dice sin rodeos: en «simulado» NO se ha escrito a
+ * nadie, y quien acaba de generar veinte auditorías tiene que saberlo antes de
+ * dar por hecho que su equipo está avisado.
+ */
+function ResumenAvisos({ avisos }) {
+  if (!avisos.total && !avisos.sinCorreo?.length) return null
+
+  const simulado = avisos.modo !== 'enviado'
+
+  return (
+    <div
+      className={cn(
+        'space-y-1.5 rounded-xl border p-3',
+        simulado ? 'border-warning/40 bg-warning/10' : 'border-border bg-background'
+      )}
+    >
+      {avisos.modo === 'enviado' && (
+        <p>
+          Se avisó por correo a{' '}
+          <span className="font-medium text-foreground">{avisos.enviados}</span> auditor
+          {avisos.enviados === 1 ? '' : 'es'}
+          {avisos.fallidos > 0 && `; ${avisos.fallidos} no se pudieron enviar`}.
+        </p>
+      )}
+
+      {avisos.modo === 'simulado' && (
+        <p>
+          <span className="font-medium text-foreground">No se envió ningún correo.</span> Se avisaría
+          a {avisos.total} auditor{avisos.total === 1 ? '' : 'es'} cuando se active el envío
+          (NOTIFICAR_GENERACION_AUDITORIAS).
+        </p>
+      )}
+
+      {avisos.modo === 'sin-configurar' && (
+        <p>
+          <span className="font-medium text-foreground">No se envió ningún correo:</span> el envío
+          está activado pero faltan los datos del servidor de correo.
+        </p>
+      )}
+
+      {avisos.sinCorreo?.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Sin aviso posible ({avisos.sinCorreo.length}): {avisos.sinCorreo.join(', ')}. El auditor no
+          tiene correo o no está activo.
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** El aro pequeño y su texto, para la fila de una tabla que está cargando. */
+function FilaCargando({ texto }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Spinner size="sm" />
+      {texto}
+    </span>
+  )
 }
 
 export default function VistaProgramaAuditoria({ soloLectura = false }) {
@@ -122,21 +186,22 @@ export default function VistaProgramaAuditoria({ soloLectura = false }) {
       return (
         p.nombre?.toLowerCase().includes(q) ||
         String(p.anio).includes(q) ||
-        p.mes_auditoria?.toLowerCase().includes(q)
+        rangoDeMeses(p).toLowerCase().includes(q)
       )
     })
   }, [programas, busqueda, filtroAnio])
 
   // Sobre `filtrados`: las tarjetas resumen lo que se está viendo, no todo lo
   // que hay cargado.
-  const stats = useMemo(
-    () => ({
-      total: filtrados.length,
-      aprobados: filtrados.filter((p) => p.estado === 'aprobado').length,
-      borradores: filtrados.filter((p) => p.estado === 'borrador').length,
-    }),
-    [filtrados]
-  )
+  const stats = useMemo(() => {
+    const total = filtrados.length
+    const aprobados = filtrados.filter((p) => p.estado === 'aprobado').length
+    const borradores = filtrados.filter((p) => p.estado === 'borrador').length
+    // Sobre el total visible, no sobre lo cargado: si no hay nada, 0 y no NaN.
+    const parte = (n) => (total ? Math.round((n / total) * 100) : 0)
+
+    return { total, aprobados, borradores, pctAprobados: parte(aprobados), pctBorradores: parte(borradores) }
+  }, [filtrados])
 
   /* ── Acciones ── */
 
@@ -257,9 +322,8 @@ export default function VistaProgramaAuditoria({ soloLectura = false }) {
   return (
     <div className={PAGE_SHELL}>
       <PageHeader
-        icon={<CalendarRange />}
         title="Programa de Auditoría"
-        subtitle="Formato PE-GS-2.2.1-FOR-7 · planificación anual de las auditorías internas"
+        subtitle="Planificación anual de las auditorías internas: alcance, cronograma y equipo auditor"
         actions={
           !soloLectura && (
             <Button
@@ -274,9 +338,26 @@ export default function VistaProgramaAuditoria({ soloLectura = false }) {
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard icon="📅" label="Programas" value={stats.total} tone="blue" />
-        <StatCard icon="✅" label="Aprobados" value={stats.aprobados} tone="green" />
-        <StatCard icon="📝" label="Borradores" value={stats.borradores} tone="gray" />
+        <InfoCard
+          label="Programas"
+          value={stats.total}
+          hint={filtroAnio === 'todos' ? 'Todos los años' : `Año ${filtroAnio}`}
+          tone="blue"
+        />
+        <InfoCard
+          label="Aprobados"
+          value={stats.aprobados}
+          total={stats.total}
+          percent={stats.pctAprobados}
+          tone="green"
+        />
+        <InfoCard
+          label="Borradores"
+          value={stats.borradores}
+          total={stats.total}
+          percent={stats.pctBorradores}
+          tone="gray"
+        />
       </div>
 
       <section className={TABLE_CONTAINER}>
@@ -311,14 +392,16 @@ export default function VistaProgramaAuditoria({ soloLectura = false }) {
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-20">Año</TableHead>
               <TableHead>Nombre</TableHead>
-              <TableHead className="w-40">Mes</TableHead>
+              <TableHead className="w-52">Meses</TableHead>
               <TableHead className="w-32">Estado</TableHead>
               <TableHead className="w-72 text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
 
           <TableBody>
-            {cargando && <TableEmpty colSpan={5}>Cargando programas…</TableEmpty>}
+            {cargando && <TableEmpty colSpan={5}>
+                <FilaCargando texto="Cargando programas…" />
+              </TableEmpty>}
 
             {!cargando && filtrados.length === 0 && (
               <TableEmpty colSpan={5}>
@@ -334,7 +417,7 @@ export default function VistaProgramaAuditoria({ soloLectura = false }) {
                   <TableCell className="tabular-nums text-muted-foreground">{p.anio}</TableCell>
                   <TableCell className="font-medium">{p.nombre}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {p.mes_auditoria || '—'}
+                    {rangoDeMeses(p) || '—'}
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -458,14 +541,14 @@ export default function VistaProgramaAuditoria({ soloLectura = false }) {
                   </span>
                   , con fecha del{' '}
                   <span className="font-medium text-foreground">
-                    1 de {(aGenerar?.mes_auditoria || '').toLowerCase() || '—'} de {aGenerar?.anio}
+                    1 de {(aGenerar?.mes_inicio || '').toLowerCase() || '—'} de {aGenerar?.anio}
                   </span>
                   . El primer auditor de cada línea queda como responsable y el resto como
                   acompañantes.
                 </p>
                 <p>
-                  La fecha exacta se puede ajustar después en «Administrar auditorías». No se envían
-                  correos: el aviso a cada auditor se hace cuando decidas.
+                  La fecha exacta se puede ajustar después en «Administrar auditorías». Cada auditor
+                  recibe el aviso de su asignación, igual que al crear una auditoría a mano.
                 </p>
                 <p>
                   Puedes volver a pulsarlo más adelante; solo se crearán las que falten.
@@ -508,6 +591,8 @@ export default function VistaProgramaAuditoria({ soloLectura = false }) {
                 {resultado.yaCreadas === 1 ? ' omitió' : ' omitieron'}.
               </p>
             )}
+
+            {resultado?.avisos && <ResumenAvisos avisos={resultado.avisos} />}
 
             {resultado?.problemas?.length > 0 && (
               <div className="space-y-1.5">

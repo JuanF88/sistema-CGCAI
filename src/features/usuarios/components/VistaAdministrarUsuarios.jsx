@@ -23,7 +23,7 @@ import { FormSection } from '@/components/ui/form-section'
 import { Input, Textarea } from '@/components/ui/input'
 import { SearchInput } from '@/components/ui/search-input'
 import { PageHeader } from '@/components/ui/page-header'
-import { StatCard } from '@/components/ui/stat-card'
+import { InfoCard } from '@/components/ui/info-card'
 import {
   Dialog,
   DialogContent,
@@ -357,7 +357,6 @@ export default function VistaAdministrarUsuarios({ headerActions = null }) {
   return (
     <div className={PAGE_SHELL}>
       <PageHeader
-        icon="👥"
         title="Administrar Usuarios"
         subtitle="Gestión de usuarios del sistema de auditoría"
         actions={
@@ -374,18 +373,21 @@ export default function VistaAdministrarUsuarios({ headerActions = null }) {
         }
       />
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        <StatCard icon="👥" tone="blue" label="Total usuarios" value={stats.total} />
-        <StatCard
-          icon="✅"
+      {/* Seis columnas solo a partir de 2xl (1536 px). En xl (1280) cada
+          tarjeta bajaba a unos 165 px y «Administradores» se salía. */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-6">
+        <InfoCard tone="blue" label="Total usuarios" value={stats.total} />
+        <InfoCard
           tone="green"
           label="Activos"
-          value={`${stats.activos} · ${porcentajeActivos}%`}
+          value={stats.activos}
+          total={stats.total}
+          percent={porcentajeActivos}
         />
-        <StatCard icon="⚠️" tone="orange" label="Inactivos" value={stats.inactivos} />
-        <StatCard icon="🔍" tone="purple" label="Auditores" value={stats.auditores} />
-        <StatCard icon="🔑" tone="indigo" label="Administradores" value={stats.admins} />
-        <StatCard icon="📄" tone="cyan" label="Gestores" value={stats.gestores} />
+        <InfoCard tone="orange" label="Inactivos" value={stats.inactivos} />
+        <InfoCard tone="purple" label="Auditores" value={stats.auditores} />
+        <InfoCard tone="indigo" label="Administradores" value={stats.admins} />
+        <InfoCard tone="cyan" label="Gestores" value={stats.gestores} />
       </section>
 
       <section className={TABLE_CONTAINER}>

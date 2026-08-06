@@ -7,6 +7,16 @@
    toda la UI existente (los CSS modules) está diseñada en claro. */
 @custom-variant dark (&:is(.dark *));
 
+/* Variantes por ALTO de ventana, no por ancho.
+   El panel lateral tiene que caber entero —avatar, nueve entradas de menú, los
+   dos logos y el botón de salir— y en un portátil no cabe con las medidas de
+   escritorio: aparecía una barra de desplazamiento dentro del panel. Los puntos
+   de ruptura de Tailwind miden el ancho, que aquí no dice nada; un portátil es
+   estrecho *y* bajo, y una pantalla vertical es estrecha y altísima.
+   900 px es el alto útil de un portátil de 1080; 760, el de uno de 768. */
+@custom-variant pantalla-baja (@media (max-height: 900px));
+@custom-variant pantalla-muy-baja (@media (max-height: 760px));
+
 /* ===== Baseline consistente ===== */
 html {
   font-size: 16px !important;
@@ -193,12 +203,26 @@ html {
     background-repeat: no-repeat;
     background-position: center;
     /* En píxeles y no en porcentaje. Antes era 130 %, que se mide sobre el
-       ancho del elemento: al plegar el panel de 288 a 80 px la imagen se
-       encogía con él y quedaba encuadrada en otra zona del banner, de otro
-       color. 374 px es exactamente ese 130 % del panel desplegado, así que
-       desplegado se ve igual que siempre y plegado se ve el centro de la
-       misma imagen, con los mismos colores. */
+       ancho del elemento: al plegar el panel la imagen se encogía con él y
+       quedaba encuadrada en otra zona del banner, de otro color. 374 px es ese
+       130 % de un panel de 288, y al ser fijo el encuadre no cambia ni al
+       plegar ni al estrecharse el panel con la ventana: siempre se ve el
+       centro de la misma imagen, con los mismos colores. */
     background-size: 374px auto;
+  }
+
+  /* Red de seguridad del panel lateral: si aun así no cabe —una ventana muy
+     baja, un menú que crezca—, la barra aparece, pero fina y del color del
+     panel en vez del gris del sistema sobre el azul institucional. */
+  .scroll-discreto {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 0.3) transparent;
+  }
+  .scroll-discreto::-webkit-scrollbar { width: 6px; }
+  .scroll-discreto::-webkit-scrollbar-track { background: transparent; }
+  .scroll-discreto::-webkit-scrollbar-thumb {
+    background: rgb(255 255 255 / 0.3);
+    border-radius: 999px;
   }
 
   /* Fondo animado de la pantalla de login. */
@@ -274,6 +298,18 @@ html {
   }
 }
 
+/* Banner de cabecera de página. El color y la luz; las formas —los anillos y
+   la barra de acento— las pone `page-header.jsx` con clases normales.
+
+   · `.bg-page-header` — el degradado institucional de siempre. Es el color.
+   · `.banner-luces`   — dos focos radiales, uno arriba a la derecha y otro
+                         abajo a la izquierda. Rompen el degradado plano y dan
+                         la sensación de volumen; el de abajo usa el color
+                         final del degradado, así que no ensucia la paleta.
+
+   Van como utilidades y no como valores arbitrarios de Tailwind porque los
+   `_` dentro de `var()` y de `radial-gradient()` no se convierten en espacios
+   y el degradado sale mal. */
 @layer utilities {
   .bg-page-header {
     background-image: linear-gradient(
@@ -281,7 +317,15 @@ html {
       hsl(var(--header-from)) 0%,
       hsl(var(--header-to)) 100%
     );
-    box-shadow: 0 10px 40px hsl(var(--header-from) / 0.25);
+    box-shadow:
+      0 18px 50px -12px hsl(var(--header-to) / 0.45),
+      inset 0 1px 0 0 rgb(255 255 255 / 0.18);
+  }
+
+  .banner-luces {
+    background-image:
+      radial-gradient(58% 130% at 85% -20%, rgb(255 255 255 / 0.3), transparent 62%),
+      radial-gradient(50% 120% at 5% 115%, hsl(var(--header-to) / 0.85), transparent 68%);
   }
 }
 

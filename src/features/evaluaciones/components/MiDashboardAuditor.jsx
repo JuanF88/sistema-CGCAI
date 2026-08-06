@@ -14,13 +14,13 @@ import {
   LabelList,
 } from 'recharts'
 import html2canvas from 'html2canvas'
-import { Sparkles, TrendingUp, ShieldCheck, CalendarRange, RefreshCw, Download } from 'lucide-react'
+import { RefreshCw, Download } from 'lucide-react'
 import { obtenerDashboardAuditor } from '@/features/evaluaciones/api/evaluaciones-api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { PageHeader } from '@/components/ui/page-header'
-import { StatCard } from '@/components/ui/stat-card'
+import { InfoCard } from '@/components/ui/info-card'
 import {
   Select,
   SelectContent,
@@ -45,7 +45,8 @@ import {
   TABLE_TOOLBAR,
 } from '@/components/ui/tokens'
 import { cn } from '@/lib/utils'
-import { useAnioInicial } from '@/hooks/useAnioInicial'
+import { useAnioInicial } from '@/hooks/useAnioInicial'
+import { Cargando } from '@/components/ui/loader'
 
 const formatNote = (value) => (typeof value === 'number' ? value.toFixed(2) : '—')
 
@@ -185,7 +186,6 @@ export default function MiDashboardAuditor({ usuario }) {
   return (
     <div className={PAGE_SHELL}>
       <PageHeader
-        icon={<Sparkles />}
         title={`Hola, ${dashboard?.auditor?.nombre || usuario?.nombre || 'Auditor'}`}
         subtitle="Este panel resume exclusivamente tus auditorías internas, con tendencia de notas y avance por periodo."
         actions={
@@ -231,34 +231,30 @@ export default function MiDashboardAuditor({ usuario }) {
         </p>
       )}
       {loading && (
-        <p className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
-          Cargando tu dashboard…
-        </p>
+        <div className="rounded-lg border border-border bg-card">
+          <Cargando mensaje="Cargando tu dashboard…" />
+        </div>
       )}
 
       {!loading && !error && dashboard && (
         <>
           <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatCard
-              icon={<ShieldCheck />}
+            <InfoCard
               tone="blue"
               label="Auditorías totales"
               value={metricas.total}
             />
-            <StatCard
-              icon={<TrendingUp />}
+            <InfoCard
               tone="green"
               label="Promedio final"
               value={formatNote(metricas.promedio)}
             />
-            <StatCard
-              icon={<Sparkles />}
+            <InfoCard
               tone="purple"
               label={`Mejor nota · ${metricas.mejorDependencia}`}
               value={formatNote(metricas.mejorNota)}
             />
-            <StatCard
-              icon={<CalendarRange />}
+            <InfoCard
               tone="cyan"
               label="Evaluaciones completas"
               value={metricas.completas}

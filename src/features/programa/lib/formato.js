@@ -122,25 +122,82 @@ export const PROGRAMA_INICIAL = {
   riesgos: RIESGOS_POR_DEFECTO,
   controles: CONTROLES_POR_DEFECTO,
   oportunidades: OPORTUNIDADES_POR_DEFECTO,
-  mes_auditoria: 'SEPTIEMBRE',
+  mes_inicio: 'SEPTIEMBRE',
+  mes_fin: 'SEPTIEMBRE',
   nomenclatura: NOMENCLATURA_POR_DEFECTO,
   observaciones: '',
   elaborado_por: '',
   elaborado_cargo: '',
   revisado_por: '',
-  revisado_cargo: 'Director',
+  revisado_cargo: '',
   aprobado_por: '',
   aprobado_cargo: 'Rector',
   fecha_aprobacion: '',
 }
 
+/** Semanas que se dibujan por cada mes del rango. */
+export const SEMANAS_POR_MES = 4
+
+/** El índice de un mes en `MESES`, sin importar tildes ni mayúsculas. */
+const indiceDeMes = (mes) => {
+  const limpio = String(mes ?? '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .trim()
+    .toUpperCase()
+
+  return MESES.findIndex(
+    (m) => m.normalize('NFD').replace(/\p{Diacritic}/gu, '') === limpio
+  )
+}
+
 /**
- * Las cuatro semanas del mes de auditoría.
+ * Los meses del programa, de `mes_inicio` a `mes_fin` y ambos incluidos.
  *
- * En el formato son una cuadrícula a la derecha de los requisitos ISO 14001,
- * bajo el rótulo del mes: una marca por proceso en la semana que le toque.
+ * El programa puede abarcar varios meses —«de septiembre a octubre»—, y de ahí
+ * salen las semanas del cronograma. Sin mes de inicio no hay rango: el
+ * cronograma se dibuja sin la cuadrícula.
+ *
+ * Un `mes_fin` anterior al de inicio se ignora y queda solo el primero: el
+ * programa vive dentro de un año, así que un rango que dé la vuelta al
+ * calendario no es un rango sino una errata. El formulario tampoco lo ofrece.
  */
-export const SEMANAS = ['1', '2', '3', '4']
+export function mesesDelPrograma(programa) {
+  const desde = indiceDeMes(programa?.mes_inicio)
+  if (desde < 0) return []
+
+  const hasta = indiceDeMes(programa?.mes_fin)
+  if (hasta < desde) return [MESES[desde]]
+
+  return MESES.slice(desde, hasta + 1)
+}
+
+/**
+ * Las semanas del programa, numeradas de corrido sobre todo el rango.
+ *
+ * Con un solo mes son la 1 a la 4, que es lo que guardaban los programas de
+ * antes; con dos meses, la 5 es la primera del segundo mes. La numeración es
+ * corrida y no «octubre-1» para que lo guardado («1,3») siga significando lo
+ * mismo y no haya que convertir nada.
+ *
+ * @returns {{id: string, mes: string, numero: number}[]}
+ */
+export function semanasDelPrograma(programa) {
+  return mesesDelPrograma(programa).flatMap((mes, iMes) =>
+    Array.from({ length: SEMANAS_POR_MES }, (_, i) => ({
+      id: String(iMes * SEMANAS_POR_MES + i + 1),
+      mes,
+      numero: i + 1,
+    }))
+  )
+}
+
+/** «SEPTIEMBRE» o «SEPTIEMBRE - OCTUBRE», para las pantallas. */
+export function rangoDeMeses(programa) {
+  const meses = mesesDelPrograma(programa)
+  if (!meses.length) return ''
+  return meses.length === 1 ? meses[0] : `${meses[0]} - ${meses[meses.length - 1]}`
+}
 
 /** «1,3» → Set{'1','3'}. */
 export const semanasDe = (texto) =>

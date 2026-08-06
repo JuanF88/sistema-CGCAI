@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { numericId, nullableText, nullableYmdDate, requiredText } from '@/lib/dto/common'
+import { MESES } from '@/features/programa/lib/formato'
 
 const ESTADOS = ['borrador', 'aprobado', 'archivado']
 
@@ -22,11 +23,24 @@ const listaDeTextos = () =>
     .default([])
     .transform((valores) => valores.filter((v) => v.length > 0))
 
-/** Una dependencia auditada dentro de una sección del cronograma. */
+/**
+ * Una dependencia auditada dentro de una sección del cronograma.
+ *
+ * `auditores` guarda **un solo nombre**, el del auditor líder, aunque la
+ * columna se llame en plural por el rótulo del formato («AUDITOR(ES)»). La
+ * auditoría se crea a nombre de una persona concreta, que es la responsable
+ * ante el auditado; quien más participe va en `auditor_acompanante`, que sí
+ * admite varios separados por comas.
+ *
+ * Se comprueba aquí y no solo en el formulario porque de esto depende a quién
+ * se le asigna la auditoría al generarla.
+ */
 export const cronogramaDependenciaSchema = z.object({
   auditado: requiredText('Cada línea necesita la dependencia auditada.', 500),
-  auditores: nullableText(500),
-  // Texto libre: suele ser alguien que no está en el catálogo de usuarios.
+  auditores: nullableText(500).refine((v) => !v || !v.includes(','), {
+    message: 'Solo puede haber un auditor líder por dependencia; los demás van como acompañantes.',
+  }),
+  // Varios, y con nombres que muchas veces no están en el catálogo de usuarios.
   auditor_acompanante: nullableText(500),
 })
 
@@ -37,8 +51,9 @@ export const cronogramaDependenciaSchema = z.object({
  * combinados verticalmente en todo el bloque—; lo que cambia línea a línea son
  * las dependencias auditadas y sus auditores.
  *
- * `semanas` son las del mes de auditoría, separadas por comas («1,3»): la
- * cuadrícula de cuatro columnas a la derecha de los requisitos ISO 14001.
+ * `semanas` son las del rango de meses, separadas por comas («1,3»): la
+ * cuadrícula a la derecha de los requisitos ISO 14001. Van numeradas de corrido
+ * sobre todo el rango, así que con dos meses la 5 es la primera del segundo.
  */
 export const cronogramaSeccionSchema = z.object({
   // La clave del proceso (`dependencias.gestion`); el nombre impreso va aparte.
@@ -101,7 +116,8 @@ const cabecera = {
   controles: listaDeTextos(),
   oportunidades: listaDeTextos(),
 
-  mes_auditoria: nullableText(60),
+  mes_inicio: nullableText(60),
+  mes_fin: nullableText(60),
   nomenclatura: textoLargo(),
   observaciones: textoLargo(),
 
@@ -122,16 +138,33 @@ const cabecera = {
  * procesos vacíos no programa nada. La distribución sí es opcional: sin ella el
  * Excel sale con una sola hoja.
  */
-export const crearProgramaSchema = z.object({
-  ...cabecera,
-  cronograma: z
-    .array(cronogramaSeccionSchema)
-    .max(20)
-    .refine((secciones) => secciones.some((s) => s.dependencias.length > 0), {
-      message: 'El cronograma necesita al menos una dependencia en algún proceso.',
-    }),
-  distribucion: z.array(distribucionItemSchema).max(500).optional().default([]),
-})
+export const crearProgramaSchema = z
+  .object({
+    ...cabecera,
+    cronograma: z
+      .array(cronogramaSeccionSchema)
+      .max(20)
+      .refine((secciones) => secciones.some((s) => s.dependencias.length > 0), {
+        message: 'El cronograma necesita al menos una dependencia en algún proceso.',
+      }),
+    distribucion: z.array(distribucionItemSchema).max(500).optional().default([]),
+  })
+  // El programa vive dentro de un año, así que el rango no puede dar la vuelta
+  // al calendario. Se comprueba aquí y no en el formulario porque de esto
+  // depende cuántas semanas dibuja el Excel.
+  .superRefine((datos, ctx) => {
+    if (!datos.mes_inicio || !datos.mes_fin) return
+
+    const desde = MESES.indexOf(datos.mes_inicio)
+    const hasta = MESES.indexOf(datos.mes_fin)
+    if (desde < 0 || hasta < 0 || hasta >= desde) return
+
+    ctx.addIssue({
+      code: 'custom',
+      path: ['mes_fin'],
+      message: 'El mes final no puede ser anterior al inicial.',
+    })
+  })
 
 /**
  * PUT /api/programa-auditoria?id=…

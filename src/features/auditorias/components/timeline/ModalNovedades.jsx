@@ -4,6 +4,7 @@
 import { Paperclip, Sparkles } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/loader'
 import {
   Dialog,
   DialogContent,
@@ -33,7 +34,10 @@ export function ModalNovedades({ auditoria, novedades, soloLectura, onAbrirUrl }
 
         <div className="flex flex-wrap gap-2">
           {novedades.cargando ? (
-            <span className="text-sm text-muted-foreground">Cargando novedades…</span>
+            <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner size="sm" />
+              Cargando novedades…
+            </span>
           ) : novedades.novedades.length === 0 ? (
             <span className="text-sm text-muted-foreground">Sin novedades registradas.</span>
           ) : (

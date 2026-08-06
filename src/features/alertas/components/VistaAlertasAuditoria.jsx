@@ -6,12 +6,13 @@
  * clase compartidos y capa `api/`. Sin CSS modules.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, BellRing, CheckCircle2, Play, RefreshCw, Save } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Play, RefreshCw, Save } from 'lucide-react'
 import { toast } from 'react-toastify'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
+import { Spinner } from '@/components/ui/loader'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -148,6 +149,16 @@ function TarjetaDetalle({ item }) {
   )
 }
 
+/** El aro pequeño y su texto, para la fila de una tabla que está cargando. */
+function FilaCargando({ texto }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Spinner size="sm" />
+      {texto}
+    </span>
+  )
+}
+
 export default function VistaAlertasAuditoria() {
   const [configs, setConfigs] = useState([])
   const [loading, setLoading] = useState(true)
@@ -275,7 +286,6 @@ export default function VistaAlertasAuditoria() {
   return (
     <div className={PAGE_SHELL}>
       <PageHeader
-        icon={<BellRing />}
         title="Alertas de Auditoría Interna"
         subtitle="Activa o desactiva notificaciones por proceso y ejecuta un barrido manual para validar el comportamiento."
         stats={
@@ -344,7 +354,9 @@ export default function VistaAlertasAuditoria() {
           </TableHeader>
 
           <TableBody>
-            {loading && <TableEmpty colSpan={9}>Cargando configuración de alertas…</TableEmpty>}
+            {loading && <TableEmpty colSpan={9}>
+                <FilaCargando texto="Cargando configuración de alertas…" />
+              </TableEmpty>}
 
             {!loading && configs.length === 0 && (
               <TableEmpty colSpan={9}>No hay procesos configurados.</TableEmpty>

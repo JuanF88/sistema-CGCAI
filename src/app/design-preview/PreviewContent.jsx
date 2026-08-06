@@ -2,7 +2,7 @@
 
 // TEMPORAL — solo para revisar el sistema de diseño. Se elimina tras validar.
 import { useState } from 'react'
-import { BellRing, Building2, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Combobox, ComboboxMultiple } from '@/components/ui/combobox'
@@ -12,7 +12,7 @@ import { FormSection } from '@/components/ui/form-section'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Input, Textarea } from '@/components/ui/input'
 import { HeaderStat, PageHeader } from '@/components/ui/page-header'
-import { StatCard } from '@/components/ui/stat-card'
+import { InfoCard } from '@/components/ui/info-card'
 import { StickyBar } from '@/components/ui/sticky-bar'
 import {
   Table,
@@ -26,14 +26,26 @@ import { PAGE_SHELL, STATUS_BADGE_TONES, TABLE_CONTAINER, TABLE_TOOLBAR } from '
 import { cn } from '@/lib/utils'
 
 const KPIS = [
-  { emoji: '🏢', tono: 'blue', label: 'Total', value: 78 },
-  { emoji: '🎯', tono: 'purple', label: 'Estratégica', value: 6 },
-  { emoji: '🎓', tono: 'green', label: 'Académica', value: 31 },
-  { emoji: '🔬', tono: 'cyan', label: 'Investigación', value: 9 },
-  { emoji: '💼', tono: 'orange', label: 'Administrativa', value: 18 },
-  { emoji: '🎨', tono: 'pink', label: 'Cultura', value: 7 },
-  { emoji: '🔒', tono: 'indigo', label: 'Control', value: 4 },
-  { emoji: '📁', tono: 'gray', label: 'Otras', value: 3 },
+  { tono: 'blue', label: 'Total', value: 78 },
+  { tono: 'purple', label: 'Estratégica', value: 6 },
+  { tono: 'green', label: 'Académica', value: 31 },
+  { tono: 'cyan', label: 'Investigación', value: 9 },
+  { tono: 'orange', label: 'Administrativa', value: 18 },
+  { tono: 'pink', label: 'Cultura', value: 7 },
+  { tono: 'indigo', label: 'Control', value: 4 },
+  { tono: 'gray', label: 'Otras', value: 3 },
+]
+
+/** Las etiquetas largas van a propósito: es lo que se sale si la rejilla aprieta. */
+const METRICAS = [
+  { tono: 'blue', label: 'Total auditorías', value: 16 },
+  { tono: 'purple', label: 'Planes', value: 12, total: 16 },
+  { tono: 'green', label: 'Asistencias', value: 14, total: 16 },
+  { tono: 'orange', label: 'Evaluaciones', value: 11, total: 16 },
+  { tono: 'cyan', label: 'Actas', value: 9, total: 16 },
+  { tono: 'pink', label: 'Actas compromiso', value: 6, total: 16 },
+  { tono: 'teal', label: 'Informes completos', value: 8, total: 16 },
+  { tono: 'indigo', label: 'Validados', value: 7, total: 16 },
 ]
 
 const FILAS = [
@@ -74,7 +86,6 @@ export default function PreviewContent() {
   return (
     <div className={cn(PAGE_SHELL, 'min-h-screen bg-app p-5 sm:p-6 lg:p-8')}>
       <PageHeader
-        icon={<Building2 />}
         title="Administrar Dependencias"
         subtitle="Gestión de dependencias y áreas organizacionales"
         actions={
@@ -85,9 +96,24 @@ export default function PreviewContent() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8">
         {KPIS.map((k) => (
-          <StatCard key={k.label} icon={k.emoji} tone={k.tono} label={k.label} value={k.value} />
+          <InfoCard key={k.label} tone={k.tono} label={k.label} value={k.value} />
+        ))}
+      </section>
+
+      {/* La misma tarjeta con total y barra de avance. */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8">
+        {METRICAS.map((m) => (
+          <InfoCard
+            key={m.label}
+            label={m.label}
+            tone={m.tono}
+            value={m.value}
+            total={m.total}
+            percent={m.total ? Math.round((m.value / m.total) * 100) : undefined}
+            hint={m.total ? undefined : 'En el periodo seleccionado'}
+          />
         ))}
       </section>
 
@@ -121,7 +147,6 @@ export default function PreviewContent() {
       </section>
 
       <PageHeader
-        icon={<BellRing />}
         title="Alertas de Auditoría Interna"
         subtitle="Activa o desactiva notificaciones por proceso y ejecuta un barrido manual."
         stats={

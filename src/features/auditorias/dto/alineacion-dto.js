@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { nullableNumericId, requiredText } from '@/lib/dto/common'
+import { numericId, requiredText } from '@/lib/dto/common'
 
 /**
  * Entrada de la revisión de alineación.
@@ -28,9 +28,12 @@ export const revisarAlineacionSchema = z
     objetivo: textoOpcional,
     conclusiones: textoOpcional,
 
-    // Con él se buscan en el cronograma los requisitos ISO del proceso. Sin él
-    // la revisión sigue funcionando, solo que sin contexto normativo.
-    informe_id: nullableNumericId(),
+    // Obligatorio: con él se buscan en el cronograma los requisitos ISO del
+    // proceso, y sobre todo es la auditoría a la que se le cuenta el consumo.
+    // El tope de diez revisiones es por auditoría, así que una revisión sin
+    // auditoría sería una revisión sin cupo. En el formulario siempre existe:
+    // el botón solo aparece cuando la auditoría viene de un programa.
+    informe_id: numericId('Falta la auditoría sobre la que se pide la revisión.'),
   })
   .refine((d) => d.objetivo || d.conclusiones, {
     message: 'Escribe el objetivo o las conclusiones antes de pedir la revisión.',

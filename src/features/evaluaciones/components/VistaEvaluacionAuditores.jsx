@@ -451,7 +451,6 @@ export default function VistaEvaluacionAuditores() {
   return (
     <div className={PAGE_SHELL}>
       <PageHeader
-        icon="🧐"
         title="Evaluación de auditores"
         subtitle="Calificación integral basada en archivos, encuestas y rúbrica manual"
         actions={

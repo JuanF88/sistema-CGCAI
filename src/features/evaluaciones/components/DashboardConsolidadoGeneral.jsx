@@ -17,7 +17,7 @@ import {
 } from 'recharts'
 
 import { ExportableChartCard } from '@/components/ui/chart-card'
-import { StatCard } from '@/components/ui/stat-card'
+import { InfoCard } from '@/components/ui/info-card'
 import {
   Table,
   TableBody,
@@ -40,11 +40,10 @@ export default function DashboardConsolidadoGeneral({
   return (
     <>
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard icon="📅" tone="indigo" label="Año" value={resumen.anio} />
-        <StatCard icon="📊" tone="blue" label="Auditorías" value={resumen.totalAuditorias} />
-        <StatCard icon="👥" tone="purple" label="Auditores" value={resumen.auditoresEvaluados} />
-        <StatCard
-          icon="⭐"
+        <InfoCard tone="indigo" label="Año" value={resumen.anio} />
+        <InfoCard tone="blue" label="Auditorías" value={resumen.totalAuditorias} />
+        <InfoCard tone="purple" label="Auditores" value={resumen.auditoresEvaluados} />
+        <InfoCard
           tone="green"
           label="Promedio general"
           value={formatNote(resumen.promedioGeneral)}

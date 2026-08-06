@@ -17,13 +17,24 @@ import {
 import { TABLE_CONTAINER, TABLE_SCROLL } from '@/components/ui/tokens'
 import { colorNota } from '@/features/evaluaciones/lib/rubrica'
 
-import { InfoBox } from './InfoBox'
+import { InfoBox } from './InfoBox'
+import { Spinner } from '@/components/ui/loader'
 
 /** Celda de nota: número coloreado o guion. */
 function Nota({ valor }) {
   if (valor === null || valor === undefined) return <span className="text-muted-foreground">-</span>
   return (
     <span className={cn('font-semibold tabular-nums', colorNota(valor))}>{valor.toFixed(2)}</span>
+  )
+}
+
+/** El aro pequeño y su texto, para la fila de una tabla que está cargando. */
+function FilaCargando({ texto }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Spinner size="sm" />
+      {texto}
+    </span>
   )
 }
 
@@ -83,7 +94,9 @@ export function TablaResumenEvaluaciones({
           </TableHeader>
 
           <TableBody>
-            {loading && <TableEmpty colSpan={8}>Cargando evaluaciones…</TableEmpty>}
+            {loading && <TableEmpty colSpan={8}>
+              <FilaCargando texto="Cargando evaluaciones…" />
+            </TableEmpty>}
 
             {vacio && (
               <TableEmpty colSpan={8}>
