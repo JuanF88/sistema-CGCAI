@@ -13,27 +13,27 @@ const HERRAMIENTAS = [
   {
     label: 'Auditoría Interna',
     icon: FileSearch,
-    href: 'https://drive.google.com/drive/folders/1Wz6aFBomgZV0kSMFpxUyQz1hqZGx1TJb?usp=drive_link',
+    href: 'https://drive.google.com/drive/folders/18cizZ_mqewb0VCJTwk5ut_9tw8C7Skvo?usp=drive_link',
   },
   {
     label: 'Documentos Seguimiento',
     icon: FolderOpen,
-    href: 'https://drive.google.com/drive/folders/1fmsHMGx_HQgDWcb6KMGhw3kQR0XOUgDT?usp=drive_link',
+    href: 'https://drive.google.com/drive/folders/1JRs4LNnr79QtUe93l2GCvy4E-7uJBgn5?usp=drive_link',
   },
   {
     label: 'Normatividad',
     icon: ScrollText,
-    href: 'https://drive.google.com/drive/folders/1IhbBu4Uxh-4oN5a82DsBdmuy-tas8Inb?usp=drive_link',
+    href: 'https://drive.google.com/drive/folders/1c9xLgg96SsJ681LwP8j6w3mN1GleXIC5?usp=drive_link',
   },
   {
     label: 'Bibliografía',
     icon: BookOpen,
-    href: 'https://drive.google.com/drive/folders/10ELYEj9Ei1Js-WvLqxfoXqTsCgG3cuHm?usp=drive_link',
+    href: 'https://drive.google.com/drive/folders/1Kr-TH_9rH6KUWHb-VjvPuBiVYPqqfTTe?usp=drive_link',
   },
   {
     label: 'Material de Estudio',
     icon: GraduationCap,
-    href: 'https://drive.google.com/drive/folders/1-SnrpX90uCR-q6NuwIqK-q1tFIOxltp4?usp=drive_link',
+    href: 'https://drive.google.com/drive/folders/1HbbxfrjcilcpvPyo7vKcELN1oJ9rLzUa?usp=drive_link',
   },
 ]
 
