@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { STATUS_BADGE_TONES } from '@/components/ui/tokens'
 import { fmt } from '@/features/auditorias/hooks/useAuditTimeline'
 
+import { NotaEtapa } from './NotaEtapa'
 import { PUNTO_POR_ESTADO, TARJETA_POR_ESTADO, badgeFor } from './etapas'
 
 /**
@@ -76,8 +77,17 @@ export function AccionEtapa({ accion }) {
  * @param {Array} props.etapas            Etapas ya decoradas (ver `decorarEtapas`)
  * @param {boolean} [props.marcarActual]  Mostrar las etiquetas AHORA / VENCIDO
  * @param {'largo'|'corto'} [props.formatoPlazo]
+ * @param {Record<string, string>} [props.notas]  Nota guardada de cada etapa, por clave
+ * @param {(etapa: string, texto: string) => Promise<boolean>} [props.onGuardarNota]
+ *        Sin ella las notas se leen pero no se editan.
  */
-export function EtapasTimeline({ etapas, marcarActual = false, formatoPlazo = 'largo' }) {
+export function EtapasTimeline({
+  etapas,
+  marcarActual = false,
+  formatoPlazo = 'largo',
+  notas,
+  onGuardarNota,
+}) {
   return (
     <ol className="flex flex-col">
       {etapas.map((step, idx) => {
@@ -144,6 +154,18 @@ export function EtapasTimeline({ etapas, marcarActual = false, formatoPlazo = 'l
                     <AccionEtapa key={act.label} accion={act} />
                   ))}
                 </div>
+              )}
+
+              {/* Debajo de los botones: la nota explica el paso, y muchas veces
+                  explica justamente por qué todavía no hay documento que subir.
+                  Sin `notas` la pantalla no las usa y no se pinta nada. */}
+              {notas && (
+                <NotaEtapa
+                  nota={notas[step.key] ?? ''}
+                  onGuardar={
+                    onGuardarNota ? (texto) => onGuardarNota(step.key, texto) : undefined
+                  }
+                />
               )}
             </div>
           </li>

@@ -39,6 +39,7 @@ import {
 import { useNovedades } from '@/features/auditorias/hooks/useNovedades'
 import { useAnioInicial } from '@/hooks/useAnioInicial'
 import { useSubidaDocumento } from '@/features/auditorias/hooks/useSubidaDocumento'
+import { useNotasEtapa } from '@/features/auditorias/hooks/useNotasEtapa'
 import {
   CHECKS_RAPIDOS,
   FILTROS_INICIALES,
@@ -106,6 +107,16 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
   )
 
   const novedades = useNovedades()
+
+  /**
+   * Las notas libres de cada paso.
+   *
+   * Las escribe sobre todo el auditor, pero administración las ve y las puede
+   * completar: la mitad de las llamadas para preguntar por qué un paso va
+   * tarde se responden con lo que ya está escrito ahí. En solo lectura
+   * (visualizador) se leen y no se tocan.
+   */
+  const { notas, guardar: guardarNota } = useNotasEtapa(selected?.id ?? null)
 
   const subida = useSubidaDocumento({
     documentos: DOCUMENTOS_ADMIN,
@@ -926,7 +937,15 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
                 </div>
               </header>
 
-              <EtapasTimeline etapas={timeline} formatoPlazo="corto" />
+              <EtapasTimeline
+                // Al cambiar de auditoría se remonta: si no, una nota a medio
+                // escribir seguiría abierta con el texto de la anterior.
+                key={selected.id}
+                etapas={timeline}
+                formatoPlazo="corto"
+                notas={notas}
+                onGuardarNota={soloLectura ? undefined : guardarNota}
+              />
             </section>
           )}
         </main>

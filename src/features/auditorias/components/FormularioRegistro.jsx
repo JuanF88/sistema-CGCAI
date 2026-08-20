@@ -136,44 +136,62 @@ const FORM_INICIAL = {
   recomendaciones: '',
 }
 
-/** Textos de los campos obligatorios del informe. */
-const OBLIGATORIOS = [
-  ['fecha_auditoria', 'La fecha de auditoría es obligatoria.'],
-  ['asistencia_tipo', 'El tipo de asistencia es obligatorio.'],
-  ['objetivo', 'El objetivo es obligatorio.'],
-  ['criterios', 'Los criterios son obligatorios.'],
-  ['conclusiones', 'Las conclusiones son obligatorias.'],
-  ['fecha_seguimiento', 'La fecha de seguimiento es obligatoria.'],
-  ['recomendaciones', 'Las recomendaciones son obligatorias.'],
+/**
+ * Los campos que cuentan para el indicador de avance.
+ *
+ * **Ninguno es obligatorio.** El informe se rellena a lo largo de semanas y en
+ * el orden que cada auditor prefiera —muchos anotan los hallazgos según los
+ * encuentran y dejan las conclusiones para el final—, así que el formulario
+ * guarda lo que haya en el momento en que se pulse guardar. Esta lista solo
+ * alimenta la barra de «lo que queda»: informa, no impide.
+ */
+const CAMPOS_DEL_AVANCE = [
+  'fecha_auditoria',
+  'asistencia_tipo',
+  'objetivo',
+  'criterios',
+  'conclusiones',
+  'recomendaciones',
+  'fecha_seguimiento',
 ]
 
 /**
- * Los cuatro apartados de texto del informe.
+ * Los apartados de texto del informe, separados por el momento en que se
+ * escriben.
  *
- * `ayuda` es la imagen guía; solo la tienen los dos que la gente pregunta más.
+ * El encuadre —objetivo y criterios— se redacta antes de auditar: es lo que se
+ * pactó revisar. El cierre —conclusiones y recomendaciones— solo se puede
+ * escribir con los hallazgos delante, así que en el formulario va después de
+ * ellos y no antes, que era donde estaba.
+ *
+ * `revisable` marca los dos que se pueden contrastar con la IA; cada uno lleva
+ * su propio botón justo debajo.
  */
-const CAMPOS_INFORME = [
+const CAMPOS_ENCUADRE = [
   {
     name: 'objetivo',
     label: 'Objetivo de la auditoría',
     placeholder: 'Para qué se hizo esta auditoría…',
+    revisable: true,
   },
   {
     name: 'criterios',
     label: 'Criterios de la auditoría',
     placeholder: 'Normas, procedimientos y documentos contra los que se auditó…',
   },
+]
+
+const CAMPOS_CIERRE = [
   {
     name: 'conclusiones',
     label: 'Conclusiones',
     placeholder: 'Qué se concluye del ejercicio…',
-    ayuda: '/ayudas/AyudaFortalezas.png',
+    revisable: true,
   },
   {
     name: 'recomendaciones',
     label: 'Recomendaciones',
     placeholder: 'Qué se recomienda a la dependencia auditada…',
-    ayuda: '/ayudas/AyudaFortalezas.png',
   },
 ]
 
@@ -264,6 +282,15 @@ const VEREDICTOS = {
 
 const CAMPO_REVISADO = { objetivo: 'Objetivo', conclusiones: 'Conclusiones' }
 
+/** Cómo se nombra cada campo dentro de una frase. */
+const NOMBRE_CAMPO = { objetivo: 'el objetivo', conclusiones: 'las conclusiones' }
+
+/** Qué contrasta cada botón; va bajo el campo al que pertenece. */
+const PIE_REVISION = {
+  objetivo: 'Contrasta este objetivo con el objetivo general del programa.',
+  conclusiones: 'Contrasta estas conclusiones con el objetivo general del programa.',
+}
+
 /**
  * Qué es lo que devuelve la IA en cada campo, que no es lo mismo.
  *
@@ -279,33 +306,40 @@ const TITULO_SUGERENCIA = {
 }
 
 /**
- * Contrasta lo escrito con el objetivo general del programa.
+ * Contrasta un campo del informe con el objetivo general del programa.
+ *
+ * Hay uno por campo y cada uno va pegado al suyo. Antes era un solo bloque al
+ * final que revisaba los dos a la vez; desde que el cierre bajó detrás de los
+ * hallazgos, el objetivo y las conclusiones están a pantallas de distancia y
+ * ese botón único obligaba a revisar ambos aunque solo se hubiera tocado uno.
+ *
+ * Revisar el informe entero cuesta ahora dos llamadas en vez de una, y cada una
+ * descuenta del tope de revisiones de la auditoría. A cambio, cada llamada
+ * lleva un solo texto —el otro campo viaja vacío y el servidor no lo mete en el
+ * prompt—, así que sale más corta, y sobre todo se revisa lo que se acaba de
+ * escribir en vez de arrastrar el otro campo a medio redactar.
  *
  * Es una segunda lectura, no un semáforo: el informe se guarda igual diga lo
- * que diga. Por eso no toca `errores` ni condiciona el botón de guardar.
+ * que diga. Por eso no condiciona en nada el botón de guardar.
  *
- * Se pide con un botón y no mientras se teclea: cada revisión es una llamada
- * de pago, y validar en cada pulsación son cientos por informe además de un
- * recuadro parpadeando mientras el auditor intenta pensar.
+ * Se pide con un botón y no mientras se teclea: cada revisión se paga, y
+ * validar en cada pulsación son cientos por informe además de un recuadro
+ * parpadeando mientras el auditor intenta pensar.
  *
  * Solo aparece si la auditoría viene de un programa; sin objetivo general no
  * hay nada contra lo que comparar.
  */
-function RevisionAlineacion({ informeId, objetivoPrograma, objetivo, conclusiones }) {
+function RevisionAlineacion({ campo, informeId, objetivoPrograma, valor }) {
   const [revisando, setRevisando] = useState(false)
   const [resultado, setResultado] = useState(null)
   /** Qué texto exacto se revisó ya, para no pagar dos veces por lo mismo. */
   const [revisado, setRevisado] = useState(null)
 
-  const texto = String(objetivoPrograma ?? '').trim()
-  const hayQueRevisar = Boolean(String(objetivo ?? '').trim() || String(conclusiones ?? '').trim())
+  const referencia = String(objetivoPrograma ?? '').trim()
+  const escrito = String(valor ?? '').trim()
+  const sinCambios = Boolean(resultado) && revisado === escrito
 
-  // El \0 separa los dos campos: sin él, mover una frase del objetivo a las
-  // conclusiones daría la misma clave y parecería que no ha cambiado nada.
-  const clave = `${objetivo ?? ''}\u0000${conclusiones ?? ''}`
-  const sinCambios = Boolean(resultado) && revisado === clave
-
-  if (!texto) return null
+  if (!referencia) return null
 
   const revisar = async () => {
     try {
@@ -313,16 +347,16 @@ function RevisionAlineacion({ informeId, objetivoPrograma, objetivo, conclusione
       setResultado(null)
 
       const data = await validarAlineacion({
-        objetivo_programa: texto,
-        objetivo: objetivo ?? '',
-        conclusiones: conclusiones ?? '',
+        objetivo_programa: referencia,
+        objetivo: campo === 'objetivo' ? escrito : '',
+        conclusiones: campo === 'conclusiones' ? escrito : '',
         // Con él, el servidor busca en el cronograma los requisitos ISO del
         // proceso. No se mandan desde aquí: son de un programa aprobado.
         informe_id: informeId ?? null,
       })
 
       setResultado(data)
-      setRevisado(clave)
+      setRevisado(escrito)
     } catch (error) {
       toast.error(error.message)
     } finally {
@@ -331,34 +365,29 @@ function RevisionAlineacion({ informeId, objetivoPrograma, objetivo, conclusione
   }
 
   return (
-    <section className={cn('rounded-2xl p-4 shadow-sm borde-ia', revisando && 'animate-borde-ia')}>
+    <section
+      className={cn('mt-2 rounded-xl p-3 shadow-sm borde-ia', revisando && 'animate-borde-ia')}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-ia shadow-lg shadow-fuchsia-500/25">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="relative grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-lg bg-ia shadow-md shadow-fuchsia-500/25">
             {/* Medido sobre el archivo: la marca ocupa 1592 de 3840 px de ancho
                 —el 41 %— centrada en un lienzo 16:9 con márgenes transparentes.
-                Para que se vea a 24 px, la imagen tiene que medir 24/0,41 ≈ 58.
-                Va posicionada en absoluto y no centrada con el grid porque, al
-                ser más ancha que la caja, el navegador cede a alineación
-                «segura» y la empuja a un lado: ese era el descuadre.
+                Para que se vea a 19 px en esta caja de 32, la imagen tiene que
+                medir 19/0,41 ≈ 46. Va posicionada en absoluto y no centrada con
+                el grid porque, al ser más ancha que la caja, el navegador cede a
+                alineación «segura» y la empuja a un lado: ese era el descuadre.
                 `brightness-0 invert` la pasa a blanco; en negro se perdía. */}
             <Image
               src="/ChatGPT-Logo.png"
               alt=""
               width={128}
               height={72}
-              className="absolute left-1/2 top-1/2 w-[3.6rem] max-w-none -translate-x-1/2 -translate-y-1/2 brightness-0 invert"
+              className="absolute left-1/2 top-1/2 w-[2.9rem] max-w-none -translate-x-1/2 -translate-y-1/2 brightness-0 invert"
             />
           </span>
 
-          <div>
-            <p className="bg-gradient-to-r from-violet-600 via-fuchsia-600 to-sky-600 bg-clip-text text-sm font-semibold text-transparent dark:from-violet-300 dark:via-fuchsia-300 dark:to-sky-300">
-              Revisión de alineación
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Contrasta tu objetivo y tus conclusiones con el objetivo general del programa.
-            </p>
-          </div>
+          <p className="text-xs text-muted-foreground">{PIE_REVISION[campo]}</p>
         </div>
 
         <Button
@@ -368,22 +397,22 @@ function RevisionAlineacion({ informeId, objetivoPrograma, objetivo, conclusione
           onClick={revisar}
           // Sin cambios no se vuelve a llamar: cada revisión se paga, y pulsar
           // dos veces sobre el mismo texto devuelve lo mismo.
-          disabled={revisando || !hayQueRevisar || sinCambios}
+          disabled={revisando || !escrito || sinCambios}
           title={
-            !hayQueRevisar
-              ? 'Escribe el objetivo o las conclusiones para poder revisarlos'
+            !escrito
+              ? `Escribe ${NOMBRE_CAMPO[campo]} para poder pedir la revisión`
               : sinCambios
                 ? 'Este texto ya está revisado. Cámbialo para volver a revisarlo.'
                 : 'Revisar la alineación con el objetivo del programa'
           }
         >
           <Sparkles />
-          {revisando ? 'Revisando…' : sinCambios ? 'Ya revisado' : 'Revisar alineación'}
+          {revisando ? 'Revisando…' : sinCambios ? 'Ya revisado' : 'Revisar con IA'}
         </Button>
       </div>
 
       {resultado && (
-        <div className="mt-4 space-y-3">
+        <div className="mt-3 space-y-3">
           {resultado.revisiones.length === 0 && (
             <p className="text-xs text-muted-foreground">
               No se obtuvo ninguna observación. Vuelve a intentarlo cuando hayas escrito más.
@@ -511,7 +540,6 @@ export default function FormularioRegistro({
   const [listaCapitulos, setListaCapitulos] = useState({})
   const [listaNumerales, setListaNumerales] = useState({})
   const [loading, setLoading] = useState(false)
-  const [errores, setErrores] = useState({})
   const [ayudaImagen, setAyudaImagen] = useState(null)
 
   const router = useRouter()
@@ -650,40 +678,39 @@ export default function FormularioRegistro({
 
   /* ── Guardado ── */
 
-  const validarFormulario = () => {
-    const nuevosErrores = {}
+  /**
+   * Una tarjeta de hallazgo que se añadió y no se llegó a tocar.
+   *
+   * Antes el formulario se negaba a guardar mientras hubiera una así. Ahora que
+   * nada bloquea, se descartan en el momento de escribir: son tarjetas abiertas
+   * por error, y una fila en blanco acabaría figurando como hallazgo real en el
+   * Plan de Mejoramiento. Con que tenga algo —una palabra o una norma
+   * seleccionada— se guarda tal cual, a medio escribir si así está.
+   */
+  const enBlanco = (tipo, hallazgo) =>
+    !hallazgo.iso &&
+    !hallazgo.capitulo &&
+    !hallazgo.numeral &&
+    tipo.campos.every((c) => !String(hallazgo[c.name] || '').trim())
 
-    for (const [campo, mensaje] of OBLIGATORIOS) {
-      const valor = form[campo]
-      if (!valor || !String(valor).trim()) nuevosErrores[campo] = mensaje
-    }
-
-    // Un hallazgo sin descripción llegaba a la base de datos como fila vacía.
-    for (const tipo of TIPOS_HALLAZGO) {
-      hallazgos[tipo.key].forEach((h, i) => {
-        if (!String(h.descripcion || '').trim()) {
-          nuevosErrores[`${tipo.key}.${i}.descripcion`] =
-            `Describe ${tipo.singular.toLowerCase()} #${i + 1} o elimínala.`
-        }
-      })
-    }
-
-    setErrores(nuevosErrores)
-    return Object.keys(nuevosErrores).length === 0
-  }
+  /**
+   * `''` → `null` antes de escribir.
+   *
+   * Sin campos obligatorios, `fecha_auditoria` y `fecha_seguimiento` pueden
+   * quedar vacías, y Postgres rechaza la cadena vacía en una columna `date`. De
+   * paso los textos en blanco entran como `null`, que es lo que comprueba el
+   * resto del sistema para saber si un apartado está escrito.
+   */
+  const limpiar = (valor) => (typeof valor === 'string' && !valor.trim() ? null : valor)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (loading) return
 
-    if (!validarFormulario()) {
-      toast.error('Por favor completa todos los campos obligatorios.')
-      return
-    }
     setLoading(true)
 
     const payload = {
-      ...form,
+      ...Object.fromEntries(Object.entries(form).map(([campo, v]) => [campo, limpiar(v)])),
       auditores_acompanantes: form.auditores_acompanantes
         ? form.auditores_acompanantes.split(',').map((s) => s.trim())
         : [],
@@ -720,13 +747,15 @@ export default function FormularioRegistro({
 
       // Un `insert` por tipo con todas sus filas, en lugar de uno por hallazgo.
       for (const tipo of TIPOS_HALLAZGO) {
-        const filas = hallazgos[tipo.key].map((h) => ({
-          informe_id: informeId,
-          iso_id: idONulo(h.iso),
-          capitulo_id: idONulo(h.capitulo),
-          numeral_id: idONulo(h.numeral),
-          ...Object.fromEntries(tipo.campos.map((c) => [c.name, h[c.name] || null])),
-        }))
+        const filas = hallazgos[tipo.key]
+          .filter((h) => !enBlanco(tipo, h))
+          .map((h) => ({
+            informe_id: informeId,
+            iso_id: idONulo(h.iso),
+            capitulo_id: idONulo(h.capitulo),
+            numeral_id: idONulo(h.numeral),
+            ...Object.fromEntries(tipo.campos.map((c) => [c.name, h[c.name] || null])),
+          }))
         if (!filas.length) continue
 
         const { error } = await supabase.from(tipo.tabla).insert(filas)
@@ -762,13 +791,14 @@ export default function FormularioRegistro({
 
   const totalHallazgos = TIPOS_HALLAZGO.reduce((n, t) => n + hallazgos[t.key].length, 0)
 
-  /** Cuántos campos obligatorios están rellenos, para las barras de avance. */
-  const obligatoriosCompletos = OBLIGATORIOS.filter(([campo]) =>
+  /** Cuántos campos hay escritos ya, para las barras de avance. */
+  const camposCompletos = CAMPOS_DEL_AVANCE.filter((campo) =>
     String(form[campo] || '').trim()
   ).length
-  const contenidoCompleto = CAMPOS_INFORME.filter((c) => String(form[c.name] || '').trim()).length
-  const progreso = Math.round((obligatoriosCompletos / OBLIGATORIOS.length) * 100)
-  const faltan = OBLIGATORIOS.length - obligatoriosCompletos
+  const encuadreCompleto = CAMPOS_ENCUADRE.filter((c) => String(form[c.name] || '').trim()).length
+  const cierreCompleto = CAMPOS_CIERRE.filter((c) => String(form[c.name] || '').trim()).length
+  const progreso = Math.round((camposCompletos / CAMPOS_DEL_AVANCE.length) * 100)
+  const faltan = CAMPOS_DEL_AVANCE.length - camposCompletos
 
   /**
    * Los acompañantes vienen fijados por el cronograma del programa.
@@ -800,6 +830,40 @@ export default function FormularioRegistro({
     >
       {hechos}/{total} completados
     </span>
+  )
+
+  /**
+   * Los apartados de texto largo.
+   *
+   * Se renderizan igual arriba (encuadre) y abajo (cierre); lo único que
+   * cambia es qué lista se le pasa.
+   */
+  const camposDeTexto = (campos) => (
+    <div className="grid gap-4">
+      {campos.map((campo) => (
+        <Field key={campo.name} label={campo.label} htmlFor={campo.name}>
+          <AutoTextarea
+            id={campo.name}
+            name={campo.name}
+            value={form[campo.name]}
+            onChange={handleChange}
+            placeholder={campo.placeholder}
+            className="min-h-[88px] bg-background"
+          />
+
+          {/* Debajo del campo que revisa y no al final del formulario: el
+              objetivo y las conclusiones viven ahora en secciones distintas. */}
+          {campo.revisable && (
+            <RevisionAlineacion
+              campo={campo.name}
+              informeId={auditoria?.id}
+              objetivoPrograma={auditoria?.programa?.objetivo}
+              valor={form[campo.name]}
+            />
+          )}
+        </Field>
+      ))}
+    </div>
   )
 
   return (
@@ -847,12 +911,7 @@ export default function FormularioRegistro({
           description="Cuándo se hizo, cómo se atendió y quién acompañó."
         >
           <FieldGrid>
-            <Field
-              label="Fecha de la auditoría"
-              htmlFor="fecha_auditoria"
-              required
-              error={errores.fecha_auditoria}
-            >
+            <Field label="Fecha de la auditoría" htmlFor="fecha_auditoria">
               <DatePicker
                 id="fecha_auditoria"
                 value={form.fecha_auditoria}
@@ -860,26 +919,7 @@ export default function FormularioRegistro({
               />
             </Field>
 
-            <Field
-              label="Fecha de seguimiento"
-              htmlFor="fecha_seguimiento"
-              required
-              error={errores.fecha_seguimiento}
-              help="Resolución 290 de 2019 de la Universidad del Cauca."
-            >
-              <DatePicker
-                id="fecha_seguimiento"
-                value={form.fecha_seguimiento}
-                onChange={(v) => setForm((prev) => ({ ...prev, fecha_seguimiento: v }))}
-              />
-            </Field>
-
-            <Field
-              label="Asistencia"
-              htmlFor="asistencia_tipo"
-              required
-              error={errores.asistencia_tipo}
-            >
+            <Field label="Asistencia" htmlFor="asistencia_tipo">
               <Select
                 value={form.asistencia_tipo}
                 onValueChange={(v) => setForm((prev) => ({ ...prev, asistencia_tipo: v }))}
@@ -898,7 +938,7 @@ export default function FormularioRegistro({
 
         <FormSection
           tone="optional"
-          title="Campos opcionales"
+          title="Acompañamiento"
           description={
             acompanantesDelPrograma
               ? 'Los acompañantes ya vienen asignados desde el cronograma del programa.'
@@ -943,57 +983,21 @@ export default function FormularioRegistro({
           </FieldGrid>
         </FormSection>
 
-        {/* ── Contenido del informe ── */}
+        {/* ── Encuadre: lo que se define antes de auditar ── */}
         <FormSection
-          title="Contenido del informe"
-          description="Los cuatro apartados que se imprimen en el documento final."
+          title="Objetivo y criterios"
+          description="Para qué se auditó y contra qué se contrastó."
           actions={
             <>
               <span className="text-[11px] text-muted-foreground">✓ Corrector ortográfico</span>
-              <Avance hechos={contenidoCompleto} total={CAMPOS_INFORME.length} />
+              <Avance hechos={encuadreCompleto} total={CAMPOS_ENCUADRE.length} />
             </>
           }
         >
           {/* Antes de los campos, porque «objetivo» es el primero de la lista. */}
           <ObjetivoDelPrograma programa={auditoria?.programa} />
 
-          <div className="grid gap-4">
-            {CAMPOS_INFORME.map((campo) => (
-              <Field
-                key={campo.name}
-                label={campo.label}
-                htmlFor={campo.name}
-                required
-                error={errores[campo.name]}
-                action={
-                  campo.ayuda && (
-                    <BotonAyuda
-                      titulo={`Ayuda para ${campo.label.toLowerCase()}`}
-                      onClick={() => setAyudaImagen(campo.ayuda)}
-                    />
-                  )
-                }
-              >
-                <AutoTextarea
-                  id={campo.name}
-                  name={campo.name}
-                  value={form[campo.name]}
-                  onChange={handleChange}
-                  placeholder={campo.placeholder}
-                  className="min-h-[88px] bg-background"
-                />
-              </Field>
-            ))}
-          </div>
-
-          {/* Después de los campos y no antes: primero se escribe, luego se
-              contrasta. Arriba invitaba a pulsarlo con todo en blanco. */}
-          <RevisionAlineacion
-            informeId={auditoria?.id}
-            objetivoPrograma={auditoria?.programa?.objetivo}
-            objetivo={form.objetivo}
-            conclusiones={form.conclusiones}
-          />
+          {camposDeTexto(CAMPOS_ENCUADRE)}
         </FormSection>
 
         {/* ── Hallazgos ── */}
@@ -1122,7 +1126,6 @@ export default function FormularioRegistro({
                         key={campo.name}
                         label={campo.label}
                         htmlFor={`${tipo.key}-${campo.name}-${i}`}
-                        error={errores[`${tipo.key}.${i}.${campo.name}`]}
                       >
                         <AutoTextarea
                           id={`${tipo.key}-${campo.name}-${i}`}
@@ -1159,6 +1162,34 @@ export default function FormularioRegistro({
           ))}
         </FormSection>
 
+        {/* ── Cierre: lo que se escribe cuando ya hay hallazgos ── */}
+        <FormSection
+          title="Conclusiones y cierre"
+          description="Va al final a propósito: se redacta con los hallazgos ya delante."
+          actions={
+            <>
+              <span className="text-[11px] text-muted-foreground">✓ Corrector ortográfico</span>
+              <Avance hechos={cierreCompleto} total={CAMPOS_CIERRE.length} />
+            </>
+          }
+        >
+          {camposDeTexto(CAMPOS_CIERRE)}
+
+          <FieldGrid>
+            <Field
+              label="Fecha de seguimiento"
+              htmlFor="fecha_seguimiento"
+              help="Resolución 290 de 2019 de la Universidad del Cauca."
+            >
+              <DatePicker
+                id="fecha_seguimiento"
+                value={form.fecha_seguimiento}
+                onChange={(v) => setForm((prev) => ({ ...prev, fecha_seguimiento: v }))}
+              />
+            </Field>
+          </FieldGrid>
+        </FormSection>
+
         {/* Guardar siempre a la vista: el formulario es largo. */}
         <StickyBar
           info={
@@ -1173,8 +1204,8 @@ export default function FormularioRegistro({
                 />
               </span>
               {faltan === 0
-                ? 'Todo lo obligatorio está completo'
-                : `Faltan ${faltan} campo${faltan === 1 ? '' : 's'} obligatorio${faltan === 1 ? '' : 's'}`}
+                ? 'Informe completo'
+                : `${faltan} campo${faltan === 1 ? '' : 's'} sin escribir · puedes guardar igual`}
             </span>
           }
         >

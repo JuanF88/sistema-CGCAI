@@ -21,6 +21,7 @@ import { EMPTY_STATE, PAGE_SHELL, SECTION_CARD } from '@/components/ui/tokens'
 import FormularioRegistro from '@/features/auditorias/components/FormularioRegistro'
 import { DOCUMENTOS_AUDITOR } from '@/features/auditorias/lib/documentos'
 import { useSubidaDocumento } from '@/features/auditorias/hooks/useSubidaDocumento'
+import { useNotasEtapa } from '@/features/auditorias/hooks/useNotasEtapa'
 import { EtapasTimeline, AccionEtapa } from './timeline/EtapasTimeline'
 import { BadgeMini, ListaAuditorias } from './timeline/ListaAuditorias'
 import { LEYENDA_ETAPAS, decorarEtapas } from './timeline/etapas'
@@ -50,6 +51,9 @@ export default function AuditoriasTimeline({ usuario }) {
     () => auditorias.find((a) => a.id === selectedId) || null,
     [auditorias, selectedId]
   )
+
+  /** Las notas libres de cada paso de la auditoría elegida. */
+  const { notas, guardar: guardarNota } = useNotasEtapa(selected?.id ?? null)
 
   /** Un solo modal para los seis documentos (ver `lib/documentos.js`). */
   const subida = useSubidaDocumento({
@@ -166,8 +170,8 @@ export default function AuditoriasTimeline({ usuario }) {
     if (!fa) return vacio
 
     // Plazos respecto a la fecha de auditoría (días hábiles).
-    const planDate = addBusinessDays(fa, -5)
     const cartaCompromisoDate = addBusinessDays(fa, -5)
+    const planDate = addBusinessDays(fa, -5)
     const actaLimit = addBusinessDays(fa, 10)
     const informeLimit = addBusinessDays(fa, 10)
     const pmLimit = addBusinessDays(fa, 20)
@@ -203,7 +207,22 @@ export default function AuditoriasTimeline({ usuario }) {
         : [{ label: textoSubir, onClick: () => subida.abrir(doc), type: 'replace' }],
     })
 
+    // La carta de compromiso abre la línea: es lo primero que se hace, y
+    // comparte plazo con el plan, así que sin este orden explícito las dos
+    // etapas empatarían en fecha y la primera saldría por casualidad.
     const base = [
+      pasoDocumento({
+        key: 'acta_compromiso',
+        title: 'Carta de compromiso',
+        when: cartaCompromisoDate,
+        days: diffInBusinessDays(hoy, cartaCompromisoDate),
+        doc: 'actaCompromiso',
+        campo: 'acta_compromiso',
+        textoVer: 'Ver carta de compromiso',
+        textoSubir: 'Subir carta de compromiso',
+        hecho: 'Cargada.',
+        pendiente: 'Subir PDF de la carta de compromiso.',
+      }),
       {
         key: 'plan',
         title: 'Plan de auditoría',
@@ -223,18 +242,6 @@ export default function AuditoriasTimeline({ usuario }) {
               },
             ],
       },
-      pasoDocumento({
-        key: 'acta_compromiso',
-        title: 'Carta de compromiso',
-        when: cartaCompromisoDate,
-        days: diffInBusinessDays(hoy, cartaCompromisoDate),
-        doc: 'actaCompromiso',
-        campo: 'acta_compromiso',
-        textoVer: 'Ver carta de compromiso',
-        textoSubir: 'Subir carta de compromiso',
-        hecho: 'Cargada.',
-        pendiente: 'Subir PDF de la carta de compromiso.',
-      }),
       pasoDocumento({
         key: 'asistencia',
         title: 'Listado de asistencia',
@@ -454,7 +461,25 @@ export default function AuditoriasTimeline({ usuario }) {
                 ))}
               </div>
 
-              <EtapasTimeline etapas={etapas} marcarActual />
+              {/* Los plazos se cuentan desde la fecha de auditoría. Ahora que
+                  ningún campo del informe es obligatorio, esa fecha puede
+                  quedar vacía, y sin ella no hay línea que dibujar. */}
+              {etapas.length ? (
+                <EtapasTimeline
+                  // Al cambiar de auditoría se remonta: si no, una nota a medio
+                  // escribir seguiría abierta con el texto de la anterior.
+                  key={selected.id}
+                  etapas={etapas}
+                  marcarActual
+                  notas={notas}
+                  onGuardarNota={guardarNota}
+                />
+              ) : (
+                <p className="rounded-xl border border-dashed border-border bg-background/60 px-4 py-6 text-center text-xs text-muted-foreground">
+                  Esta auditoría no tiene fecha, y los plazos se calculan a partir de ella. Ponla en
+                  el informe para ver la línea de trabajo.
+                </p>
+              )}
             </section>
           )}
         </main>
