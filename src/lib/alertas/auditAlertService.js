@@ -157,11 +157,22 @@ export function isProcessCompleted(processKey, audit, storageFilesByBucket) {
   const processDefinition = getProcessDefinition(processKey)
   if (!processDefinition) return true
 
+  const tieneArchivo = hasAuditFile(storageFilesByBucket, processDefinition.bucket, audit?.id)
+
+  // El informe cuenta como hecho con la marca `validado` O con el PDF firmado
+  // en `validaciones`.
+  //
+  // Antes solo miraba la marca, y las dos únicas alertas que este proceso llegó
+  // a enviar (#266 y #267, abril de 2026) fueron a auditorías que sí tenían su
+  // PDF subido: la marca se había quedado sin poner y el sistema reclamó un
+  // trabajo terminado. El resto de la aplicación lleva desde siempre leyendo
+  // las dos señales —`validated?.url || validado === true`—, así que la alerta
+  // era la única pieza que veía otra cosa que la pantalla.
   if (processDefinition.completionKind === 'report') {
-    return Boolean(audit?.validado === true)
+    return audit?.validado === true || tieneArchivo
   }
 
-  return hasAuditFile(storageFilesByBucket, processDefinition.bucket, audit?.id)
+  return tieneArchivo
 }
 
 export function shouldTriggerAlert({ daysLeft, alertType, config }) {

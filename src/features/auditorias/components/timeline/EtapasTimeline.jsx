@@ -92,8 +92,8 @@ export function EtapasTimeline({
     <ol className="flex flex-col">
       {etapas.map((step, idx) => {
         const esUltima = idx === etapas.length - 1
-        const esActual = marcarActual && step.status.startsWith('current')
-        const badge = badgeFor(step.days, step.done, formatoPlazo)
+        const esActual = marcarActual && Boolean(step.status?.startsWith('current'))
+        const badge = badgeFor(step.days, step.done, formatoPlazo, step.tardio)
 
         return (
           <li key={step.key} className="flex gap-4" aria-current={esActual ? 'step' : undefined}>

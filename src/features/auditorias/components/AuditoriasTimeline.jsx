@@ -127,7 +127,14 @@ export default function AuditoriasTimeline({ usuario }) {
               const { data: signed } = await supabase.storage
                 .from(bucket)
                 .createSignedUrl(hit.name, 60 * 60)
-              return { file: hit.name, url: signed?.signedUrl || null }
+              return {
+                file: hit.name,
+                url: signed?.signedUrl || null,
+                // Cuándo se entregó, para poder distinguir un envío tardío de
+                // uno a tiempo. `created_at` y no `updated_at`: cuenta la
+                // primera entrega, no el reemplazo por un escaneo mejor.
+                subido_at: hit.created_at ?? hit.updated_at ?? null,
+              }
             } catch {
               return null
             }
@@ -194,18 +201,28 @@ export default function AuditoriasTimeline({ usuario }) {
     // `?informeId=`). Ahora el informe se abre aquí mismo, en un panel lateral.
     const irAlInforme = () => setInformeAbierto(true)
 
-    /** Etapa de «subir un documento»: ver el archivo o subirlo. */
-    const pasoDocumento = ({ key, title, when, days, doc, campo, textoVer, textoSubir, hecho, pendiente }) => ({
-      key,
-      title,
-      when,
-      days,
-      explicitDone: Boolean(selected[campo]?.url),
-      subtitle: selected[campo]?.url ? hecho : pendiente,
-      actions: selected[campo]?.url
-        ? [{ label: textoVer, href: selected[campo].url }]
-        : [{ label: textoSubir, onClick: () => subida.abrir(doc), type: 'replace' }],
-    })
+    /**
+     * Etapa de «subir un documento»: ver el archivo o subirlo.
+     *
+     * `subidoAt` viaja hasta `decorarEtapas`, que es quien compara la fecha de
+     * entrega con `when` y marca la etapa como envío tardío.
+     */
+    const pasoDocumento = ({ key, title, when, days, doc, campo, textoVer, textoSubir, hecho, pendiente }) => {
+      const url = selected[campo]?.url
+      const subidoAt = selected[campo]?.subido_at ?? null
+      return {
+        key,
+        title,
+        when,
+        days,
+        explicitDone: Boolean(url),
+        subidoAt,
+        subtitle: url ? `${hecho}${subidoAt ? ` el ${fmt(new Date(subidoAt))}` : ''}.` : pendiente,
+        actions: url
+          ? [{ label: textoVer, href: url }]
+          : [{ label: textoSubir, onClick: () => subida.abrir(doc), type: 'replace' }],
+      }
+    }
 
     // La carta de compromiso abre la línea: es lo primero que se hace, y
     // comparte plazo con el plan, así que sin este orden explícito las dos
@@ -220,7 +237,7 @@ export default function AuditoriasTimeline({ usuario }) {
         campo: 'acta_compromiso',
         textoVer: 'Ver carta de compromiso',
         textoSubir: 'Subir carta de compromiso',
-        hecho: 'Cargada.',
+        hecho: 'Cargada',
         pendiente: 'Subir PDF de la carta de compromiso.',
       }),
       {
@@ -229,8 +246,9 @@ export default function AuditoriasTimeline({ usuario }) {
         when: planDate,
         days: diffInBusinessDays(hoy, planDate),
         explicitDone: Boolean(selected.plan?.enviado_at),
+        subidoAt: selected.plan?.enviado_at ?? null,
         subtitle: selected.plan?.enviado_at
-          ? `Enviado el ${fmt(new Date(selected.plan.enviado_at))}`
+          ? `Enviado el ${fmt(new Date(selected.plan.enviado_at))}.`
           : 'Programar y enviar (5 días hábiles antes).',
         actions: selected.plan?.url
           ? [{ label: 'Ver plan enviado', href: selected.plan.url }]
@@ -251,7 +269,7 @@ export default function AuditoriasTimeline({ usuario }) {
         campo: 'asistencia',
         textoVer: 'Ver asistencia',
         textoSubir: 'Subir asistencia',
-        hecho: 'Cargado.',
+        hecho: 'Cargado',
         pendiente: 'Subir PDF del listado de asistencia.',
       }),
       pasoDocumento({
@@ -263,7 +281,7 @@ export default function AuditoriasTimeline({ usuario }) {
         campo: 'evaluacion',
         textoVer: 'Ver evaluación',
         textoSubir: 'Subir evaluación',
-        hecho: 'Cargada.',
+        hecho: 'Cargada',
         pendiente: 'Subir PDF de evaluación.',
       }),
       pasoDocumento({
@@ -275,7 +293,7 @@ export default function AuditoriasTimeline({ usuario }) {
         campo: 'acta',
         textoVer: 'Ver acta',
         textoSubir: 'Subir acta',
-        hecho: 'Cargada.',
+        hecho: 'Cargada',
         pendiente: 'Subir PDF del acta de reunión (10 días hábiles).',
       }),
       {
@@ -285,12 +303,15 @@ export default function AuditoriasTimeline({ usuario }) {
         when: informeLimit,
         days: diffInBusinessDays(hoy, informeLimit),
         explicitDone: hasValidated,
+        subidoAt: selected.validated?.subido_at ?? null,
         subtitle: !isFilled
           ? 'Completar objetivo, criterios, conclusiones y recomendaciones (plazo +10 días hábiles).'
           : !hasHallazgos
             ? 'Campos listos. Asignar hallazgos.'
             : hasValidated
-              ? 'Informe validado.'
+              ? selected.validated?.subido_at
+                ? `Informe validado el ${fmt(new Date(selected.validated.subido_at))}.`
+                : 'Informe validado.'
               : 'Campos y hallazgos listos: descarga y valida.',
         actions: hasValidated
           ? [{ label: 'Ver informe validado', href: selected.validated.url, variant: 'default' }]

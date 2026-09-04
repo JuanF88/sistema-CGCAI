@@ -47,6 +47,7 @@ import {
 } from './timeline/FiltrosAuditorias'
 import { BadgeMini, ListaAuditorias } from './timeline/ListaAuditorias'
 import { EtapasTimeline } from './timeline/EtapasTimeline'
+import { decorarEtapas } from './timeline/etapas'
 import { ModalCrearAuditoria } from './timeline/ModalCrearAuditoria'
 import { ModalDetalleAuditoria } from './timeline/ModalDetalleAuditoria'
 import { ModalNovedades } from './timeline/ModalNovedades'
@@ -145,10 +146,15 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
         .from(bucket)
         .list(dir, { limit: 1000 })
 
-      if (listError || !listData?.some((file) => file.name === fileName)) return null
+      const entrada = listData?.find((file) => file.name === fileName)
+      if (listError || !entrada) return null
 
       const { data: s } = await supabase.storage.from(bucket).createSignedUrl(path, 3600)
-      return s?.signedUrl ? { file: path, url: s.signedUrl } : null
+      // `created_at` y no `updated_at`: interesa cuándo se entregó por primera
+      // vez, no cuándo se reemplazó el archivo por una versión mejor escaneada.
+      return s?.signedUrl
+        ? { file: path, url: s.signedUrl, subido_at: entrada.created_at ?? entrada.updated_at ?? null }
+        : null
     } catch {
       return null
     }
@@ -213,8 +219,11 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
           const plan = planFirmado
             ? {
                 path: planFirmado.file,
-                enviado_at: rec?.archivo_path ? rec.enviado_at : null,
+                // La tabla manda cuando existe; si no hay constancia, vale la
+                // fecha del archivo en Storage.
+                enviado_at: (rec?.archivo_path ? rec.enviado_at : null) || planFirmado.subido_at,
                 url: planFirmado.url,
+                subido_at: planFirmado.subido_at,
               }
             : null
 
@@ -489,16 +498,23 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
     const hasValidated = flags.validado
     const puedeEscribir = !soloLectura
 
-    /** Etapa de «subir un documento»: ver, reemplazar o subir. */
+    /**
+     * Etapa de «subir un documento»: ver, reemplazar o subir.
+     *
+     * `subidoAt` viaja hasta `decorarEtapas`, que es quien decide si la entrega
+     * fue tardía comparándola con `when`.
+     */
     const pasoDocumento = ({ key, title, when, days, doc, campo, nombre, hecho, pendiente }) => {
       const url = selected[campo]?.url
+      const subidoAt = selected[campo]?.subido_at ?? null
       return {
         key,
         title,
         when,
         days,
         explicitDone: Boolean(url),
-        subtitle: url ? hecho : pendiente,
+        subidoAt,
+        subtitle: url ? `${hecho}${subidoAt ? ` el ${fmt(new Date(subidoAt))}` : ''}.` : pendiente,
         actions: url
           ? [
               { label: `Ver ${nombre}`, onClick: () => openInNewTab(url), type: 'view' },
@@ -575,7 +591,13 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
       ]
     }
 
-    return [
+    // `decorarEtapas` es lo que traduce `explicitDone` en `done` y `tardio`.
+    // Este panel no lo llamaba, así que `step.done` llegaba a la línea como
+    // `undefined`: ningún paso salía nunca como completado —el aspa verde, la
+    // línea en verde y la etiqueta «Completado» no aparecían jamás— y una
+    // etapa con su documento subido pero con el plazo pasado se anunciaba como
+    // «Vencido 9 d».
+    return decorarEtapas([
       pasoDocumento({
         key: 'acta_compromiso',
         title: 'Carta de compromiso',
@@ -584,7 +606,7 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
         doc: 'actaCompromiso',
         campo: 'acta_compromiso',
         nombre: 'carta de compromiso',
-        hecho: 'Cargada.',
+        hecho: 'Cargada',
         pendiente: 'Subir PDF de la carta de compromiso.',
       }),
       {
@@ -593,8 +615,9 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
         when: planDate,
         days: diffInBusinessDays(hoy, planDate),
         explicitDone: flags.tienePlan,
+        subidoAt: selected.plan?.enviado_at ?? selected.plan?.subido_at ?? null,
         subtitle: selected.plan?.enviado_at
-          ? `Enviado el ${fmt(new Date(selected.plan.enviado_at))}`
+          ? `Enviado el ${fmt(new Date(selected.plan.enviado_at))}.`
           : 'Programar y enviar (5 días hábiles antes).',
         actions: selected.plan?.url
           ? [
@@ -615,7 +638,7 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
         doc: 'asistencia',
         campo: 'asistencia',
         nombre: 'asistencia',
-        hecho: 'Cargado.',
+        hecho: 'Cargado',
         pendiente: 'Subir PDF del listado de asistencia.',
       }),
       pasoDocumento({
@@ -626,7 +649,7 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
         doc: 'evaluacion',
         campo: 'evaluacion',
         nombre: 'evaluación',
-        hecho: 'Cargada.',
+        hecho: 'Cargada',
         pendiente: 'Subir PDF de evaluación.',
       }),
       pasoDocumento({
@@ -637,7 +660,7 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
         doc: 'acta',
         campo: 'acta',
         nombre: 'acta',
-        hecho: 'Cargada.',
+        hecho: 'Cargada',
         pendiente: 'Subir PDF del acta de reunión (10 días hábiles).',
       }),
       {
@@ -646,10 +669,13 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
         when: informeLimit,
         days: diffInBusinessDays(hoy, informeLimit),
         explicitDone: hasValidated,
+        subidoAt: selected.validated?.subido_at ?? null,
         subtitle: !flags.informeCompleto
           ? 'Completar objetivo, criterios, conclusiones y recomendaciones (plazo +10 días hábiles).'
           : hasValidated
-            ? 'Informe validado.'
+            ? selected.validated?.subido_at
+              ? `Informe validado el ${fmt(new Date(selected.validated.subido_at))}.`
+              : 'Informe validado.'
             : flags.listoValidar
               ? 'Campos y hallazgos listos: descarga y valida.'
               : 'Campos listos. Asignar hallazgos.',
@@ -672,7 +698,7 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
             ]
           : [],
       },
-    ]
+    ]).etapas
     // `subida.abrir` es estable (es un setState).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, soloLectura, openInNewTab])

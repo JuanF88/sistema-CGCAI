@@ -33,14 +33,40 @@ export const LEYENDA_ETAPAS = [
   { label: 'Completada', clase: 'bg-emerald-500' },
 ]
 
+/** El mismo día sin horas: los plazos se cuentan por días completos. */
+const soloDia = (fecha) => {
+  const f = fecha instanceof Date ? fecha : new Date(fecha)
+  return Number.isNaN(f.getTime()) ? null : new Date(f.getFullYear(), f.getMonth(), f.getDate())
+}
+
+/**
+ * ¿Se entregó después del plazo?
+ *
+ * Se compara por día natural y no por instante: subir a las seis de la tarde
+ * del último día es entregar a tiempo, y comparando horas exactas cualquier
+ * entrega hecha el mismo día del vencimiento habría salido tardía.
+ */
+export function llegoTarde(subidoAt, limite) {
+  const subido = subidoAt ? soloDia(subidoAt) : null
+  const tope = limite ? soloDia(limite) : null
+  return Boolean(subido && tope && subido > tope)
+}
+
 /**
  * Etiqueta de plazo de una etapa.
  *
  * `formato: 'largo'` es el texto del panel del auditor («Quedan 3 días»);
  * `'corto'` el del administrador, que muestra muchas etapas seguidas.
  */
-export function badgeFor(daysLeft, completada = false, formato = 'largo') {
-  if (completada) return { label: 'Completado', tone: 'success' }
+export function badgeFor(daysLeft, completada = false, formato = 'largo', tardio = false) {
+  if (completada) {
+    // Hecho, pero fuera de plazo. Sin esta distinción el retraso desaparecía
+    // del expediente en cuanto se subía el archivo, y es justo el dato que
+    // hace falta para evaluar al auditor y para saber por qué el proceso fue
+    // como fue. «Vencido» tampoco valía: eso es lo que sigue sin entregarse.
+    if (tardio) return { label: 'Envío tardío', tone: 'warning' }
+    return { label: 'Completado', tone: 'success' }
+  }
 
   const largo = formato === 'largo'
   if (daysLeft < 0) {
@@ -63,6 +89,9 @@ export function decorarEtapas(etapas) {
 
   const decoradas = etapas.map((etapa, i) => {
     const done = Boolean(etapa.explicitDone)
+    // `subidoAt` lo pone cada panel con la fecha del archivo en Storage; sin
+    // ella la etapa se da por entregada a tiempo, que es lo que se hacía antes.
+    const tardio = done && llegoTarde(etapa.subidoAt, etapa.when)
     const overdue = !done && etapa.days < 0
     const soon = !done && etapa.days >= 0 && etapa.days <= 3
 
@@ -74,7 +103,7 @@ export function decorarEtapas(etapas) {
     else if (soon) status = 'soon'
     else if (overdue) status = 'overdue'
 
-    return { ...etapa, done, overdue, soon, status }
+    return { ...etapa, done, tardio, overdue, soon, status }
   })
 
   return {

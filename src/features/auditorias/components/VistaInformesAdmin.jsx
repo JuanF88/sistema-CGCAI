@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import {
+import {
+
   LayoutGrid,
   RefreshCw,
 } from 'lucide-react'
@@ -269,13 +270,14 @@ export default function AuditoriasMallaControl() {
     { key: 'validado',   label: 'Validados',          tono: 'indigo' },
   ]
 
+  /** En el orden del ciclo: la carta de compromiso es lo primero que se hace. */
   const columns = [
+    { key: 'actaComp',   title: 'Carta Comp.' },
     { key: 'plan',       title: 'Plan' },
     { key: 'asistencia', title: 'Asistencia' },
     { key: 'evaluacion', title: 'Evaluación' },
     { key: 'acta',       title: 'Acta' },
-    { key: 'actaComp',   title: 'Carta Comp.' },
-    { key: 'informeOk',  title: 'Informe OK' },
+    { key: 'informeOk',  title: 'Informe' },
     { key: 'validado',   title: 'Validado' },
   ]
 
