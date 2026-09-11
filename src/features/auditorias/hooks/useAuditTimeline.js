@@ -120,22 +120,41 @@ export const BUCKETS = {
 }
 
 /* ---- Validación de Archivos ---- */
-export const FILE_LIMITS = {
-  PLAN: 2 * 1024 * 1024,        // 2MB
-  ASISTENCIA: 2 * 1024 * 1024,
-  EVALUACION: 2 * 1024 * 1024,
-  ACTA: 2 * 1024 * 1024,
-  ACTA_COMPROMISO: 2 * 1024 * 1024,
-  VALIDACION: 1 * 1024 * 1024,  // 1MB (más restrictivo)
-  NOVEDAD: 2 * 1024 * 1024,
+
+/**
+ * Tamaño máximo por tipo de documento, en megabytes. **Dos para todos.**
+ *
+ * Única fuente del límite. Antes el número vivía por triplicado —aquí, en
+ * `lib/documentos.js` y escrito a mano en el modal de «Mis auditorías»—, y se
+ * desincronizaron: el modal anunciaba 2 MB mientras el código rechazaba a
+ * partir de 1. El informe firmado se quedaba con ese 1 MB, el límite más
+ * pequeño del sistema para el documento que más pesa; de los veinte informes
+ * subidos, el mayor pesa 0,94 MB, pegado al techo.
+ *
+ * Se mantienen todos iguales a propósito: un único número que explicar al
+ * auditor, y un solo sitio que tocar si algún día se queda corto. Los buckets
+ * de Storage no imponen tope propio, así que esto es el único freno que hay.
+ */
+export const MAX_MB = {
+  PLAN: 2,
+  ASISTENCIA: 2,
+  EVALUACION: 2,
+  ACTA: 2,
+  ACTA_COMPROMISO: 2,
+  VALIDACION: 2,
+  NOVEDAD: 2,
 }
+
+export const FILE_LIMITS = Object.fromEntries(
+  Object.entries(MAX_MB).map(([tipo, mb]) => [tipo, mb * 1024 * 1024])
+)
 
 export function validateFileSize(file, type = 'PLAN') {
   const limit = FILE_LIMITS[type] || FILE_LIMITS.PLAN
   if (!file) return { valid: false, error: 'No se seleccionó ningún archivo' }
   if (file.size > limit) {
     const mb = (limit / (1024 * 1024)).toFixed(0)
-    return { valid: false, error: `El archivo supera el tamaño máximo de ${mb}MB` }
+    return { valid: false, error: `El archivo supera el tamaño máximo de ${mb} MB.` }
   }
   return { valid: true, error: null }
 }

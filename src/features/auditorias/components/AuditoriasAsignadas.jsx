@@ -10,6 +10,7 @@ import { Eye, FilePen, Pencil } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import DocumentUploadModal from '@/components/ui/DocumentUploadModal'
+import { MAX_MB } from '@/features/auditorias/hooks/useAuditTimeline'
 import { FormDrawer } from '@/components/ui/form-drawer'
 import { PageHeader } from '@/components/ui/page-header'
 import { InfoCard } from '@/components/ui/info-card'
@@ -548,13 +549,15 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
         <SeccionAuditorias titulo="✅ Completadas" lista={agrupadas.completadas} />
       </div>
 
-      {/* El límite real siempre fue 1 MB; el texto del modal antiguo decía 2 MB. */}
+      {/* El límite sale de `MAX_MB`, que es el mismo que comprueba la subida.
+          Escrito a mano se desincronizó: el modal anunciaba 2 MB y el código
+          rechazaba a partir de 1. */}
       <DocumentUploadModal
         isOpen={modalVisible}
         onClose={() => setModalVisible(false)}
         title="Subir informe firmado"
         description="Se marcará la auditoría como validada."
-        maxSizeMB={1}
+        maxSizeMB={MAX_MB.VALIDACION}
         uploadButtonLabel="Subir y validar"
         onUpload={subirArchivoValidacion}
         isUploading={subiendoValidacion}
