@@ -9,6 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, FileCheck2, RefreshCw } from 'lucide-react'
+import { toast } from 'react-toastify'
 
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -25,6 +26,13 @@ import { useNotasEtapa } from '@/features/auditorias/hooks/useNotasEtapa'
 import { EtapasTimeline, AccionEtapa } from './timeline/EtapasTimeline'
 import { BadgeMini, ListaAuditorias } from './timeline/ListaAuditorias'
 import { LEYENDA_ETAPAS, decorarEtapas } from './timeline/etapas'
+import { PLAZOS } from '@/lib/catalogos/plazos'
+import {
+  avisoDeFallidos,
+  buscarDocumento,
+  firmarDocumentos,
+  leerBuckets,
+} from '@/features/auditorias/lib/indice-archivos'
 import {
   descargarInformeAuditoria,
   descargarPlanMejora,
@@ -33,12 +41,37 @@ import {
 import {
   BUCKETS,
   addBusinessDays,
+  buildActaCompromisoPath,
+  buildActaPath,
+  buildAsistenciaPath,
+  buildEvaluacionPath,
+  buildPlanPath,
+  buildValidationPath,
   diffInBusinessDays,
-  diffInDays,
   fmt,
   parseYMD,
   startOfDay,
 } from '@/features/auditorias/hooks/useAuditTimeline'
+
+/**
+ * Los documentos que se buscan en Storage y el campo donde queda cada uno.
+ *
+ * Mismo criterio que el panel del administrador —nombre exacto, no «el que
+ * contenga el id»—, para que las dos pantallas no discrepen sobre si un
+ * documento está entregado.
+ */
+const DOCUMENTOS = [
+  {
+    campo: 'plan',
+    bucket: BUCKETS.PLANES,
+    ruta: (a) => a.plan_informe?.[0]?.archivo_path || buildPlanPath(a),
+  },
+  { campo: 'asistencia', bucket: BUCKETS.ASISTENCIAS, ruta: buildAsistenciaPath },
+  { campo: 'evaluacion', bucket: BUCKETS.EVALUACIONES, ruta: buildEvaluacionPath },
+  { campo: 'acta', bucket: BUCKETS.ACTAS, ruta: buildActaPath },
+  { campo: 'acta_compromiso', bucket: BUCKETS.ACTAS_COMPROMISO, ruta: buildActaCompromisoPath },
+  { campo: 'validated', bucket: BUCKETS.VALIDACIONES, ruta: buildValidationPath },
+]
 
 export default function AuditoriasTimeline({ usuario }) {
   const [loading, setLoading] = useState(true)
@@ -96,61 +129,58 @@ export default function AuditoriasTimeline({ usuario }) {
 
       if (error) throw error
 
-      const merged = await Promise.all(
-        (data || []).map(async (a) => {
-          // Plan de auditoría: la ruta está en la tabla, la URL hay que firmarla.
-          let plan = null
-          const rec = a.plan_informe?.[0] || null
-          if (rec?.archivo_path) {
-            try {
-              const { data: signed } = await supabase.storage
-                .from(BUCKETS.PLANES)
-                .createSignedUrl(rec.archivo_path, 60 * 60)
-              plan = {
-                path: rec.archivo_path,
-                enviado_at: rec.enviado_at,
-                url: signed?.signedUrl || null,
-              }
-            } catch {
-              /* sin URL firmada: el paso se muestra como pendiente */
-            }
-          }
+      const filas = data || []
 
-          /** Busca en el bucket el archivo cuyo nombre contiene el id del informe. */
-          const fetchDoc = async (bucket) => {
-            try {
-              const { data: files } = await supabase.storage
-                .from(bucket)
-                .list('', { limit: 100, sortBy: { column: 'name', order: 'asc' } })
-              const hit = (files || []).find((f) => f.name.includes(String(a.id)))
-              if (!hit) return null
-              const { data: signed } = await supabase.storage
-                .from(bucket)
-                .createSignedUrl(hit.name, 60 * 60)
-              return {
-                file: hit.name,
-                url: signed?.signedUrl || null,
-                // Cuándo se entregó, para poder distinguir un envío tardío de
-                // uno a tiempo. `created_at` y no `updated_at`: cuenta la
-                // primera entrega, no el reemplazo por un escaneo mejor.
-                subido_at: hit.created_at ?? hit.updated_at ?? null,
-              }
-            } catch {
-              return null
-            }
-          }
+      // Una lectura por bucket y una firma por lote (ver `lib/indice-archivos`).
+      // Antes se listaba el bucket entero —con tope de 100 objetos— una vez por
+      // documento y por auditoría, y cualquier fallo de red devolvía `null`,
+      // que en pantalla es idéntico a «no lo he subido».
+      const { indice, fallidos } = await leerBuckets(DOCUMENTOS.map((d) => d.bucket))
 
-          const [validated, asistencia, evaluacion, acta, acta_compromiso] = await Promise.all([
-            fetchDoc(BUCKETS.VALIDACIONES),
-            fetchDoc(BUCKETS.ASISTENCIAS),
-            fetchDoc(BUCKETS.EVALUACIONES),
-            fetchDoc(BUCKETS.ACTAS),
-            fetchDoc(BUCKETS.ACTAS_COMPROMISO),
-          ])
-
-          return { ...a, plan, validated, asistencia, evaluacion, acta, acta_compromiso }
-        })
+      const hallazgos = filas.map((a) =>
+        DOCUMENTOS.map((documento) => buscarDocumento(indice, documento.bucket, documento.ruta(a)))
       )
+
+      const rutasPorBucket = {}
+      hallazgos.forEach((deLaAuditoria) => {
+        deLaAuditoria.forEach((hallazgo, i) => {
+          if (!hallazgo.existe) return
+          ;(rutasPorBucket[DOCUMENTOS[i].bucket] ||= []).push(hallazgo.path)
+        })
+      })
+
+      const urls = await firmarDocumentos(rutasPorBucket)
+
+      const merged = filas.map((a, fila) => {
+        const documentos = {}
+
+        DOCUMENTOS.forEach((documento, i) => {
+          const hallazgo = hallazgos[fila][i]
+
+          documentos[documento.campo] = hallazgo.existe
+            ? {
+                path: hallazgo.path,
+                url: urls.get(`${documento.bucket}|${hallazgo.path}`) ?? null,
+                subido_at: hallazgo.subido_at,
+              }
+            : hallazgo.desconocido
+              ? { desconocido: true }
+              : null
+        })
+
+        // La constancia de `planes_auditoria_informe` manda; si no la hay, vale
+        // la fecha del archivo. Así el paso se da por hecho igual que en el
+        // panel del administrador.
+        const rec = a.plan_informe?.[0] || null
+        if (documentos.plan?.path) {
+          documentos.plan.enviado_at =
+            (rec?.archivo_path ? rec.enviado_at : null) || documentos.plan.subido_at
+        }
+
+        return { ...a, ...documentos }
+      })
+
+      if (fallidos.length) toast.warning(avisoDeFallidos(fallidos))
 
       setAuditorias(merged)
       setSelectedId((prev) => prev ?? merged?.[0]?.id ?? null)
@@ -176,11 +206,15 @@ export default function AuditoriasTimeline({ usuario }) {
     const fa = parseYMD(selected.fecha_auditoria)
     if (!fa) return vacio
 
-    // Plazos respecto a la fecha de auditoría (días hábiles).
-    const cartaCompromisoDate = addBusinessDays(fa, -5)
-    const planDate = addBusinessDays(fa, -5)
-    const actaLimit = addBusinessDays(fa, 10)
-    const informeLimit = addBusinessDays(fa, 10)
+    // Plazos respecto a la fecha de auditoría, en días hábiles. Los números
+    // salen de `PLAZOS`, que es de donde los leen también el Centro de Control,
+    // las alertas y la nota de archivos.
+    const cartaCompromisoDate = addBusinessDays(fa, PLAZOS.actaCompromiso.dias)
+    const planDate = addBusinessDays(fa, PLAZOS.plan.dias)
+    const asistenciaLimit = addBusinessDays(fa, PLAZOS.asistencia.dias)
+    const evaluacionLimit = addBusinessDays(fa, PLAZOS.evaluacion.dias)
+    const actaLimit = addBusinessDays(fa, PLAZOS.acta.dias)
+    const informeLimit = addBusinessDays(fa, PLAZOS.validacion.dias)
     const pmLimit = addBusinessDays(fa, 20)
 
     const isFilled =
@@ -210,6 +244,22 @@ export default function AuditoriasTimeline({ usuario }) {
     const pasoDocumento = ({ key, title, when, days, doc, campo, textoVer, textoSubir, hecho, pendiente }) => {
       const url = selected[campo]?.url
       const subidoAt = selected[campo]?.subido_at ?? null
+
+      // Storage no contestó al cargar: no se sabe si está: no es lo mismo que
+      // faltar, y anunciarlo como pendiente haría subirlo otra vez.
+      if (selected[campo]?.desconocido === true) {
+        return {
+          key,
+          title,
+          when,
+          days,
+          explicitDone: false,
+          subidoAt: null,
+          subtitle: 'No se pudo consultar el almacenamiento, así que no se sabe si está cargado.',
+          actions: [{ label: 'Reintentar', onClick: loadData, type: 'replace' }],
+        }
+      }
+
       return {
         key,
         title,
@@ -263,26 +313,26 @@ export default function AuditoriasTimeline({ usuario }) {
       pasoDocumento({
         key: 'asistencia',
         title: 'Listado de asistencia',
-        when: fa,
-        days: diffInDays(hoy, fa),
+        when: asistenciaLimit,
+        days: diffInBusinessDays(hoy, asistenciaLimit),
         doc: 'asistencia',
         campo: 'asistencia',
         textoVer: 'Ver asistencia',
         textoSubir: 'Subir asistencia',
         hecho: 'Cargado',
-        pendiente: 'Subir PDF del listado de asistencia.',
+        pendiente: `Subir PDF del listado de asistencia (${PLAZOS.asistencia.texto}).`,
       }),
       pasoDocumento({
         key: 'evaluacion',
         title: 'Evaluación',
-        when: fa,
-        days: diffInDays(hoy, fa),
+        when: evaluacionLimit,
+        days: diffInBusinessDays(hoy, evaluacionLimit),
         doc: 'evaluacion',
         campo: 'evaluacion',
         textoVer: 'Ver evaluación',
         textoSubir: 'Subir evaluación',
         hecho: 'Cargada',
-        pendiente: 'Subir PDF de evaluación.',
+        pendiente: `Subir PDF de evaluación (${PLAZOS.evaluacion.texto}).`,
       }),
       pasoDocumento({
         key: 'acta',

@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/table'
 import { DataTablePagination } from '@/components/ui/data-table-pagination'
 import { usePagination } from '@/components/ui/use-pagination'
+import { formatearDia } from '@/lib/fechas'
 import {
   PAGE_SHELL,
   STATUS_BADGE_TONES,
@@ -54,12 +55,12 @@ const normalize = (s) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
 
-const fmtDate = (value) => {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleDateString('es-CO')
-}
+/**
+ * Fecha legible. Pasa por `formatearDia`, que lee la cadena tal cual: con
+ * `new Date('2026-09-17')` se interpretaba medianoche UTC y en Bogotá salía el
+ * 16, un día antes que en el resto del sistema.
+ */
+const fmtDate = (value) => formatearDia(value) ?? ''
 
 const formatCapitulo = (cap) => {
   if (cap == null) return ''

@@ -1,9 +1,12 @@
 /**
- * Custom Hook para gestionar lógica de timeline de auditorías
- * Centraliza utilidades de fecha, cálculos de progreso y gestión de etapas
+ * Utilidades de la línea de tiempo de auditorías: fechas, buckets, rutas de
+ * archivo y límites de tamaño.
+ *
+ * Pese al nombre del archivo ya no exporta ningún hook: son funciones puras,
+ * y por eso las puede importar también una ruta de servidor. Los plazos de los
+ * documentos no están aquí, sino en `@/lib/catalogos/plazos`.
  */
-
-import { useMemo } from 'react'
+import { formatearDia, toYMD } from '@/lib/fechas'
 
 /* ---- Utilidades de Fecha ---- */
 export function parseYMD(ymd) {
@@ -72,17 +75,16 @@ export function diffInBusinessDays(from, to) {
   return count
 }
 
+/**
+ * Fecha legible en hora de Colombia.
+ *
+ * Delega en `formatearDia`, que acepta tanto un día suelto («2026-09-17») como
+ * un instante ISO, para que la misma fecha se lea igual en todas las
+ * pantallas. El respaldo ya no usa `toLocaleDateString()` a secas: ese sí
+ * dependía del huso de la máquina.
+ */
 export function fmt(date) {
-  try {
-    return new Intl.DateTimeFormat('es-CO', {
-      timeZone: 'America/Bogota',
-      year: 'numeric',
-      month: 'short',
-      day: '2-digit'
-    }).format(date)
-  } catch {
-    return date.toLocaleDateString()
-  }
+  return formatearDia(date) ?? ''
 }
 
 /* ---- Sistema de Badges ---- */
@@ -102,11 +104,9 @@ export const toSlugUpper = (s = '') =>
    .replace(/^_+|_+$/g, '')
    .toUpperCase()
 
-export const toYMD = (input) => {
-  if (!input) return new Date().toISOString().slice(0, 10)
-  const s = String(input)
-  return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : new Date(input).toISOString().slice(0, 10)
-}
+// `toYMD` vive ahora en `lib/fechas`; se reexporta para no tocar a quienes ya
+// lo importaban desde aquí.
+export { toYMD }
 
 /* ---- Constantes de Buckets ---- */
 export const BUCKETS = {
@@ -178,37 +178,6 @@ export const buildActaCompromisoPath = (a) =>
 
 export const buildValidationPath = (a) => 
   `Auditoria_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEPENDENCIA')}.pdf`
-
-/* ---- Cálculo de Timeline ---- */
-export function useTimelineCalculation(selectedAudit) {
-  return useMemo(() => {
-    if (!selectedAudit?.fecha_auditoria) return []
-    
-    const hoy = startOfDay(new Date())
-    const fa = parseYMD(selectedAudit.fecha_auditoria)
-    if (!fa) return []
-
-    const planDate = addDays(fa, -5)
-    const informeLimit = addDays(fa, 10)
-    const pmLimit = addDays(fa, 20)
-    const actaCompromisoLimit = addDays(fa, 15)
-
-    return {
-      planDate,
-      auditDate: fa,
-      informeLimit,
-      pmLimit,
-      actaCompromisoLimit,
-      today: hoy,
-      // Días restantes para cada etapa
-      planDays: diffInDays(hoy, planDate),
-      auditDays: diffInDays(hoy, fa),
-      informeDays: diffInDays(hoy, informeLimit),
-      pmDays: diffInDays(hoy, pmLimit),
-      actaCompDays: diffInDays(hoy, actaCompromisoLimit),
-    }
-  }, [selectedAudit])
-}
 
 /* ---- Validación de estado de informe ---- */
 export function getInformeStatus(informe) {

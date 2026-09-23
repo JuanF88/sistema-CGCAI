@@ -40,6 +40,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { PAGE_SHELL, STATUS_BADGE_TONES } from '@/components/ui/tokens'
+import { anioDe } from '@/lib/fechas'
 
 /* ------------------------------------------------------------------ *
  * Configuración de los tipos de hallazgo
@@ -784,9 +785,9 @@ export default function FormularioRegistro({
 
   const anioAuditoria = useMemo(() => {
     if (!auditoria?.fecha_auditoria) return null
-    const anio = new Date(auditoria.fecha_auditoria).getFullYear()
-    // 1969 es el año que sale cuando la fecha viene vacía o inválida.
-    return Number.isNaN(anio) || anio === 1969 ? null : anio
+    // De la cadena y no de un `Date`: `new Date('2026-01-01')` es medianoche
+    // UTC y leída en Bogotá cae en 2025 (ver `lib/fechas`).
+    return anioDe(auditoria.fecha_auditoria)
   }, [auditoria])
 
   const totalHallazgos = TIPOS_HALLAZGO.reduce((n, t) => n + hallazgos[t.key].length, 0)

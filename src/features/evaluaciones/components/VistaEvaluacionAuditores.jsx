@@ -9,8 +9,8 @@
  *
  * La nota final combina archivos entregados, encuesta y rúbrica.
  */
-import { useEffect, useState } from 'react'
-import { AlertCircle, Calculator, Calendar, Edit3, Filter, RefreshCw, TrendingUp, Upload } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { AlertCircle, Calculator, Calendar, Edit3, Filter, RefreshCw, Scale, TrendingUp, Upload } from 'lucide-react'
 import { toast } from 'react-toastify'
 
 import { cn } from '@/lib/utils'
@@ -37,14 +37,17 @@ import {
 import { ImportarEncuestas } from './evaluacion/ImportarEncuestas'
 import { MatrizRubrica } from './evaluacion/MatrizRubrica'
 import { ModalDesgloseArchivos } from './evaluacion/ModalDesgloseArchivos'
+import { ModalPesosNotaFinal } from './evaluacion/ModalPesosNotaFinal'
 import { TablaResumenEvaluaciones } from './evaluacion/TablaResumenEvaluaciones'
 import {
   actualizarFechas,
   calcularArchivos,
+  guardarPesos,
   guardarRubrica,
   importarEncuestas,
   listarEvaluaciones,
   listarPeriodosDisponibles,
+  obtenerPesos,
 } from '@/features/evaluaciones/api/evaluaciones-api'
 
 const TABS = [
@@ -165,6 +168,48 @@ export default function VistaEvaluacionAuditores() {
     // `cargarEvaluaciones` se redefine en cada render; el disparador real es el periodo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodo])
+
+  /* ── Pesos de la nota final ── */
+
+  const [pesosAbierto, setPesosAbierto] = useState(false)
+  const [pesosConfig, setPesosConfig] = useState(null)
+  const [pesosCargando, setPesosCargando] = useState(false)
+  const [pesosGuardando, setPesosGuardando] = useState(false)
+
+  const abrirPesos = useCallback(async () => {
+    if (!periodo) return
+
+    setPesosAbierto(true)
+    setPesosCargando(true)
+    try {
+      setPesosConfig(await obtenerPesos(periodo))
+    } catch (err) {
+      toast.error(`No se pudieron cargar los pesos: ${err.message}`)
+      setPesosAbierto(false)
+    } finally {
+      setPesosCargando(false)
+    }
+  }, [periodo])
+
+  const guardarPesosDelPeriodo = async (pesos) => {
+    setPesosGuardando(true)
+    try {
+      const res = await guardarPesos({ periodo, ...pesos })
+
+      toast.success(
+        `Pesos guardados: ${res.pesos.peso_archivos} / ${res.pesos.peso_encuesta} / ${res.pesos.peso_rubrica} %` +
+          ` · ${res.recalculadas} evaluación(es) recalculada(s)`
+      )
+      if (res.fallidas) toast.warning(`${res.fallidas} evaluación(es) no se pudieron recalcular.`)
+
+      setPesosAbierto(false)
+      await cargarEvaluaciones()
+    } catch (err) {
+      toast.error(`No se pudieron guardar los pesos: ${err.message}`)
+    } finally {
+      setPesosGuardando(false)
+    }
+  }
 
   /* ── Recalcular notas de archivos ── */
 
@@ -473,6 +518,16 @@ export default function VistaEvaluacionAuditores() {
             </Button>
             <Button
               variant="secondary"
+              onClick={abrirPesos}
+              disabled={!periodo}
+              title="Cuánto pesa cada fuente en la nota final de este periodo"
+              className="bg-white/15 text-white hover:bg-white/25"
+            >
+              <Scale />
+              Pesos
+            </Button>
+            <Button
+              variant="secondary"
               onClick={cargarEvaluaciones}
               disabled={loading}
               className="bg-white/15 text-white hover:bg-white/25"
@@ -593,6 +648,16 @@ export default function VistaEvaluacionAuditores() {
         onDescartar={() => setArchivosEditados({})}
         onGuardar={guardarFechasEditadas}
         guardando={guardandoFechas}
+      />
+
+      <ModalPesosNotaFinal
+        open={pesosAbierto}
+        onOpenChange={setPesosAbierto}
+        periodo={periodoLabel}
+        cargando={pesosCargando}
+        config={pesosConfig}
+        onGuardar={guardarPesosDelPeriodo}
+        guardando={pesosGuardando}
       />
     </div>
   )

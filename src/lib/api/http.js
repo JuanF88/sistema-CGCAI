@@ -23,6 +23,9 @@ export class ApiError extends Error {
 /** Cuántos motivos se listan antes de resumir; más no se lee en un aviso. */
 const MAX_MOTIVOS = 3
 
+/** A partir de aquí, un texto plano deja de parecer un mensaje para el usuario. */
+const MAX_TEXTO_PLANO = 300
+
 /**
  * Los motivos concretos de un error de validación.
  *
@@ -48,9 +51,19 @@ function motivosDeValidacion(details) {
   return resto > 0 ? `${visibles} · y ${resto} más` : visibles
 }
 
+/** ¿El cuerpo es una página de error del servidor en vez de un mensaje? */
+const pareceHtml = (texto) => /^\s*<!?[a-z]/i.test(texto)
+
 /** Mensaje legible a partir del cuerpo de error del backend. */
 export function getApiErrorMessage(data, status) {
-  if (typeof data === 'string' && data.trim()) return data
+  // Un cuerpo que no es JSON casi siempre es la página de error de Next o de
+  // la plataforma. Enseñarla tal cual metía el HTML entero en el aviso rojo
+  // del formulario: media pantalla de etiquetas donde debía ir una frase.
+  // Solo se acepta el texto si de verdad parece un mensaje corto.
+  if (typeof data === 'string') {
+    const texto = data.trim()
+    if (texto && !pareceHtml(texto) && texto.length <= MAX_TEXTO_PLANO) return texto
+  }
 
   const motivos = motivosDeValidacion(data?.details)
   if (motivos) return motivos
@@ -60,6 +73,7 @@ export function getApiErrorMessage(data, status) {
   if (status === 401) return 'Tu sesión expiró. Vuelve a iniciar sesión.'
   if (status === 403) return 'No tienes permisos para hacer esto.'
   if (status === 404) return 'No se encontró el recurso solicitado.'
+  if (status >= 500) return 'El servidor falló al procesar la petición. Intenta nuevamente.'
   return 'No se pudo completar la operación. Intenta nuevamente.'
 }
 

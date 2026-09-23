@@ -6,7 +6,16 @@
  * Muestra documento a documento la fecha límite, la de entrega y los puntos, y
  * permite corregir la fecha de entrega a mano: los puntos se recalculan en el
  * momento y las fechas editadas se preservan en los recálculos posteriores.
+ *
+ * Todo lo que se ve sale de `recalcularDetalle`, es decir, de la fecha de la
+ * auditoría, el tipo de documento y la fecha de entrega. No se enseña lo que
+ * hubiera guardado en `fechaLimite`, `estado` ni `puntos`: los desgloses
+ * calculados antes del arreglo de fechas tienen el plazo un día antes de lo
+ * debido y cuentan como tardía cualquier entrega hecha el propio día del
+ * vencimiento. Recalcular en pantalla deja la tabla correcta desde que se abre,
+ * sin esperar a que alguien pulse «Recalcular archivos».
  */
+import { useMemo } from 'react'
 import { AlertCircle, Save } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -34,9 +43,9 @@ import {
   PUNTOS_A_TIEMPO,
   PUNTOS_TARDE,
   archivosDe,
-  calcularEstado,
-  calcularPuntos,
+  recalcularDetalle,
 } from '@/features/evaluaciones/lib/archivos'
+import { formatearDia } from '@/lib/fechas'
 
 /** Tono del badge según los puntos obtenidos. */
 const tonoPorPuntos = (puntos) =>
@@ -49,8 +58,8 @@ const colorPorPuntos = (puntos) =>
       ? 'text-amber-600'
       : 'text-destructive'
 
-/** Tabla de archivos de un informe. */
-function TablaArchivos({ informe, informeIdx, editados, onFecha }) {
+/** Tabla de archivos de un informe, ya recalculada. */
+function TablaArchivos({ informe, informeIdx, onFecha }) {
   return (
     <div className={TABLE_SCROLL}>
       <Table>
@@ -66,22 +75,17 @@ function TablaArchivos({ informe, informeIdx, editados, onFecha }) {
 
         <TableBody>
           {archivosDe(informe).map((archivo, archIdx) => {
-            const editado = editados[`${informeIdx}-${archIdx}`]
-            const fechaCarga = editado?.fechaCarga || archivo.fechaCarga?.split('T')[0]
-            const fechaLimite = archivo.fechaLimite?.split('T')[0]
-            const manual = archivo.editado_manualmente === true
-
-            const puntos = editado ? calcularPuntos(fechaCarga, fechaLimite) : archivo.puntos
-            const estado = editado ? calcularEstado(fechaCarga, fechaLimite) : archivo.estado
+            const editado = archivo.fue_editado_en_sesion_actual === true
+            const manual = archivo.editado_manualmente === true && !editado
 
             return (
               <TableRow
                 key={archIdx}
-                className={cn(manual && !editado && 'bg-emerald-50/50 dark:bg-emerald-950/20')}
+                className={cn(manual && 'bg-emerald-50/50 dark:bg-emerald-950/20')}
               >
                 <TableCell className="font-medium">
                   {archivo.nombre}
-                  {manual && !editado && (
+                  {manual && (
                     <span className="ml-2 text-xs font-medium text-emerald-600">🔒 Manual</span>
                   )}
                 </TableCell>
@@ -91,9 +95,9 @@ function TablaArchivos({ informe, informeIdx, editados, onFecha }) {
                 </TableCell>
 
                 <TableCell>
-                  {archivo.existe || editado ? (
+                  {archivo.existe ? (
                     <DatePicker
-                      value={fechaCarga || ''}
+                      value={archivo.fechaCarga || ''}
                       onChange={(v) => onFecha(informeIdx, archIdx, v)}
                       title={
                         manual
@@ -103,7 +107,7 @@ function TablaArchivos({ informe, informeIdx, editados, onFecha }) {
                       className={cn(
                         'h-8 text-xs',
                         editado && 'border-primary bg-primary/5',
-                        manual && !editado && 'border-emerald-500'
+                        manual && 'border-emerald-500'
                       )}
                     />
                   ) : (
@@ -111,7 +115,7 @@ function TablaArchivos({ informe, informeIdx, editados, onFecha }) {
                       size="sm"
                       variant="outline"
                       onClick={() =>
-                        onFecha(informeIdx, archIdx, new Date().toISOString().split('T')[0])
+                        onFecha(informeIdx, archIdx, hoy())
                       }
                     >
                       + Agregar fecha
@@ -123,18 +127,18 @@ function TablaArchivos({ informe, informeIdx, editados, onFecha }) {
                   <span
                     className={cn(
                       'rounded-full border px-2.5 py-0.5 text-xs font-semibold',
-                      STATUS_BADGE_TONES[tonoPorPuntos(puntos)]
+                      STATUS_BADGE_TONES[tonoPorPuntos(archivo.puntos)]
                     )}
                   >
-                    {estado || 'No disponible'}
+                    {archivo.estado || 'No disponible'}
                     {editado && ' ✏️'}
-                    {manual && !editado && ' 🔒'}
+                    {manual && ' 🔒'}
                   </span>
                 </TableCell>
 
                 <TableCell className="text-center">
-                  <span className={cn('font-bold tabular-nums', colorPorPuntos(puntos))}>
-                    {puntos !== undefined ? `${puntos}/${PUNTOS_A_TIEMPO}` : '-'}
+                  <span className={cn('font-bold tabular-nums', colorPorPuntos(archivo.puntos))}>
+                    {archivo.puntos !== undefined ? `${archivo.puntos}/${PUNTOS_A_TIEMPO}` : '-'}
                   </span>
                 </TableCell>
               </TableRow>
@@ -156,11 +160,25 @@ export function ModalDesgloseArchivos({
   onGuardar,
   guardando,
 }) {
+  // El `?? []` va dentro: fuera crea un array nuevo en cada render y el memo
+  // no serviría de nada.
+  const guardadosRef = evaluacion?.detalle_archivos?.informes
+
+  const recalculado = useMemo(
+    () => recalcularDetalle(guardadosRef ?? [], editados ?? {}),
+    [guardadosRef, editados]
+  )
+
   if (!evaluacion) return null
 
-  const detalle = evaluacion.detalle_archivos
-  const informes = detalle?.informes || []
-  const cambiosPendientes = Object.keys(editados).length
+  const informes = recalculado.informes
+  const cambiosPendientes = Object.keys(editados ?? {}).length
+
+  // La nota guardada se quedó con el cálculo anterior mientras nadie vuelva a
+  // pasar por «Recalcular archivos». Se avisa en vez de sustituirla en silencio.
+  const notaGuardada = evaluacion.nota_archivos ?? 0
+  const desfasada =
+    !cambiosPendientes && informes.length > 0 && Math.abs(notaGuardada - recalculado.nota) > 0.005
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -179,6 +197,16 @@ export function ModalDesgloseArchivos({
             conservan al recalcular. Las demás se recalculan según el almacenamiento.
           </p>
 
+          {desfasada && (
+            <p className="rounded-lg border border-amber-300 bg-amber-50/70 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+              <strong>⚠️ La nota guardada está desactualizada.</strong> Se calculó cuando el plazo se
+              contaba mal —un día antes, y la entrega del propio día del vencimiento figuraba como
+              tardía—. La tabla de abajo ya está corregida:{' '}
+              <strong>{notaGuardada.toFixed(2)} → {recalculado.nota.toFixed(2)}</strong>. Pulsa
+              «Recalcular archivos» para fijarla.
+            </p>
+          )}
+
           {informes.length > 0 ? (
             <>
               {informes.map((informe, idx) => (
@@ -186,24 +214,19 @@ export function ModalDesgloseArchivos({
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5">
                     <h3 className="text-sm font-semibold">Informe #{informe.informe_id}</h3>
                     <span className="text-xs text-muted-foreground">
-                      Auditoría: {informe.fecha_auditoria}
+                      Auditoría: {formatearDia(informe.fecha_auditoria) || informe.fecha_auditoria}
                     </span>
                   </div>
 
-                  <TablaArchivos
-                    informe={informe}
-                    informeIdx={idx}
-                    editados={editados}
-                    onFecha={onFecha}
-                  />
+                  <TablaArchivos informe={informe} informeIdx={idx} onFecha={onFecha} />
                 </div>
               ))}
 
               <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/40 p-4 text-sm">
                 {[
-                  ['Total archivos esperados', detalle.total_esperados || 0],
-                  ['Archivos entregados', detalle.total_cargados || 0],
-                  ['Puntos totales', detalle.total_puntos || 0],
+                  ['Total archivos esperados', recalculado.totalEsperados],
+                  ['Archivos entregados', recalculado.totalCargados],
+                  ['Puntos totales', recalculado.totalPuntos],
                 ].map(([label, valor]) => (
                   <div key={label} className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">{label}:</span>
@@ -216,17 +239,17 @@ export function ModalDesgloseArchivos({
                   <span
                     className={cn(
                       'text-2xl font-extrabold tabular-nums',
-                      colorNota(evaluacion.nota_archivos)
+                      colorNota(recalculado.nota)
                     )}
                   >
-                    {evaluacion.nota_archivos?.toFixed(2) || '0.00'}
+                    {recalculado.nota.toFixed(2)}
                   </span>
                 </div>
               </div>
 
               <p className="flex items-start gap-2 text-xs text-muted-foreground">
                 <AlertCircle className="h-4 w-4 shrink-0" />
-                {detalle.metodo_calculo ||
+                {evaluacion.detalle_archivos?.metodo_calculo ||
                   'La nota se calcula como el promedio de puntos obtenidos en todos los archivos.'}
               </p>
             </>

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/guard'
 import { ROLES } from '@/lib/auth/roles'
+import { anioDe } from '@/lib/fechas'
 
 export async function GET(request) {
   const guard = await requireAuth()
@@ -116,8 +117,8 @@ export async function GET(request) {
 
     const auditorias = (informes || []).map((informe) => {
       const evaluacion = evaluacionesPorInforme.get(informe.id) || null
-      const fecha = informe.fecha_auditoria ? new Date(informe.fecha_auditoria) : null
-      const anio = fecha && !Number.isNaN(fecha.getTime()) ? fecha.getFullYear() : null
+      // De la cadena, no de un `Date`: ver `lib/fechas`.
+      const anio = anioDe(informe.fecha_auditoria)
 
       return {
         informe_id: informe.id,

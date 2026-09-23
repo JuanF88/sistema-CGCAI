@@ -1,47 +1,30 @@
+import { plazoDeAlerta } from '@/lib/catalogos/plazos'
+
+/**
+ * Los seis procesos que se vigilan.
+ *
+ * El plazo de cada uno sale de `PLAZOS`, el catálogo que comparten las líneas
+ * de trabajo, el Centro de Control y la nota de archivos. Aquí solo se
+ * declara qué bucket mirar y cómo se sabe que está hecho.
+ *
+ * El plazo con el que se dispara la alerta sale de aquí (`getDueDateForProcess`),
+ * no de la base de datos: de `alertas_procesos_config` solo se leen `activo`,
+ * qué avisos están encendidos y cada cuánto se repite el de vencido. La columna
+ * `due_offset_business_days` de esa tabla es únicamente lo que se enseña en el
+ * panel de alertas, así que conviene dejarla igual —lo hace
+ * `sql/plazos-asistencia-evaluacion.sql`— para que no diga una cosa distinta.
+ */
 const PROCESS_DEFINITIONS = [
-  {
-    key: 'carta_compromiso',
-    label: 'Carta de compromiso',
-    bucket: 'actascompromiso',
-    dueOffsetBusinessDays: -5,
-    completionKind: 'storage',
-  },
-  {
-    key: 'plan_auditoria',
-    label: 'Plan de auditoría',
-    bucket: 'planes',
-    dueOffsetBusinessDays: -5,
-    completionKind: 'storage',
-  },
-  {
-    key: 'listado_asistencia',
-    label: 'Listado de asistencia',
-    bucket: 'asistencias',
-    dueOffsetBusinessDays: 0,
-    completionKind: 'storage',
-  },
-  {
-    key: 'evaluacion',
-    label: 'Evaluación',
-    bucket: 'evaluaciones',
-    dueOffsetBusinessDays: 0,
-    completionKind: 'storage',
-  },
-  {
-    key: 'acta_reunion',
-    label: 'Acta de reunión',
-    bucket: 'actas',
-    dueOffsetBusinessDays: 10,
-    completionKind: 'storage',
-  },
-  {
-    key: 'informe_auditoria',
-    label: 'Informe de auditoría',
-    bucket: 'validaciones',
-    dueOffsetBusinessDays: 10,
-    completionKind: 'report',
-  },
-]
+  { key: 'carta_compromiso', label: 'Carta de compromiso', bucket: 'actascompromiso', completionKind: 'storage' },
+  { key: 'plan_auditoria', label: 'Plan de auditoría', bucket: 'planes', completionKind: 'storage' },
+  { key: 'listado_asistencia', label: 'Listado de asistencia', bucket: 'asistencias', completionKind: 'storage' },
+  { key: 'evaluacion', label: 'Evaluación', bucket: 'evaluaciones', completionKind: 'storage' },
+  { key: 'acta_reunion', label: 'Acta de reunión', bucket: 'actas', completionKind: 'storage' },
+  { key: 'informe_auditoria', label: 'Informe de auditoría', bucket: 'validaciones', completionKind: 'report' },
+].map((proceso) => ({
+  ...proceso,
+  dueOffsetBusinessDays: plazoDeAlerta(proceso.key)?.dias ?? 0,
+}))
 
 export const DEFAULT_ALERT_CONFIGS = PROCESS_DEFINITIONS.map((process) => ({
   proceso_key: process.key,

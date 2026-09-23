@@ -21,9 +21,17 @@ import {
 import { PAGE_SHELL, SECTION_CARD } from '@/components/ui/tokens'
 import { useAnioInicial } from '@/hooks/useAnioInicial'
 import { cn } from '@/lib/utils'
+import { toast } from 'react-toastify'
+import { PLAZOS } from '@/lib/catalogos/plazos'
+import { llegoTarde } from './timeline/etapas'
+import {
+  avisoDeFallidos,
+  buscarDocumento,
+  leerBuckets,
+} from '@/features/auditorias/lib/indice-archivos'
 import {
   parseYMD,
-  addDays,
+  addBusinessDays,
   startOfDay,
   fmt,
   buildPlanPath,
@@ -35,17 +43,45 @@ import {
   BUCKETS
 } from '@/features/auditorias/hooks/useAuditTimeline'
 
-/* ===== obtener timestamps desde Storage (created_at/updated_at) ===== */
-async function getFileTimestamps(supabase, bucket, fullPath) {
-  try {
-    const dir = fullPath.includes('/') ? fullPath.slice(0, fullPath.lastIndexOf('/')) : ''
-    const name = fullPath.includes('/') ? fullPath.slice(fullPath.lastIndexOf('/') + 1) : fullPath
-    const { data: list } = await supabase.storage.from(bucket).list(dir || '', { limit: 1000 })
-    const obj = (list || []).find(x => x.name === name)
-    return obj ? { created_at: obj.created_at, updated_at: obj.updated_at } : null
-  } catch {
-    return null
-  }
+/**
+ * Los documentos de la malla, en el orden del ciclo de la auditoría.
+ *
+ * De aquí salen las dos cosas que se comparan de un vistazo —las tarjetas de
+ * arriba y las columnas de la tabla—, para que la tercera tarjeta corresponda
+ * siempre con la tercera columna. Antes eran dos listas sueltas en distinto
+ * orden y no había forma de leerlas juntas.
+ */
+const DOCUMENTOS_MALLA = [
+  { key: 'actaComp',   columna: 'Carta Comp.', tarjeta: 'Cartas compromiso',  tono: 'pink' },
+  { key: 'plan',       columna: 'Plan',        tarjeta: 'Planes',             tono: 'purple' },
+  { key: 'asistencia', columna: 'Asistencia',  tarjeta: 'Asistencias',        tono: 'green' },
+  { key: 'evaluacion', columna: 'Evaluación',  tarjeta: 'Evaluaciones',       tono: 'orange' },
+  { key: 'acta',       columna: 'Acta',        tarjeta: 'Actas',              tono: 'cyan' },
+  { key: 'informeOk',  columna: 'Informe',     tarjeta: 'Informes completos', tono: 'teal' },
+  { key: 'validado',   columna: 'Validado',    tarjeta: 'Validados',          tono: 'indigo' },
+]
+
+const COLUMNAS = DOCUMENTOS_MALLA.map(({ key, columna }) => ({ key, title: columna }))
+
+/**
+ * Las ocho métricas de la cabecera.
+ *
+ * `sinPorcentaje` es solo para el total: es el denominador de las otras siete,
+ * así que un «16/16 · 100 %» no diría nada.
+ */
+const TARJETAS = [
+  { key: 'total', label: 'Total auditorías', tono: 'blue', sinPorcentaje: true },
+  ...DOCUMENTOS_MALLA.map(({ key, tarjeta, tono }) => ({ key, label: tarjeta, tono })),
+]
+
+/** Los seis buckets que hay que leer para pintar la matriz. */
+const BUCKETS_DOCUMENTO = {
+  planes: BUCKETS.PLANES,
+  asistencias: BUCKETS.ASISTENCIAS,
+  evaluaciones: BUCKETS.EVALUACIONES,
+  actas: BUCKETS.ACTAS,
+  actascompromiso: BUCKETS.ACTAS_COMPROMISO,
+  validaciones: BUCKETS.VALIDACIONES,
 }
 
 // `soloLectura` se acepta por coherencia con las demás vistas del panel del
@@ -77,45 +113,47 @@ export default function AuditoriasMallaControl() {
       if (error) throw error
       const rows = data || []
 
-      const fileExists = async (bucket, path) => {
-        try {
-          // Extraer directorio y nombre del archivo
-          const lastSlash = path.lastIndexOf('/')
-          const dir = lastSlash > 0 ? path.substring(0, lastSlash) : ''
-          const fileName = lastSlash > 0 ? path.substring(lastSlash + 1) : path
-          
-          // Listar archivos en el directorio
-          const { data, error } = await supabase.storage
-            .from(bucket)
-            .list(dir, { limit: 1000 })
-          
-          if (error) return false
-          return data?.some(file => file.name === fileName) || false
-        } catch { 
-          return false 
-        }
-      }
+      // Una sola lectura por bucket para toda la pantalla. Antes se listaba el
+      // bucket entero para saber si un documento existía, y **otra vez** para
+      // leer su fecha: hasta 468 listados encadenados en cada carga. Y cualquier
+      // fallo devolvía «no existe», que aquí se convierte en un vencimiento
+      // inventado. Ver `lib/indice-archivos`.
+      const { indice, fallidos } = await leerBuckets(Object.values(BUCKETS_DOCUMENTO))
+      if (fallidos.length) toast.warning(avisoDeFallidos(fallidos))
 
-      const merged = await Promise.all(rows.map(async (a) => {
+      const merged = rows.map((a) => {
         const fa = parseYMD(a.fecha_auditoria)
+
+        // Los plazos salen de `PLAZOS` y se cuentan en días hábiles, igual que
+        // en las dos líneas de trabajo y en la nota de archivos. Esta pantalla
+        // llevaba su propia tabla en días naturales y se había desalineado del
+        // resto: daba el acta por vencida el mismo día de la auditoría y la
+        // carta de compromiso quince días *después*, cuando se entrega cinco
+        // días hábiles *antes*.
         const due = fa ? {
-          plan:        addDays(fa, -5),
-          asistencia:  fa,
-          evaluacion:  fa,
-          acta:        fa,
-          actaComp:    addDays(fa, 15),
-          informeOk:   addDays(fa, 10),
-          validado:    addDays(fa, 10),
+          plan:        addBusinessDays(fa, PLAZOS.plan.dias),
+          asistencia:  addBusinessDays(fa, PLAZOS.asistencia.dias),
+          evaluacion:  addBusinessDays(fa, PLAZOS.evaluacion.dias),
+          acta:        addBusinessDays(fa, PLAZOS.acta.dias),
+          actaComp:    addBusinessDays(fa, PLAZOS.actaCompromiso.dias),
+          informeOk:   addBusinessDays(fa, PLAZOS.validacion.dias),
+          validado:    addBusinessDays(fa, PLAZOS.validacion.dias),
         } : {}
 
-        const [hasPlan, hasAsis, hasEval, hasActa, hasActaComp, hasValid] = await Promise.all([
-          fileExists(BUCKETS.PLANES,            buildPlanPath(a)),
-          fileExists(BUCKETS.ASISTENCIAS,       buildAsistenciaPath(a)),
-          fileExists(BUCKETS.EVALUACIONES,      buildEvaluacionPath(a)),
-          fileExists(BUCKETS.ACTAS,             buildActaPath(a)),
-          fileExists(BUCKETS.ACTAS_COMPROMISO,  buildActaCompromisoPath(a)),
-          fileExists(BUCKETS.VALIDACIONES,      buildValidationPath(a)),
-        ])
+        // Existencia y fecha de entrega salen de la misma lectura.
+        const plan       = buscarDocumento(indice, BUCKETS.PLANES,           buildPlanPath(a))
+        const asis       = buscarDocumento(indice, BUCKETS.ASISTENCIAS,      buildAsistenciaPath(a))
+        const evalu      = buscarDocumento(indice, BUCKETS.EVALUACIONES,     buildEvaluacionPath(a))
+        const actaDoc    = buscarDocumento(indice, BUCKETS.ACTAS,            buildActaPath(a))
+        const actaCompDoc= buscarDocumento(indice, BUCKETS.ACTAS_COMPROMISO, buildActaCompromisoPath(a))
+        const validacion = buscarDocumento(indice, BUCKETS.VALIDACIONES,     buildValidationPath(a))
+
+        const hasPlan = plan.existe
+        const hasAsis = asis.existe
+        const hasEval = evalu.existe
+        const hasActa = actaDoc.existe
+        const hasActaComp = actaCompDoc.existe
+        const hasValid = validacion.existe
 
 
         // Campos e hallazgos completos = "informeOk"
@@ -126,22 +164,36 @@ export default function AuditoriasMallaControl() {
         const validadoOk = hasValid || a.validado === true
 
         // Fechas de entrega (cuando existan)
-        const planSentAt = a?.plan_informe?.[0]?.enviado_at
-          || (hasPlan ? (await getFileTimestamps(supabase, 'planes', buildPlanPath(a)))?.created_at : null)
-        const asistenciaAt = hasAsis ? (await getFileTimestamps(supabase, 'asistencias', buildAsistenciaPath(a)))?.created_at : null
-        const evaluacionAt = hasEval ? (await getFileTimestamps(supabase, 'evaluaciones', buildEvaluacionPath(a)))?.created_at : null
-        const actaAt       = hasActa ? (await getFileTimestamps(supabase, 'actas', buildActaPath(a)))?.created_at : null
-        const actaCompAt   = hasActaComp ? (await getFileTimestamps(supabase, 'actascompromiso', buildActaCompromisoPath(a)))?.created_at : null
-        const validadoAt   = validadoOk ? (await getFileTimestamps(supabase, 'validaciones', buildValidationPath(a)))?.created_at : null
+        const planSentAt   = a?.plan_informe?.[0]?.enviado_at || plan.subido_at
+        const asistenciaAt = asis.subido_at
+        const evaluacionAt = evalu.subido_at
+        const actaAt       = actaDoc.subido_at
+        const actaCompAt   = actaCompDoc.subido_at
+        const validadoAt   = validacion.subido_at
+
+        /** Una etapa con su plazo y, si se entregó, si llegó fuera de él. */
+        const etapa = (delivered, limite, fecha) => {
+          const deliveredAt = fecha ? new Date(fecha) : null
+          return {
+            delivered,
+            due: limite,
+            deliveredAt,
+            // Mismo criterio que la línea de trabajo: se compara por día
+            // natural, así que entregar el propio día del plazo es a tiempo.
+            late: delivered && llegoTarde(deliveredAt, limite),
+          }
+        }
 
         const _stages = {
-          plan:       { delivered: hasPlan,       due: due.plan,       deliveredAt: planSentAt ? new Date(planSentAt) : null },
-          asistencia: { delivered: hasAsis,       due: due.asistencia, deliveredAt: asistenciaAt ? new Date(asistenciaAt) : null },
-          evaluacion: { delivered: hasEval,       due: due.evaluacion, deliveredAt: evaluacionAt ? new Date(evaluacionAt) : null },
-          acta:       { delivered: hasActa,       due: due.acta,       deliveredAt: actaAt ? new Date(actaAt) : null },
-          actaComp:   { delivered: hasActaComp,   due: due.actaComp,   deliveredAt: actaCompAt ? new Date(actaCompAt) : null },
-          informeOk:  { delivered: informeOk,     due: due.informeOk,  deliveredAt: null },
-          validado:   { delivered: validadoOk,    due: due.validado,   deliveredAt: validadoAt ? new Date(validadoAt) : null },
+          plan:       etapa(hasPlan,     due.plan,       planSentAt),
+          asistencia: etapa(hasAsis,     due.asistencia, asistenciaAt),
+          evaluacion: etapa(hasEval,     due.evaluacion, evaluacionAt),
+          acta:       etapa(hasActa,     due.acta,       actaAt),
+          actaComp:   etapa(hasActaComp, due.actaComp,   actaCompAt),
+          // El informe no es un archivo: se da por hecho cuando los campos y
+          // los hallazgos están, y de eso no queda fecha.
+          informeOk:  etapa(informeOk,   due.informeOk,  null),
+          validado:   etapa(validadoOk,  due.validado,   validadoAt),
         }
 
         // Puntuaciones
@@ -154,7 +206,7 @@ export default function AuditoriasMallaControl() {
           _stages,
           _scores: { docScore, infoScore }
         }
-      }))
+      })
 
       setAuditorias(merged)
     } catch (e) {
@@ -197,14 +249,14 @@ export default function AuditoriasMallaControl() {
     }
 
     // Agrega métricas agregadas + % avance + tooltips
-    const cols = ['plan','asistencia','evaluacion','acta','actaComp','informeOk','validado']
+    const cols = DOCUMENTOS_MALLA.map((d) => d.key)
     const list = Array.from(m.values()).map(row => {
       const total = row.items.length
       const agg = {}
       let sumDone = 0
 
       for (const key of cols) {
-        let done = 0, overdue = 0, pending = 0
+        let done = 0, overdue = 0, pending = 0, tardios = 0
         let nextDue = null, lastDelivered = null
 
         for (const a of row.items) {
@@ -212,6 +264,7 @@ export default function AuditoriasMallaControl() {
           if (!st) continue
           if (st.delivered) {
             done++
+            if (st.late) tardios++
             if (st.deliveredAt && (!lastDelivered || st.deliveredAt > lastDelivered)) {
               lastDelivered = st.deliveredAt
             }
@@ -225,7 +278,7 @@ export default function AuditoriasMallaControl() {
         }
 
         sumDone += done
-        agg[key] = { done, total, overdue, pending, nextDue, lastDelivered }
+        agg[key] = { done, total, overdue, pending, tardios, nextDue, lastDelivered }
       }
 
       const completion = total ? (sumDone / (total * cols.length)) : 0
@@ -253,33 +306,6 @@ export default function AuditoriasMallaControl() {
     return { ...t, pct }
   }, [filtered])
 
-  /**
-   * Las ocho métricas de la cabecera, en el orden del ciclo de la auditoría.
-   *
-   * `sinPorcentaje` es solo para el total: es el denominador de las otras
-   * siete, así que un «16/16 · 100 %» no diría nada.
-   */
-  const KPIS = [
-    { key: 'total',      label: 'Total auditorías',   tono: 'blue',   sinPorcentaje: true },
-    { key: 'plan',       label: 'Planes',             tono: 'purple' },
-    { key: 'asistencia', label: 'Asistencias',        tono: 'green' },
-    { key: 'evaluacion', label: 'Evaluaciones',       tono: 'orange' },
-    { key: 'acta',       label: 'Actas',              tono: 'cyan' },
-    { key: 'actaComp',   label: 'Actas compromiso',   tono: 'pink' },
-    { key: 'informeOk',  label: 'Informes completos', tono: 'teal' },
-    { key: 'validado',   label: 'Validados',          tono: 'indigo' },
-  ]
-
-  /** En el orden del ciclo: la carta de compromiso es lo primero que se hace. */
-  const columns = [
-    { key: 'actaComp',   title: 'Carta Comp.' },
-    { key: 'plan',       title: 'Plan' },
-    { key: 'asistencia', title: 'Asistencia' },
-    { key: 'evaluacion', title: 'Evaluación' },
-    { key: 'acta',       title: 'Acta' },
-    { key: 'informeOk',  title: 'Informe' },
-    { key: 'validado',   title: 'Validado' },
-  ]
 
   return (
     <div className={PAGE_SHELL}>
@@ -319,11 +345,14 @@ export default function AuditoriasMallaControl() {
       />
 
       {/* KPIs.
+          Van en el mismo orden que las columnas de la malla —salen los dos de
+          `DOCUMENTOS_MALLA`—, así la tercera tarjeta es la tercera columna.
+
           La escalera de columnas llega a ocho solo en 2xl (1536 px). Antes
           saltaba a ocho en xl (1280): en un portátil de 1366 eso dejaba 127 px
           por tarjeta y las etiquetas largas se salían. */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8">
-        {KPIS.map(({ key, label, tono, sinPorcentaje }) => (
+        {TARJETAS.map(({ key, label, tono, sinPorcentaje }) => (
           <InfoCard
             key={key}
 
@@ -380,7 +409,7 @@ export default function AuditoriasMallaControl() {
                 <div className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Avance
                 </div>
-                {columns.map((col) => (
+                {COLUMNAS.map((col) => (
                   <div
                     key={col.key}
                     className="px-2 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground"
@@ -420,7 +449,7 @@ export default function AuditoriasMallaControl() {
                       <span className="text-xs font-semibold tabular-nums">{pct}%</span>
                     </div>
 
-                    {columns.map((col) => {
+                    {COLUMNAS.map((col) => {
                       const ag = row._agg[col.key] || {
                         done: 0,
                         total: row.total,
@@ -432,8 +461,10 @@ export default function AuditoriasMallaControl() {
                       const localPct = ag.total ? Math.round((ag.done / ag.total) * 100) : 0
                       const tip = buildTooltip(col.title, ag)
 
+                      // El reloj marca la entrega que llegó fuera de plazo; el
+                      // visto, la que llegó a tiempo.
                       let dateInfo = ''
-                      if (ag.lastDelivered) dateInfo = `✓ ${fmt(ag.lastDelivered)}`
+                      if (ag.lastDelivered) dateInfo = `${ag.tardios ? '⏱' : '✓'} ${fmt(ag.lastDelivered)}`
                       else if (ag.nextDue) dateInfo = `⏰ ${fmt(ag.nextDue)}`
 
                       return (
@@ -443,7 +474,7 @@ export default function AuditoriasMallaControl() {
                           aria-label={tip}
                           className={cn(
                             'm-1 flex flex-col items-center justify-center rounded-lg px-1 py-2 text-center',
-                            heatClass(localPct)
+                            heatClass(localPct, ag.tardios)
                           )}
                         >
                           <span className="text-sm font-bold tabular-nums">
@@ -464,6 +495,24 @@ export default function AuditoriasMallaControl() {
             </div>
           </div>
         )}
+
+        {!loading && !error && matrix.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border px-4 py-3 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded bg-amber-200" aria-hidden="true" />
+              Entregado fuera de plazo
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded bg-emerald-100" aria-hidden="true" />
+              Completo y a tiempo
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded bg-slate-50 ring-1 ring-inset ring-border" aria-hidden="true" />
+              Sin entregar
+            </span>
+            <span>✓ entrega a tiempo · ⏱ entrega tardía · ⏰ próximo vencimiento</span>
+          </div>
+        )}
       </section>
     </div>
   )
@@ -471,8 +520,15 @@ export default function AuditoriasMallaControl() {
 
 /* ===== Subcomponentes UI ===== */
 
-/** Color de fondo de una celda del heatmap según su porcentaje. */
-function heatClass(pct) {
+/**
+ * Color de fondo de una celda del heatmap.
+ *
+ * Una entrega fuera de plazo manda sobre el porcentaje: es lo que hay que ver
+ * de un vistazo y, pintada de verde por estar completa, se perdía entre las
+ * demás. El mismo ámbar que usa «Envío tardío» en la línea de trabajo.
+ */
+function heatClass(pct, tardios = 0) {
+  if (tardios > 0) return 'bg-amber-200 text-amber-900'
   if (pct >= 90) return 'bg-emerald-100 text-emerald-900'
   if (pct >= 70) return 'bg-green-200 text-green-900'
   if (pct >= 50) return 'bg-blue-200 text-blue-900'
@@ -495,7 +551,12 @@ function buildTooltip(title, ag) {
   parts.push(`${title}: ${ag.done}/${ag.total}`)
   if (typeof ag.pending === 'number') parts.push(`Pendientes: ${ag.pending}`)
   if (typeof ag.overdue === 'number') parts.push(`Vencidos: ${ag.overdue}`)
+  if (ag.tardios) parts.push(`Fuera de plazo: ${ag.tardios}`)
   if (ag.nextDue) parts.push(`Próximo límite: ${fmt(ag.nextDue)}`)
-  if (ag.lastDelivered) parts.push(`Última entrega: ${fmt(ag.lastDelivered)}`)
+  // «Última» solo cuando la celda resume más de una auditoría; con una sola,
+  // decir «última» hacía dudar de si había otra entrega escondida.
+  if (ag.lastDelivered) {
+    parts.push(`${ag.total > 1 ? 'Última entrega' : 'Entregado'}: ${fmt(ag.lastDelivered)}`)
+  }
   return parts.join(' · ')
 }

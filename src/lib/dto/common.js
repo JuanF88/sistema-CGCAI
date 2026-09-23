@@ -20,6 +20,18 @@ export const nullableText = (max = 4000) =>
     .optional()
     .transform((v) => (v === undefined || v === '' ? null : v))
 
+/**
+ * Identificador UUID.
+ *
+ * No se usa `z.string().uuid()` porque cambió de sitio entre versiones de Zod;
+ * la expresión regular dice lo mismo y no se mueve.
+ */
+export const uuidId = (mensaje = 'Identificador inválido') =>
+  z
+    .string({ message: mensaje })
+    .trim()
+    .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, mensaje)
+
 /** Id numérico que puede llegar como string desde un query param o un form. */
 export const numericId = (mensaje = 'Identificador inválido') =>
   z.coerce.number({ message: mensaje }).int(mensaje).positive(mensaje)

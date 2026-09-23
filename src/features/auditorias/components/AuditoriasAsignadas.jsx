@@ -14,13 +14,14 @@ import { MAX_MB } from '@/features/auditorias/hooks/useAuditTimeline'
 import { FormDrawer } from '@/components/ui/form-drawer'
 import { PageHeader } from '@/components/ui/page-header'
 import { InfoCard } from '@/components/ui/info-card'
+import { anioDe, toYMD } from '@/lib/fechas'
 import {
   EMPTY_STATE,
   PAGE_SHELL,
   SECTION_CARD,
   STATUS_BADGE_TONES,
 } from '@/components/ui/tokens'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { Cargando } from '@/components/ui/loader'
 
 export default function AuditoriasAsignadas({ usuario, reset }) {
@@ -46,11 +47,8 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
       .replace(/^_+|_+$/g, '')
       .toUpperCase()
 
-  const toYMD = (input) => {
-    if (!input) return new Date().toISOString().slice(0, 10)
-    const s = String(input)
-    return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : new Date(input).toISOString().slice(0, 10)
-  }
+  // `toYMD` sale de `lib/fechas`: la copia local recortaba el día en UTC y de
+  // noche devolvía el siguiente.
 
   const handleVolver = () => {
     setAuditoriaSeleccionada(null)
@@ -259,15 +257,23 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
         .upload(filePath, archivo, { upsert: true, contentType: 'application/pdf' })
       if (uploadError) throw uploadError
 
-      await supabase
-        .from('validaciones_informe')
-        .insert([{ informe_id: auditoriaParaValidar.id, archivo_url: filePath }])
-
-      const { error: updErr } = await supabase
+      // Aquí había un `insert` en `validaciones_informe`, una tabla que no
+      // existe en la base y cuyo resultado nadie comprobaba: la escritura se
+      // perdía en silencio en cada validación.
+      //
+      // La fila se pide de vuelta porque bajo RLS un `update` que no alcanza
+      // ninguna fila devuelve cero filas **sin error**. Así una validación a
+      // medias se ve en el momento, en vez de descubrirse meses después.
+      const { data: marcadas, error: updErr } = await supabase
         .from('informes_auditoria')
         .update({ validado: true })
         .eq('id', auditoriaParaValidar.id)
+        .select('id')
+
       if (updErr) throw updErr
+      if (!marcadas?.length) {
+        throw new Error('El PDF se subió, pero no se pudo marcar como validada.')
+      }
 
       // Antes el estado local no se refrescaba: la tarjeta seguía en «Por
       // validar» hasta recargar la página.
@@ -360,7 +366,7 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
           {lista.map((a) => {
             const progreso = progresoAuditoria(a)
             const nombreDep = a.dependencias?.nombre || 'Dependencia no encontrada'
-            const year = a.fecha_auditoria ? new Date(a.fecha_auditoria).getFullYear() : null
+            const year = anioDe(a.fecha_auditoria)
             const estado = estadoPill(progreso)
             const planEnlace = a.dependencias?.plan_auditoria?.[0]?.enlace || ''
 

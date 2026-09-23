@@ -1,9 +1,15 @@
 import { z } from 'zod'
-import { numericId, periodo, requiredText } from '@/lib/dto/common'
+import { periodo, requiredText, uuidId } from '@/lib/dto/common'
 
-/** POST /api/evaluaciones-auditores/guardar-rubrica */
+/**
+ * POST /api/evaluaciones-auditores/guardar-rubrica
+ *
+ * `evaluacion_id` es un UUID, no un entero. Estaba declarado como id numérico,
+ * así que la validación rechazaba toda petición antes de llegar a la base y
+ * guardar la rúbrica devolvía «Datos inválidos».
+ */
 export const guardarRubricaSchema = z.object({
-  evaluacion_id: numericId('evaluacion_id es requerido'),
+  evaluacion_id: uuidId('evaluacion_id es requerido'),
   rubrica_respuestas: z.record(z.string(), z.unknown(), {
     message: 'rubrica_respuestas debe ser un objeto válido',
   }),
@@ -28,3 +34,28 @@ export const importarEncuestasSchema = z.object({
   anio: z.coerce.number().int().min(2000).max(2100, 'Año inválido'),
   semestre: z.enum(['S1', 'S2'], { message: 'Semestre inválido' }),
 })
+
+/** Peso de una fuente, en porcentaje entero. */
+const peso = (fuente) =>
+  z.coerce
+    .number({ message: `El peso de ${fuente} debe ser un número` })
+    .int(`El peso de ${fuente} debe ser un número entero`)
+    .min(0, `El peso de ${fuente} no puede ser negativo`)
+    .max(100, `El peso de ${fuente} no puede pasar de 100`)
+
+/**
+ * PUT /api/evaluaciones-auditores/pesos
+ *
+ * Los tres tienen que sumar 100. Es la condición que hace que la nota se
+ * pueda explicar: «40 % archivos, 30 % encuesta, 30 % rúbrica».
+ */
+export const pesosEvaluacionSchema = z
+  .object({
+    periodo: periodo(),
+    peso_archivos: peso('archivos'),
+    peso_encuesta: peso('la encuesta'),
+    peso_rubrica: peso('la rúbrica'),
+  })
+  .refine((d) => d.peso_archivos + d.peso_encuesta + d.peso_rubrica === 100, {
+    message: 'Los tres pesos tienen que sumar 100 %.',
+  })

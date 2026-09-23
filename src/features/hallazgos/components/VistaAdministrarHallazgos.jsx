@@ -44,6 +44,7 @@ import {
   TABLE_TOOLBAR,
 } from '@/components/ui/tokens'
 import { cn } from '@/lib/utils'
+import { formatearDia } from '@/lib/fechas'
 
 /**
  * Valor centinela de los selects de filtro: el estado usa `''` para "sin
@@ -84,12 +85,12 @@ const formatCapitulo = (cap) => {
   return String(cap)
 }
 
-const fmtDate = (value) => {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleDateString('es-CO')
-}
+/**
+ * Fecha legible. Pasa por `formatearDia`, que lee la cadena tal cual: con
+ * `new Date('2026-09-17')` se interpretaba medianoche UTC y en Bogotá salía el
+ * 16, un día antes que en el resto del sistema.
+ */
+const fmtDate = (value) => formatearDia(value) ?? ''
 
 /* ===================== Utils base ===================== */
 const getInforme = (row) =>

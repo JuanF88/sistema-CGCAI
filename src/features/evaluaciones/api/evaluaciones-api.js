@@ -1,7 +1,7 @@
 /**
  * Acceso HTTP al dominio de evaluación de auditores.
  */
-import { fetchJson, get, post, queryString } from '@/lib/api/http'
+import { fetchJson, get, post, put, queryString } from '@/lib/api/http'
 
 /**
  * GET /api/evaluaciones-auditores
@@ -16,6 +16,20 @@ export const listarPeriodosDisponibles = () =>
 
 /** GET /api/evaluaciones-auditores/periodos */
 export const listarPeriodos = () => get('/api/evaluaciones-auditores/periodos')
+
+/**
+ * GET /api/evaluaciones-auditores/pesos?periodo=2026-S2
+ * Cuánto pesa cada fuente en la nota final de ese periodo.
+ */
+export const obtenerPesos = (periodo) =>
+  get(`/api/evaluaciones-auditores/pesos${queryString({ periodo })}`)
+
+/**
+ * PUT /api/evaluaciones-auditores/pesos
+ * Guarda los pesos del periodo y recalcula sus evaluaciones.
+ * @param {{periodo: string, peso_archivos: number, peso_encuesta: number, peso_rubrica: number}} pesos
+ */
+export const guardarPesos = (pesos) => put('/api/evaluaciones-auditores/pesos', pesos)
 
 /** GET /api/evaluaciones-auditores/auditor-dashboard?auditor_id=… */
 export const obtenerDashboardAuditor = (auditorId) =>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import { toast } from 'react-toastify'
 import { Eye, EyeOff } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase/client'
@@ -18,7 +19,6 @@ export default function LoginForm() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [errorMsg, setErrorMsg] = useState(null)
   const [enviando, setEnviando] = useState(false)
   const [mostrarPassword, setMostrarPassword] = useState(false)
 
@@ -57,15 +57,28 @@ export default function LoginForm() {
       const destino = HOME_BY_ROLE[normalizeRole(data.usuario?.rol)]
 
       if (!destino) {
-        setErrorMsg(`Rol no reconocido: ${data.usuario?.rol ?? 'sin rol'}`)
+        toast.warning(`Rol no reconocido: ${data.usuario?.rol ?? 'sin rol'}`)
         return
       }
 
       router.replace(destino)
       router.refresh()
     } catch (error) {
+      // Una contraseña equivocada no es una avería: el servidor contestó y dijo
+      // que no. Sale como aviso, no como error, y no se registra en consola —
+      // el log se estaba llenando de «errores» que eran personas tecleando mal.
+      //
+      // Solo un 5xx o un fallo de red (sin `status`, porque la petición no
+      // llegó a contestar) merecen el tono de error.
+      const respondioElServidor = error?.status >= 400 && error?.status < 500
+
+      if (respondioElServidor) {
+        toast.warning(error.message)
+        return
+      }
+
       console.error('Error en login:', error)
-      setErrorMsg(error?.message || 'Error de conexión. Intenta nuevamente.')
+      toast.error(error?.message || 'Error de conexión. Intenta nuevamente.')
     } finally {
       setEnviando(false)
     }
@@ -102,10 +115,7 @@ export default function LoginForm() {
               type="email"
               placeholder="usuario@correo.com"
               value={email}
-              onChange={(e) => {
-                setEmail(e.target.value)
-                if (errorMsg) setErrorMsg(null)
-              }}
+              onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="username"
               className="h-11 bg-white"
@@ -122,10 +132,7 @@ export default function LoginForm() {
                 type={mostrarPassword ? 'text' : 'password'}
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value)
-                  if (errorMsg) setErrorMsg(null)
-                }}
+                onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
                 className="h-11 bg-white pr-11"
@@ -141,12 +148,6 @@ export default function LoginForm() {
               </button>
             </div>
           </div>
-
-          {errorMsg && (
-            <p role="alert" className="text-sm font-medium text-red-600">
-              {errorMsg}
-            </p>
-          )}
 
           <Button
             type="submit"

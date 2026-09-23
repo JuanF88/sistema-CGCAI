@@ -28,8 +28,13 @@ export const POST = withRoute(async (request) => {
 
   // Recalcular la nota final con la función de PostgreSQL. Si falla, la rúbrica
   // ya quedó guardada: se avisa pero no se considera error.
+  //
+  // El parámetro se llama `evaluacion_id`. Iba como `evaluacion_id_param`, que
+  // no existe, así que Postgres devolvía «función no encontrada» y la nota
+  // final no se recalculaba nunca al guardar una rúbrica; como el fallo solo
+  // se avisaba, nadie se enteraba.
   const { error: recalcError } = await supabase.rpc('calcular_nota_final', {
-    evaluacion_id_param: evaluacion_id,
+    evaluacion_id,
   })
 
   if (recalcError) {

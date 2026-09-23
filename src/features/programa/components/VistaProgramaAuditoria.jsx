@@ -63,6 +63,7 @@ import {
 import { exportarProgramaExcel } from '@/features/programa/lib/exportar-programa'
 import { rangoDeMeses } from '@/features/programa/lib/formato'
 import { useAnioInicial } from '@/hooks/useAnioInicial'
+import { hoy } from '@/lib/fechas'
 import { ProgramaDrawer } from './ProgramaDrawer'
 import { Spinner } from '@/components/ui/loader'
 
@@ -270,7 +271,7 @@ export default function VistaProgramaAuditoria({ soloLectura = false }) {
         // El formato pide la fecha en el pie; si no hay ninguna, se pone hoy.
         fecha_aprobacion:
           estado === 'aprobado' && !completo.fecha_aprobacion
-            ? new Date().toISOString().slice(0, 10)
+            ? hoy()
             : completo.fecha_aprobacion,
       })
 

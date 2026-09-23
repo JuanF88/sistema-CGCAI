@@ -1,5 +1,6 @@
 // @/components/auditor/Utilidades/generarPlanMejora.xpp.js
 import { saveAs } from 'file-saver'
+import { aDia, hoy } from '@/lib/fechas'
 // ===== Utilidades (reusadas/adaptadas) =====
 const toSlugUpper = (s = '') =>
   s.normalize('NFD')
@@ -8,11 +9,8 @@ const toSlugUpper = (s = '') =>
     .replace(/^_+|_+$/g, '')
     .toUpperCase()
 
-const toYMD = (input) => {
-  if (!input) return new Date().toISOString().slice(0, 10)
-  const s = String(input)
-  return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : new Date(input).toISOString().slice(0, 10)
-}
+/** El día en Colombia; la copia anterior recortaba en UTC (ver `lib/fechas`). */
+const toYMD = (input) => aDia(input) ?? hoy()
 
 // Sanitiza texto para XML 1.0 / XLSX y normaliza saltos
 const sanitizeExcelText = (val) => {

@@ -36,8 +36,10 @@ INSERT INTO alertas_procesos_config (
 VALUES
   ('carta_compromiso', 'Carta de compromiso', 'actascompromiso', -5, TRUE, TRUE, TRUE, TRUE, 10),
   ('plan_auditoria', 'Plan de auditoría', 'planes', -5, TRUE, TRUE, TRUE, TRUE, 10),
-  ('listado_asistencia', 'Listado de asistencia', 'asistencias', 0, TRUE, TRUE, TRUE, TRUE, 10),
-  ('evaluacion', 'Evaluación', 'evaluaciones', 0, TRUE, TRUE, TRUE, TRUE, 10),
+  -- Día hábil siguiente a la auditoría: se recogen en la reunión y se
+  -- digitalizan después. Ver `sql/plazos-asistencia-evaluacion.sql`.
+  ('listado_asistencia', 'Listado de asistencia', 'asistencias', 1, TRUE, TRUE, TRUE, TRUE, 10),
+  ('evaluacion', 'Evaluación', 'evaluaciones', 1, TRUE, TRUE, TRUE, TRUE, 10),
   ('acta_reunion', 'Acta de reunión', 'actas', 10, TRUE, TRUE, TRUE, TRUE, 10),
   ('informe_auditoria', 'Informe de auditoría', 'validaciones', 10, TRUE, TRUE, TRUE, TRUE, 10)
 ON CONFLICT (proceso_key) DO NOTHING;

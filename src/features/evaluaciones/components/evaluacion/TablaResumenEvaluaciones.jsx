@@ -67,7 +67,8 @@ export function TablaResumenEvaluaciones({
         <p>
           Evalúan la entrega oportuna de: carta de compromiso, plan, asistencia, evaluación, acta y
           validación. <strong>Plazos:</strong> carta de compromiso y plan (5 días hábiles antes),
-          asistencia y evaluación (mismo día), acta y validación (10 días hábiles después).{' '}
+          asistencia y evaluación (el día hábil siguiente), acta y validación (10 días hábiles
+          después).{' '}
           <strong>Puntuación:</strong> 5 puntos a tiempo, 1 punto tarde. La nota es el promedio de
           todos los archivos.
         </p>

@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server'
 import { requireRole } from '@/lib/api/guard'
 import { AUDITORIA_READ_ROLES } from '@/lib/auth/roles'
+import { anioDe } from '@/lib/fechas'
 
 const normalizeGestion = (g) => {
   if (!g) return null
@@ -59,9 +60,8 @@ export async function GET() {
         const ia = item.informes_auditoria
         if (!ia) continue
 
-        const fecha = ia.fecha_auditoria ? new Date(ia.fecha_auditoria) : null
-        const anio =
-          fecha && !Number.isNaN(fecha.getTime()) ? fecha.getFullYear() : null
+        // De la cadena, no de un `Date`: ver `lib/fechas`.
+        const anio = anioDe(ia.fecha_auditoria)
 
         const dependencia = ia.dependencias?.nombre || 'Desconocida'
         const gestion = normalizeGestion(ia.dependencias?.gestion) || null

@@ -9,45 +9,31 @@ import {
   buildActaPath,
   buildActaCompromisoPath,
   buildValidationPath,
-  addBusinessDays,
   BUCKETS
 } from '@/features/auditorias/hooks/useAuditTimeline'
+import {
+  calcularEstado,
+  calcularPuntos,
+  diasDeRetraso,
+  limiteDe,
+} from '@/features/evaluaciones/lib/archivos'
+import { aDia, formatearDia } from '@/lib/fechas'
 
-// Tipos de archivos esperados para cada auditoría (en orden cronológico)
+/**
+ * Los seis documentos esperados, en orden cronológico.
+ *
+ * El plazo de cada uno ya no vive aquí: está en `PLAZOS_POR_TIPO`, que también
+ * lee el desglose para poder deducir la fecha límite sin depender de lo que se
+ * guardó. Aquí solo queda dónde buscar el archivo.
+ */
 const ARCHIVOS_ESPERADOS = [
-  { tipo: 'actaCompromiso', bucket: BUCKETS.ACTAS_COMPROMISO, nombre: 'Carta de Compromiso', buildPath: buildActaCompromisoPath, diasLimite: -5, usarDiasHabiles: true },
-  { tipo: 'plan', bucket: BUCKETS.PLANES, nombre: 'Plan de Auditoría', buildPath: buildPlanPath, diasLimite: -5, usarDiasHabiles: true },
-  { tipo: 'asistencia', bucket: BUCKETS.ASISTENCIAS, nombre: 'Asistencia', buildPath: buildAsistenciaPath, diasLimite: 0, usarDiasHabiles: false },
-  { tipo: 'evaluacion', bucket: BUCKETS.EVALUACIONES, nombre: 'Evaluación', buildPath: buildEvaluacionPath, diasLimite: 0, usarDiasHabiles: false },
-  { tipo: 'acta', bucket: BUCKETS.ACTAS, nombre: 'Acta', buildPath: buildActaPath, diasLimite: 10, usarDiasHabiles: true },
-  { tipo: 'validacion', bucket: BUCKETS.VALIDACIONES, nombre: 'Validación', buildPath: buildValidationPath, diasLimite: 10, usarDiasHabiles: true },
+  { tipo: 'actaCompromiso', bucket: BUCKETS.ACTAS_COMPROMISO, nombre: 'Carta de Compromiso', buildPath: buildActaCompromisoPath },
+  { tipo: 'plan', bucket: BUCKETS.PLANES, nombre: 'Plan de Auditoría', buildPath: buildPlanPath },
+  { tipo: 'asistencia', bucket: BUCKETS.ASISTENCIAS, nombre: 'Asistencia', buildPath: buildAsistenciaPath },
+  { tipo: 'evaluacion', bucket: BUCKETS.EVALUACIONES, nombre: 'Evaluación', buildPath: buildEvaluacionPath },
+  { tipo: 'acta', bucket: BUCKETS.ACTAS, nombre: 'Acta', buildPath: buildActaPath },
+  { tipo: 'validacion', bucket: BUCKETS.VALIDACIONES, nombre: 'Validación', buildPath: buildValidationPath },
 ]
-
-// Calcula la fecha límite para un tipo de archivo
-function calcularFechaLimite(fechaAuditoria, diasLimite, usarDiasHabiles = false) {
-  const fecha = new Date(fechaAuditoria + 'T00:00:00')
-  if (usarDiasHabiles) {
-    return addBusinessDays(fecha, diasLimite)
-  } else {
-    fecha.setDate(fecha.getDate() + diasLimite)
-    return fecha
-  }
-}
-
-// Formatea una fecha al formato Colombia
-function formatearFecha(fecha) {
-  if (!fecha) return null
-  try {
-    return new Intl.DateTimeFormat('es-CO', {
-      timeZone: 'America/Bogota',
-      year: 'numeric',
-      month: 'short',
-      day: '2-digit'
-    }).format(new Date(fecha))
-  } catch {
-    return new Date(fecha).toLocaleDateString()
-  }
-}
 
 // Verifica si un archivo existe en el bucket y obtiene su metadata
 async function getFileMetadata(supabase, bucket, path) {
@@ -294,9 +280,27 @@ export async function POST(request) {
           const archivoManual = encontrarArchivoManual(informe.id, archivoEsperado.tipo)
           
           if (archivoManual) {
-            console.log(`📌 Preservando archivo editado manualmente: ${archivoEsperado.nombre}`)
+            // Se conserva la fecha que puso el administrador, pero el plazo y la
+            // nota se vuelven a calcular con el criterio vigente: lo que se
+            // corrigió a mano fue la fecha de entrega, no la regla con la que
+            // se puntúa. Antes se devolvía la fila entera tal cual, así que una
+            // fila manual se quedaba para siempre con el cálculo del día en que
+            // se editó.
+            const fechaCargaManual = aDia(archivoManual.fechaCarga)
+            const limiteManual = limiteDe(fechaAuditoria, archivoEsperado.tipo)
+
+            console.log(`📌 Preservando la fecha manual de ${archivoEsperado.nombre}: ${fechaCargaManual}`)
+
             return {
               ...archivoManual,
+              fechaLimite: limiteManual,
+              fechaLimiteFormateada: formatearDia(limiteManual),
+              fechaCarga: fechaCargaManual,
+              fechaCargaFormateada: formatearDia(fechaCargaManual),
+              diasRetraso: diasDeRetraso(fechaCargaManual, limiteManual),
+              puntos: calcularPuntos(fechaCargaManual, limiteManual),
+              estado: calcularEstado(fechaCargaManual, limiteManual),
+              existe: Boolean(fechaCargaManual),
               editado_manualmente: true
             }
           }
@@ -316,43 +320,37 @@ export async function POST(request) {
             console.log(`✗ Archivo NO encontrado: ${archivoEsperado.nombre}`)
           }
           
-          // Calcular fecha límite
-          const fechaLimite = calcularFechaLimite(fechaAuditoria, archivoEsperado.diasLimite, archivoEsperado.usarDiasHabiles)
-          console.log(`Fecha límite para ${archivoEsperado.nombre}: ${formatearFecha(fechaLimite)} (${archivoEsperado.diasLimite} días desde auditoría)`)
-          
-          let puntos = 0
-          let estado = 'No entregado'
-          let fechaCarga = null
-          let diasRetraso = null
-          
-          if (metadata && metadata.existe) {
-            // Usar updated_at (última modificación) como fecha de carga
-            fechaCarga = new Date(metadata.updated_at || metadata.created_at)
-            const diferenciaMs = fechaCarga - fechaLimite
-            diasRetraso = Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24))
-            
-            console.log(`Análisis de ${archivoEsperado.nombre}: Cargado el ${formatearFecha(fechaCarga)}, límite ${formatearFecha(fechaLimite)}, retraso: ${diasRetraso} días`)
-            
-            if (diasRetraso <= 0) {
-              // Entregado a tiempo o antes
-              puntos = 5
-              estado = diasRetraso === 0 ? 'A tiempo' : `Anticipado (${Math.abs(diasRetraso)} día${Math.abs(diasRetraso) !== 1 ? 's' : ''})`
-            } else {
-              // Entregado tarde
-              puntos = 1
-              estado = `Tarde (${diasRetraso} día${diasRetraso !== 1 ? 's' : ''})`
-            }
+          // El plazo es un día de calendario, no un instante: se cumple
+          // durante todo el día del vencimiento.
+          const fechaLimite = limiteDe(fechaAuditoria, archivoEsperado.tipo)
+
+          // `created_at` y no `updated_at`: la entrega es la primera vez que se
+          // subió el documento. Con `updated_at`, reemplazar un PDF por un
+          // escaneo mejor movía la fecha de entrega meses hacia adelante y el
+          // auditor perdía los puntos por haberlo corregido.
+          const fechaCarga =
+            metadata && metadata.existe ? aDia(metadata.created_at || metadata.updated_at) : null
+
+          const diasRetraso = diasDeRetraso(fechaCarga, fechaLimite)
+          const puntos = calcularPuntos(fechaCarga, fechaLimite)
+          const estado = calcularEstado(fechaCarga, fechaLimite)
+
+          if (fechaCarga) {
+            console.log(`Análisis de ${archivoEsperado.nombre}: cargado el ${fechaCarga}, límite ${fechaLimite}, retraso: ${diasRetraso} días → ${estado}`)
           }
-          
+
           return {
             tipo: archivoEsperado.tipo,
             nombre: archivoEsperado.nombre,
             path: path,
-            existe: metadata ? metadata.existe : false,
-            fechaLimite: fechaLimite.toISOString(),
-            fechaLimiteFormateada: formatearFecha(fechaLimite),
-            fechaCarga: fechaCarga ? fechaCarga.toISOString() : null,
-            fechaCargaFormateada: fechaCarga ? formatearFecha(fechaCarga) : null,
+            existe: Boolean(fechaCarga),
+            // Días sueltos «YYYY-MM-DD», no instantes ISO: un instante hay que
+            // interpretarlo en alguna zona horaria y ahí es donde se perdía el
+            // día. Una fecha sin hora significa lo mismo en todas partes.
+            fechaLimite: fechaLimite,
+            fechaLimiteFormateada: formatearDia(fechaLimite),
+            fechaCarga: fechaCarga,
+            fechaCargaFormateada: formatearDia(fechaCarga),
             diasRetraso: diasRetraso,
             puntos: puntos,
             estado: estado,

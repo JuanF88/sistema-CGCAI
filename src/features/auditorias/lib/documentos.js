@@ -48,13 +48,29 @@ async function registrarPlan(auditoria, filePath) {
   if (error) throw error
 }
 
-/** Marca el informe como validado. */
+/**
+ * Marca el informe como validado.
+ *
+ * Se pide la fila de vuelta y se comprueba que llegó: bajo RLS, un `update`
+ * que no encuentra fila que pueda tocar **no da error**, devuelve cero filas.
+ * Sin esta comprobación el fallo era invisible —y así acabaron tres informes
+ * con su PDF firmado subido pero sin la marca en la base, que es lo que hacía
+ * que las alertas reclamaran un trabajo ya entregado—.
+ */
 async function marcarValidado(auditoria) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('informes_auditoria')
     .update({ validado: true })
     .eq('id', auditoria.id)
+    .select('id')
+
   if (error) throw error
+
+  if (!data?.length) {
+    throw new Error(
+      'El PDF se subió, pero no se pudo marcar la auditoría como validada. Avisa a administración.'
+    )
+  }
 }
 
 /** Los cinco documentos que se suben igual en los dos paneles. */
@@ -124,12 +140,10 @@ export const DOCUMENTOS_AUDITOR = {
   ...COMUNES,
   validacion: {
     ...VALIDACION_BASE,
-    despues: async (auditoria, filePath) => {
-      await supabase
-        .from('validaciones_informe')
-        .insert([{ informe_id: auditoria.id, archivo_url: filePath }])
-      await marcarValidado(auditoria)
-    },
+    // Aquí había además un `insert` en `validaciones_informe`, una tabla que no
+    // existe en la base. Como no se comprobaba el resultado, la escritura se
+    // perdía en silencio en cada validación; se quita en vez de arrastrarla.
+    despues: marcarValidado,
   },
 }
 

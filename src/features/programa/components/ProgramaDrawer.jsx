@@ -36,6 +36,7 @@ import { PROCESOS_CRONOGRAMA } from '@/lib/catalogos/procesos'
 import { subirAlInicio } from '@/lib/dom/desplazar'
 import { BotonMas, NuevaDependenciaDialog, NuevoAuditorDialog } from './AltaRapida'
 import { ListasMetodologia } from './ListasMetodologia'
+import { hoy } from '@/lib/fechas'
 
 /**
  * Dos pestañas, no tres.
@@ -84,7 +85,7 @@ function cambioDeEstado(form, estado) {
     return { estado }
   }
 
-  return { estado, fecha_aprobacion: new Date().toISOString().slice(0, 10) }
+  return { estado, fecha_aprobacion: hoy() }
 }
 
 /**

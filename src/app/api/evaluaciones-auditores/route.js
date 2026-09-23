@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireRole } from '@/lib/api/guard'
 import { ROLES, EVALUACION_READ_ROLES } from '@/lib/auth/roles'
+import { anioDe, periodoDe } from '@/lib/fechas'
 
 // GET /api/evaluaciones-auditores
 // Carga evaluaciones basándose en informes_auditoria del periodo
@@ -97,11 +98,10 @@ export async function GET(request) {
       if (!auditor || !dependencia) continue
 
       // Determinar periodo del informe
-      const fechaAud = new Date(informe.fecha_auditoria)
-      const anioInf = fechaAud.getFullYear()
-      const mes = fechaAud.getMonth() + 1
-      const semestreInf = mes <= 6 ? 'S1' : 'S2'
-      const periodoInf = `${anioInf}-${semestreInf}`
+      // Leído de la cadena: un `Date` sin hora es medianoche UTC y en Bogotá
+      // retrocede un día, lo que movía de semestre a las auditorías del día 1.
+      const anioInf = anioDe(informe.fecha_auditoria)
+      const periodoInf = periodoDe(informe.fecha_auditoria)
 
       // Buscar evaluación existente
       const { data: evalExistente } = await supabase

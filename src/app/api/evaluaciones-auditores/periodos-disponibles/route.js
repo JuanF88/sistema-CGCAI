@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireRole } from '@/lib/api/guard'
 import { EVALUACION_READ_ROLES } from '@/lib/auth/roles'
+import { anioDe, periodoDe } from '@/lib/fechas'
 
 // GET /api/evaluaciones-auditores/periodos-disponibles
 // Retorna años y semestres únicos basándose en las auditorías existentes
@@ -37,13 +38,15 @@ export async function GET() {
     informes.forEach(informe => {
       if (!informe.fecha_auditoria) return
       
-      const fecha = new Date(informe.fecha_auditoria)
-      const anio = fecha.getFullYear()
-      const mes = fecha.getMonth() + 1
-      const semestre = mes <= 6 ? 'S1' : 'S2'
-      
+      // Se lee la cadena, no un `Date`: `new Date('2026-07-01')` es medianoche
+      // UTC y en Bogotá retrocede al 30 de junio, así que una auditoría del 1
+      // de julio caía en S1 y una del 1 de enero, en el año anterior. Además
+      // daba resultados distintos en el navegador y en el servidor.
+      const anio = anioDe(informe.fecha_auditoria)
+      if (!anio) return
+
       aniosSet.add(anio)
-      periodosSet.add(`${anio}-${semestre}`)
+      periodosSet.add(periodoDe(informe.fecha_auditoria))
     })
 
     // Convertir a arrays y ordenar
