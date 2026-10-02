@@ -174,9 +174,36 @@ export function shouldTriggerAlert({ daysLeft, alertType, config }) {
   return false
 }
 
-export function buildAlertMessage({ processLabel, alertType, dueDate, audit, dependencyName }) {
+export function buildAlertMessage({ processLabel, alertType, dueDate, audit, dependencyName, daysLeft }) {
   const dueDateText = dueDate ? formatYMD(dueDate) : 'Sin fecha'
   const dependency = dependencyName || 'la dependencia asignada'
+
+  /**
+   * Aviso enviado a mano desde el Centro de Control.
+   *
+   * No lo manda el barrido en uno de sus tres momentos, sino una persona que
+   * ha visto la celda en rojo, así que el texto no promete nada sobre cuándo
+   * volverá a llegar: dice qué falta y para cuándo era.
+   */
+  if (alertType === 'manual') {
+    const dias = Number.isFinite(daysLeft) ? daysLeft : null
+    const plazo =
+      dias === null
+        ? `La fecha límite es ${dueDateText}.`
+        : dias < 0
+          ? `El plazo venció el ${dueDateText}, hace ${Math.abs(dias)} día${Math.abs(dias) === 1 ? '' : 's'} hábil${Math.abs(dias) === 1 ? '' : 'es'}.`
+          : dias === 0
+            ? `El plazo vence hoy, ${dueDateText}.`
+            : `El plazo vence el ${dueDateText}: quedan ${dias} día${dias === 1 ? '' : 's'} hábil${dias === 1 ? '' : 'es'}.`
+
+    return {
+      subject: `Pendiente: ${processLabel} - Auditoría #${audit.id}`,
+      title: `Falta ${processLabel.toLowerCase()}`,
+      summary: `Todavía no se ha cargado ${processLabel.toLowerCase()} de la auditoría #${audit.id} en ${dependency}.`,
+      detail: `${plazo} Sube el documento en el sistema; si ya lo hiciste, avísanos para revisarlo.`,
+      ctaLabel: 'Subir el documento',
+    }
+  }
 
   if (alertType === 'before_5') {
     return {

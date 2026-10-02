@@ -32,10 +32,7 @@ import { EMPTY_STATE, PAGE_SHELL, SECTION_CARD } from '@/components/ui/tokens'
 import FormularioRegistro from '@/features/auditorias/components/FormularioRegistro'
 import { DOCUMENTOS_ADMIN } from '@/features/auditorias/lib/documentos'
 import { computeFlags, isAuditValidated } from '@/features/auditorias/lib/estado-auditoria'
-import {
-  descargarInformeAuditoria,
-  descargarPlanMejora,
-} from '@/features/auditorias/lib/descargas'
+import { descargarInformeAuditoria } from '@/features/auditorias/lib/descargas'
 import { useNovedades } from '@/features/auditorias/hooks/useNovedades'
 import { useAnioInicial } from '@/hooks/useAnioInicial'
 import { useSubidaDocumento } from '@/features/auditorias/hooks/useSubidaDocumento'
@@ -512,7 +509,6 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
     const evaluacionLimit = addBusinessDays(fa, PLAZOS.evaluacion.dias)
     const actaLimit = addBusinessDays(fa, PLAZOS.acta.dias)
     const informeLimit = addBusinessDays(fa, PLAZOS.validacion.dias)
-    const pmLimit = addBusinessDays(fa, 20)
 
     const flags = computeFlags(selected)
     const validatedHref = selected.validated?.url ?? null
@@ -718,23 +714,6 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
               ? 'Campos y hallazgos listos: descarga y valida.'
               : 'Campos listos. Asignar hallazgos.',
         actions: accionesInforme(),
-      },
-      {
-        key: 'pm',
-        title: 'Levantamiento del PM',
-        when: pmLimit,
-        days: diffInBusinessDays(hoy, pmLimit),
-        explicitDone: false,
-        subtitle: 'Plan de Mejoramiento (20 días hábiles después de entregar el informe).',
-        actions: hasValidated
-          ? [
-              {
-                label: 'Descargar formato PM',
-                onClick: () => descargarPlanMejora(selected),
-                type: 'download',
-              },
-            ]
-          : [],
       },
     ]).etapas
     // `subida.abrir` es estable (es un setState).

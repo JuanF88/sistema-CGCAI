@@ -117,6 +117,7 @@ export const BUCKETS = {
   ACTAS_COMPROMISO: 'actascompromiso',
   VALIDACIONES: 'validaciones',
   NOVEDADES: 'novedades',
+  PLANES_MEJORA: 'planesdemejora',
 }
 
 /* ---- Validación de Archivos ---- */
@@ -143,6 +144,7 @@ export const MAX_MB = {
   ACTA_COMPROMISO: 2,
   VALIDACION: 2,
   NOVEDAD: 2,
+  PLAN_MEJORA: 2,
 }
 
 export const FILE_LIMITS = Object.fromEntries(
@@ -178,6 +180,10 @@ export const buildActaCompromisoPath = (a) =>
 
 export const buildValidationPath = (a) => 
   `Auditoria_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEPENDENCIA')}.pdf`
+
+/** El Plan de Mejoramiento firmado de una auditoría. */
+export const buildPlanMejoraPath = (a) =>
+  `PlanMejora_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}.pdf`
 
 /* ---- Validación de estado de informe ---- */
 export function getInformeStatus(informe) {

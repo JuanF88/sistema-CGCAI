@@ -10,6 +10,7 @@ import {
   BellRing,
   Building,
   CalendarRange,
+  ClipboardCheck,
   ClipboardList,
   Eye,
   FileText,
@@ -44,6 +45,9 @@ export const ADMIN_NAV = [
     alias: ['crearUsuario', 'adminDependencia'],
   },
   { key: 'administrarHallazgos', label: 'Reporte de Hallazgos', icon: Lightbulb },
+  // Después de los hallazgos porque es lo que sale de ellos: el plan se
+  // levanta con las oportunidades de mejora y las no conformidades.
+  { key: 'planesMejora', label: 'Planes de Mejoramiento', icon: ClipboardCheck },
   { key: 'evaluacionAuditores', label: 'Evaluación de Auditores', icon: Award },
   { key: 'dashboardAuditores', label: 'Dashboard de Auditores', icon: UserRound },
   { key: 'alertasAuditoria', label: 'Alertas de Auditoría', icon: BellRing },

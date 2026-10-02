@@ -33,10 +33,7 @@ import {
   firmarDocumentos,
   leerBuckets,
 } from '@/features/auditorias/lib/indice-archivos'
-import {
-  descargarInformeAuditoria,
-  descargarPlanMejora,
-} from '@/features/auditorias/lib/descargas'
+import { descargarInformeAuditoria } from '@/features/auditorias/lib/descargas'
 
 import {
   BUCKETS,
@@ -215,7 +212,6 @@ export default function AuditoriasTimeline({ usuario }) {
     const evaluacionLimit = addBusinessDays(fa, PLAZOS.evaluacion.dias)
     const actaLimit = addBusinessDays(fa, PLAZOS.acta.dias)
     const informeLimit = addBusinessDays(fa, PLAZOS.validacion.dias)
-    const pmLimit = addBusinessDays(fa, 20)
 
     const isFilled =
       Boolean(selected.objetivo?.trim()) &&
@@ -388,23 +384,6 @@ export default function AuditoriasTimeline({ usuario }) {
                   icon: <FileCheck2 />,
                 },
               ],
-      },
-      {
-        key: 'pm',
-        title: 'Levantamiento del PM',
-        when: pmLimit,
-        days: diffInBusinessDays(hoy, pmLimit),
-        explicitDone: false,
-        subtitle: 'Plan de Mejoramiento (20 días hábiles después de entregar el informe).',
-        actions: hasValidated
-          ? [
-              {
-                label: 'Descargar formato PM',
-                onClick: () => descargarPlanMejora(selected),
-                icon: <Download />,
-              },
-            ]
-          : [],
       },
     ]
 

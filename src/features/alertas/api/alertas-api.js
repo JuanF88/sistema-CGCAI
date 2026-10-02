@@ -21,3 +21,13 @@ export const ejecutarAlertas = () => post('/api/alertas/ejecutar')
 
 /** POST /api/alertas/preview — simulacro: calcula sin enviar nada. */
 export const previsualizarAlertas = () => post('/api/alertas/preview')
+
+/**
+ * POST /api/alertas/manual — aviso de un documento pendiente, a mano.
+ *
+ * Sin `enviar` solo calcula: devuelve a quién iría y con qué texto. El envío
+ * se pide aparte, con la misma llamada y `enviar: true`.
+ *
+ * @param {{proceso_key: string, informe_ids: number[], enviar?: boolean}} datos
+ */
+export const avisarPendientes = (datos) => post('/api/alertas/manual', datos)

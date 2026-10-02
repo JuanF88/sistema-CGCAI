@@ -216,7 +216,11 @@ export default function AppShell({
           )}
         >
           {/* El avatar es lo primero que se recorta: es lo único del panel que
-              no aporta información y ocupa lo que tres entradas de menú. */}
+              no aporta información y ocupa lo que dos entradas de menú.
+
+              Estaba en 150 px, de cuando el menú del administrador tenía siete
+              entradas. Con diez, el conjunto pasaba de los 950 px de alto y en
+              una pantalla de 1080 aparecía la barra de desplazamiento. */}
           <img
             src={avatarSrc || DEFAULT_AVATAR}
             alt={usuario?.nombre ? `Avatar de ${usuario.nombre}` : 'Avatar'}
@@ -226,9 +230,9 @@ export default function AppShell({
               plegado
                 ? 'mb-4 h-11 w-11'
                 : [
-                    'mb-2 h-[150px] w-[150px]',
-                    'pantalla-baja:h-[104px] pantalla-baja:w-[104px]',
-                    'pantalla-muy-baja:h-[84px] pantalla-muy-baja:w-[84px]',
+                    'mb-2 h-[112px] w-[112px]',
+                    'pantalla-baja:h-[88px] pantalla-baja:w-[88px]',
+                    'pantalla-muy-baja:h-[72px] pantalla-muy-baja:w-[72px]',
                   ]
             )}
           />
@@ -236,7 +240,11 @@ export default function AppShell({
           {/* Plegado no queda sitio para texto: solo iconos. */}
           {!plegado && (
             <>
-              {usuario?.nombre && <p className="mb-2 text-center font-semibold">{usuario.nombre}</p>}
+              {usuario?.nombre && (
+                <p className="mb-2 text-center text-[0.95rem] font-semibold leading-tight">
+                  {usuario.nombre}
+                </p>
+              )}
 
               {badge}
 
@@ -254,12 +262,14 @@ export default function AppShell({
             </>
           )}
 
+          {/* La separación entre entradas es lo segundo que cede. Con diez
+              ítems, cada 6 px de hueco son 54 px de panel. */}
           <nav
             className={cn(
               'flex flex-col',
               plegado
                 ? 'gap-2 pantalla-muy-baja:gap-1.5'
-                : 'gap-4 pantalla-baja:gap-2 pantalla-muy-baja:gap-1.5'
+                : 'gap-2.5 pantalla-baja:gap-1.5 pantalla-muy-baja:gap-1'
             )}
           >
             {nav.map((item) => {
@@ -275,8 +285,8 @@ export default function AppShell({
                   // cada icono.
                   title={plegado ? item.label : undefined}
                   className={cn(
-                    'flex items-center whitespace-nowrap rounded-xl py-[0.7rem] text-left',
-                    'pantalla-baja:py-2 pantalla-muy-baja:py-1.5',
+                    'flex items-center whitespace-nowrap rounded-xl py-2 text-left',
+                    'pantalla-baja:py-1.5 pantalla-muy-baja:py-1',
                     'font-medium transition-all duration-200 cursor-pointer',
                     'hover:bg-white/20',
                     plegado ? 'justify-center px-0' : 'gap-3 px-4',
@@ -284,7 +294,7 @@ export default function AppShell({
                   )}
                 >
                   <Icon className={cn('shrink-0', plegado ? 'h-5 w-5' : 'h-[15px] w-[15px]')} />
-                  {!plegado && <span className="text-[0.9rem] leading-tight">{item.label}</span>}
+                  {!plegado && <span className="text-[0.85rem] leading-tight">{item.label}</span>}
                 </button>
               )
             })}
@@ -296,7 +306,7 @@ export default function AppShell({
             'relative z-10 flex shrink-0 flex-col items-center',
             plegado
               ? 'mt-4 gap-3 pantalla-baja:mt-3 pantalla-baja:gap-2'
-              : 'mt-8 gap-4 pantalla-baja:mt-4 pantalla-baja:gap-2.5'
+              : 'mt-6 gap-3 pantalla-baja:mt-4 pantalla-baja:gap-2.5'
           )}
         >
           <div className={cn('flex items-center justify-center', plegado ? 'gap-2' : 'gap-3')}>

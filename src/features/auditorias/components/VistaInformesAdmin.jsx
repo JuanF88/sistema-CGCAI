@@ -2,11 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import {
-
-  LayoutGrid,
-  RefreshCw,
-} from 'lucide-react'
+import { BellRing, LayoutGrid, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Cargando } from '@/components/ui/loader'
 import { PageHeader } from '@/components/ui/page-header'
@@ -22,6 +18,8 @@ import { PAGE_SHELL, SECTION_CARD } from '@/components/ui/tokens'
 import { useAnioInicial } from '@/hooks/useAnioInicial'
 import { cn } from '@/lib/utils'
 import { toast } from 'react-toastify'
+import { avisarPendientes } from '@/features/alertas/api/alertas-api'
+import { ModalAvisoPendientes } from './ModalAvisoPendientes'
 import { PLAZOS } from '@/lib/catalogos/plazos'
 import { llegoTarde } from './timeline/etapas'
 import {
@@ -52,14 +50,21 @@ import {
  * orden y no había forma de leerlas juntas.
  */
 const DOCUMENTOS_MALLA = [
-  { key: 'actaComp',   columna: 'Carta Comp.', tarjeta: 'Cartas compromiso',  tono: 'pink' },
-  { key: 'plan',       columna: 'Plan',        tarjeta: 'Planes',             tono: 'purple' },
-  { key: 'asistencia', columna: 'Asistencia',  tarjeta: 'Asistencias',        tono: 'green' },
-  { key: 'evaluacion', columna: 'Evaluación',  tarjeta: 'Evaluaciones',       tono: 'orange' },
-  { key: 'acta',       columna: 'Acta',        tarjeta: 'Actas',              tono: 'cyan' },
-  { key: 'informeOk',  columna: 'Informe',     tarjeta: 'Informes completos', tono: 'teal' },
-  { key: 'validado',   columna: 'Validado',    tarjeta: 'Validados',          tono: 'indigo' },
+  { key: 'actaComp',   columna: 'Carta Comp.', tarjeta: 'Cartas compromiso',  tono: 'pink',   plazo: 'actaCompromiso' },
+  { key: 'plan',       columna: 'Plan',        tarjeta: 'Planes',             tono: 'purple', plazo: 'plan' },
+  { key: 'asistencia', columna: 'Asistencia',  tarjeta: 'Asistencias',        tono: 'green',  plazo: 'asistencia' },
+  { key: 'evaluacion', columna: 'Evaluación',  tarjeta: 'Evaluaciones',       tono: 'orange', plazo: 'evaluacion' },
+  { key: 'acta',       columna: 'Acta',        tarjeta: 'Actas',              tono: 'cyan',   plazo: 'acta' },
+  // El informe «completo» no es un archivo: es tener los campos y los
+  // hallazgos. No hay documento que reclamar, así que no se puede avisar.
+  { key: 'informeOk',  columna: 'Informe',     tarjeta: 'Informes completos', tono: 'teal',   plazo: null },
+  { key: 'validado',   columna: 'Validado',    tarjeta: 'Validados',          tono: 'indigo', plazo: 'validacion' },
 ]
+
+/** De la columna de la malla a la clave del proceso en las alertas. */
+const ALERTA_POR_COLUMNA = Object.fromEntries(
+  DOCUMENTOS_MALLA.filter((d) => d.plazo).map((d) => [d.key, PLAZOS[d.plazo].alerta])
+)
 
 const COLUMNAS = DOCUMENTOS_MALLA.map(({ key, columna }) => ({ key, title: columna }))
 
@@ -92,6 +97,8 @@ export default function AuditoriasMallaControl() {
   const [error, setError] = useState(null)
   const [auditorias, setAuditorias] = useState([])
   const [selectedYear, setSelectedYear] = useState('') // '' = todos
+  /** Celda sobre la que se está avisando: documento, dependencia y auditorías. */
+  const [aviso, setAviso] = useState(null)
 
   const loadData = useCallback(async () => {
     setLoading(true); setError(null)
@@ -258,6 +265,9 @@ export default function AuditoriasMallaControl() {
       for (const key of cols) {
         let done = 0, overdue = 0, pending = 0, tardios = 0
         let nextDue = null, lastDelivered = null
+        // Qué auditorías concretas lo tienen pendiente, para poder avisar a
+        // sus auditores desde la propia celda.
+        const pendientes = []
 
         for (const a of row.items) {
           const st = a._stages?.[key]
@@ -270,6 +280,7 @@ export default function AuditoriasMallaControl() {
             }
           } else {
             pending++
+            pendientes.push(a.id)
             if (st.due) {
               if (st.due < today) overdue++
               if (st.due >= today && (!nextDue || st.due < nextDue)) nextDue = st.due
@@ -278,7 +289,7 @@ export default function AuditoriasMallaControl() {
         }
 
         sumDone += done
-        agg[key] = { done, total, overdue, pending, tardios, nextDue, lastDelivered }
+        agg[key] = { done, total, overdue, pending, tardios, pendientes, nextDue, lastDelivered }
       }
 
       const completion = total ? (sumDone / (total * cols.length)) : 0
@@ -455,6 +466,7 @@ export default function AuditoriasMallaControl() {
                         total: row.total,
                         overdue: 0,
                         pending: 0,
+                        pendientes: [],
                         nextDue: null,
                         lastDelivered: null,
                       }
@@ -467,13 +479,19 @@ export default function AuditoriasMallaControl() {
                       if (ag.lastDelivered) dateInfo = `${ag.tardios ? '⏱' : '✓'} ${fmt(ag.lastDelivered)}`
                       else if (ag.nextDue) dateInfo = `⏰ ${fmt(ag.nextDue)}`
 
+                      // La campana solo aparece donde hay algo que reclamar y
+                      // existe un documento que reclamar.
+                      const puedeAvisar = Boolean(
+                        ALERTA_POR_COLUMNA[col.key] && ag.pendientes?.length
+                      )
+
                       return (
                         <div
                           key={col.key}
                           title={tip}
                           aria-label={tip}
                           className={cn(
-                            'm-1 flex flex-col items-center justify-center rounded-lg px-1 py-2 text-center',
+                            'group relative m-1 flex flex-col items-center justify-center rounded-lg px-1 py-2 text-center',
                             heatClass(localPct, ag.tardios)
                           )}
                         >
@@ -485,6 +503,40 @@ export default function AuditoriasMallaControl() {
                           </span>
                           {dateInfo && (
                             <span className="mt-0.5 text-[0.65rem] opacity-75">{dateInfo}</span>
+                          )}
+
+                          {/* La campana tapa la celda entera, no una esquina:
+                              así se ve desde lejos cuál se puede reclamar y no
+                              hay que acertarle a un icono de catorce píxeles. */}
+                          {puedeAvisar && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAviso({
+                                  proceso_key: ALERTA_POR_COLUMNA[col.key],
+                                  label: col.title,
+                                  dependencia: row.depName,
+                                  informe_ids: ag.pendientes,
+                                })
+                              }
+                              title={`Avisar de ${col.title.toLowerCase()} pendiente (${ag.pendientes.length})`}
+                              aria-label={`Avisar de ${col.title.toLowerCase()} pendiente en ${row.depName}: ${ag.pendientes.length} auditoría(s)`}
+                              className={cn(
+                                'absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg',
+                                // El velo deja intuir el número que hay debajo
+                                // y mantiene legible el texto de la celda.
+                                'bg-background/85 opacity-0 transition-opacity',
+                                'hover:bg-background focus-visible:opacity-100 group-hover:opacity-100'
+                              )}
+                            >
+                              <BellRing className="h-4 w-4" aria-hidden="true" />
+                              <span
+                                className="text-[0.65rem] font-semibold leading-none"
+                                aria-hidden="true"
+                              >
+                                Avisar{ag.pendientes.length > 1 ? ` (${ag.pendientes.length})` : ''}
+                              </span>
+                            </button>
                           )}
                         </div>
                       )
@@ -514,6 +566,36 @@ export default function AuditoriasMallaControl() {
           </div>
         )}
       </section>
+
+      <ModalAvisoPendientes
+        open={Boolean(aviso)}
+        onOpenChange={(abierto) => (abierto ? null : setAviso(null))}
+        destino={aviso}
+        onPrevisualizar={({ proceso_key, informe_ids }) =>
+          avisarPendientes({ proceso_key, informe_ids })
+        }
+        onEnviar={async ({ proceso_key, informe_ids }) => {
+          try {
+            const res = await avisarPendientes({ proceso_key, informe_ids, enviar: true })
+
+            if (res.enviados) {
+              toast.success(`${res.enviados} aviso(s) enviado(s).`)
+            } else {
+              toast.info('No se envió ningún aviso.')
+            }
+            if (res.fallidos?.length) {
+              toast.warning(`${res.fallidos.length} no se pudieron enviar.`)
+            }
+
+            // Se recarga para que la celda refleje el aviso ya mandado.
+            await loadData()
+            return true
+          } catch (err) {
+            toast.error(`No se pudo avisar: ${err.message}`)
+            return false
+          }
+        }}
+      />
     </div>
   )
 }

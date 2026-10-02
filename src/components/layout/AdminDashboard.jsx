@@ -14,6 +14,7 @@ import VistaEvaluacionAuditores from '@/features/evaluaciones/components/VistaEv
 import VistaDashboardAuditores from '@/features/evaluaciones/components/VistaDashboardAuditores'
 import VistaAlertasAuditoria from '@/features/alertas/components/VistaAlertasAuditoria'
 import VistaProgramaAuditoria from '@/features/programa/components/VistaProgramaAuditoria'
+import VistaPlanesMejora from '@/features/auditorias/components/VistaPlanesMejora'
 
 // `usuario` llega ya verificado desde el Server Component de la ruta
 // (`src/app/admin/page.js`), no desde localStorage.
@@ -43,6 +44,7 @@ export default function AdminDashboard({ usuario }) {
         />
       )}
       {vista === 'administrarHallazgos' && <VistaAdministrarHallazgos />}
+      {vista === 'planesMejora' && <VistaPlanesMejora />}
       {vista === 'evaluacionAuditores' && <VistaEvaluacionAuditores />}
       {vista === 'dashboardAuditores' && <VistaDashboardAuditores />}
       {vista === 'alertasAuditoria' && <VistaAlertasAuditoria />}
