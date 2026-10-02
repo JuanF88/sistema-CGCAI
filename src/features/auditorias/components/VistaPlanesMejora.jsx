@@ -11,6 +11,11 @@
  * Hace dos cosas y ninguna más: generar el formato a partir de los hallazgos
  * de la auditoría, y guardar el plan ya validado. Se agrupa por año porque es
  * el ciclo con el que se revisa.
+ *
+ * La misma pantalla sirve al administrador y al auditor: con `usuarioId` se
+ * limita a las auditorías de ese auditor y se oculta la columna del auditor,
+ * que entonces sobra. Es lo que el auditor necesita y nada más, en vez de una
+ * vista paralela que se quedaría atrás en el primer cambio.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ClipboardCheck, Download, ExternalLink, RefreshCw, Upload } from 'lucide-react'
@@ -21,6 +26,7 @@ import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import DocumentUploadModal from '@/components/ui/DocumentUploadModal'
+import ModalGenerarPlanMejora from '@/features/auditorias/components/ModalGenerarPlanMejora'
 import { InfoCard } from '@/components/ui/info-card'
 import { PageHeader } from '@/components/ui/page-header'
 import { SearchInput } from '@/components/ui/search-input'
@@ -46,26 +52,42 @@ import { useAnioInicial } from '@/hooks/useAnioInicial'
 import { anioDe, formatearDia } from '@/lib/fechas'
 import { descargarPlanMejora } from '@/features/auditorias/lib/descargas'
 import {
+  ACCEPT_PLAN_MEJORA,
   BUCKETS,
+  FORMATOS_PLAN_MEJORA,
   MAX_MB,
   buildPlanMejoraPath,
+  extensionDe,
+  rutasPlanMejora,
 } from '@/features/auditorias/hooks/useAuditTimeline'
 import {
   avisoDeFallidos,
-  buscarDocumento,
+  buscarDocumentoEntre,
   firmarDocumentos,
   leerBuckets,
 } from '@/features/auditorias/lib/indice-archivos'
 
-const SELECT = `
+/**
+ * El auditor no pide el nombre del auditor: es él.
+ *
+ * No es solo ahorrar una unión. Un `embed` que RLS no deje leer no devuelve el
+ * campo vacío, tumba la consulta entera, y el auditor solo tiene garantizada
+ * su propia fila de `usuarios`.
+ */
+const SELECT = (conAuditor) => `
   id, fecha_auditoria, validado, dependencia_id,
   dependencias:dependencia_id ( nombre ),
-  usuarios:usuario_id ( nombre, apellido ),
+  ${conAuditor ? 'usuarios:usuario_id ( nombre, apellido ),' : ''}
   oportunidades_mejora ( id ),
   no_conformidades ( id )
 `
 
-export default function VistaPlanesMejora({ soloLectura = false }) {
+/** Cómo se nombran los formatos admitidos en el texto de ayuda: «Excel o PDF». */
+const ETIQUETA_FORMATOS = [
+  ...new Set(Object.values(FORMATOS_PLAN_MEJORA).map((f) => f.etiqueta)),
+].join(' o ')
+
+export default function VistaPlanesMejora({ usuarioId = null, soloLectura = false }) {
   const [auditorias, setAuditorias] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState(null)
@@ -73,15 +95,21 @@ export default function VistaPlanesMejora({ soloLectura = false }) {
   const [busqueda, setBusqueda] = useState('')
   const [aSubir, setASubir] = useState(null)
   const [subiendo, setSubiendo] = useState(false)
+  const [aGenerar, setAGenerar] = useState(null)
+  const [generando, setGenerando] = useState(false)
 
   const cargar = useCallback(async () => {
     setCargando(true)
     setError(null)
     try {
-      const { data, error: errorConsulta } = await supabase
+      let consulta = supabase
         .from('informes_auditoria')
-        .select(SELECT)
+        .select(SELECT(!usuarioId))
         .order('fecha_auditoria', { ascending: false })
+
+      if (usuarioId) consulta = consulta.eq('usuario_id', usuarioId)
+
+      const { data, error: errorConsulta } = await consulta
 
       if (errorConsulta) throw errorConsulta
       const filas = data ?? []
@@ -91,8 +119,10 @@ export default function VistaPlanesMejora({ soloLectura = false }) {
       const { indice, fallidos } = await leerBuckets([BUCKETS.PLANES_MEJORA])
       if (fallidos.length) toast.warning(avisoDeFallidos(fallidos))
 
+      // El plan puede llegar en Excel o en PDF, y la extensión va en el nombre:
+      // se pregunta por todas las variantes.
       const hallazgos = filas.map((a) =>
-        buscarDocumento(indice, BUCKETS.PLANES_MEJORA, buildPlanMejoraPath(a))
+        buscarDocumentoEntre(indice, BUCKETS.PLANES_MEJORA, rutasPlanMejora(a))
       )
 
       const urls = await firmarDocumentos({
@@ -109,6 +139,7 @@ export default function VistaPlanesMejora({ soloLectura = false }) {
                   path: h.path,
                   url: urls.get(`${BUCKETS.PLANES_MEJORA}|${h.path}`) ?? null,
                   subido_at: h.subido_at,
+                  formato: FORMATOS_PLAN_MEJORA[extensionDe(h.path)]?.etiqueta ?? null,
                 }
               : h.desconocido
                 ? { desconocido: true }
@@ -122,7 +153,7 @@ export default function VistaPlanesMejora({ soloLectura = false }) {
     } finally {
       setCargando(false)
     }
-  }, [])
+  }, [usuarioId])
 
   useEffect(() => {
     cargar()
@@ -163,20 +194,68 @@ export default function VistaPlanesMejora({ soloLectura = false }) {
     }
   }, [filtradas])
 
+  const mostrarAuditor = !usuarioId
+  const columnas = mostrarAuditor ? 6 : 5
+
+  /**
+   * Genera el formato de la auditoría que se confirmó en el modal.
+   *
+   * `descargarPlanMejora` vuelve a leer los hallazgos: lo que se descarga es
+   * lo que hay en la base en este momento, no lo que se contó al pintar la
+   * tabla.
+   */
+  const generarFormato = async () => {
+    if (!aGenerar) return
+
+    setGenerando(true)
+    try {
+      await descargarPlanMejora(aGenerar)
+      setAGenerar(null)
+    } finally {
+      setGenerando(false)
+    }
+  }
+
   const subirPlan = async (archivo) => {
     if (!archivo || !aSubir) return
 
+    // El `accept` del selector solo es una sugerencia: se puede escribir el
+    // nombre a mano y elegir cualquier cosa. Aquí se comprueba de verdad.
+    const extension = extensionDe(archivo.name)
+    const formato = FORMATOS_PLAN_MEJORA[extension]
+
+    if (!formato) {
+      toast.error(
+        `Formato no admitido («.${extension || archivo.name}»). Sube el plan en ${ETIQUETA_FORMATOS}.`
+      )
+      return
+    }
+
     setSubiendo(true)
     try {
-      const path = buildPlanMejoraPath(aSubir)
+      const path = buildPlanMejoraPath(aSubir, extension)
 
       const { error: errorSubida } = await supabase.storage
         .from(BUCKETS.PLANES_MEJORA)
-        .upload(path, archivo, { upsert: true, contentType: 'application/pdf' })
+        .upload(path, archivo, { upsert: true, contentType: formato.mime })
 
       if (errorSubida) throw errorSubida
 
-      toast.success('Plan de mejoramiento cargado.')
+      // Si antes había un plan en otro formato, su archivo sigue ahí con otro
+      // nombre: sin borrarlo quedarían dos planes para la misma auditoría y la
+      // pantalla tendría que elegir. Se va detrás de la subida, no antes, para
+      // no quedarse sin ninguno si la subida falla.
+      const anteriores = rutasPlanMejora(aSubir).filter((otra) => otra !== path)
+      if (anteriores.length) {
+        const { error: errorBorrado } = await supabase.storage
+          .from(BUCKETS.PLANES_MEJORA)
+          .remove(anteriores)
+        if (errorBorrado) {
+          console.warn('No se pudieron borrar los planes en otro formato:', errorBorrado.message)
+        }
+      }
+
+      toast.success(`Plan de mejoramiento cargado (${formato.etiqueta}).`)
       setASubir(null)
       await cargar()
     } catch (e) {
@@ -191,7 +270,11 @@ export default function VistaPlanesMejora({ soloLectura = false }) {
     <div className={PAGE_SHELL}>
       <PageHeader
         title="Planes de Mejoramiento"
-        subtitle="Genera el formato a partir de los hallazgos y guarda el plan ya validado"
+        subtitle={
+          usuarioId
+            ? 'Genera el formato de tus auditorías y guarda el plan que te devuelve la dependencia'
+            : 'Genera el formato a partir de los hallazgos y guarda el plan ya validado'
+        }
         actions={
           <div className="flex items-center gap-2">
             <Select value={anio || 'todos'} onValueChange={(v) => setAnio(v === 'todos' ? '' : v)}>
@@ -222,7 +305,11 @@ export default function VistaPlanesMejora({ soloLectura = false }) {
       />
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <InfoCard tone="blue" label="Auditorías" value={resumen.auditorias} />
+        <InfoCard
+          tone="blue"
+          label={usuarioId ? 'Mis auditorías' : 'Auditorías'}
+          value={resumen.auditorias}
+        />
         <InfoCard tone="purple" label="Con hallazgos" value={resumen.conHallazgos} />
         <InfoCard tone="green" label="Planes cargados" value={resumen.cargados} />
         <InfoCard tone="orange" label="Por cargar" value={resumen.pendientes} />
@@ -233,7 +320,11 @@ export default function VistaPlanesMejora({ soloLectura = false }) {
           <SearchInput
             value={busqueda}
             onChange={setBusqueda}
-            placeholder="Buscar por dependencia, auditor o número…"
+            placeholder={
+              usuarioId
+                ? 'Buscar por dependencia o número…'
+                : 'Buscar por dependencia, auditor o número…'
+            }
           />
         </div>
 
@@ -252,16 +343,24 @@ export default function VistaPlanesMejora({ soloLectura = false }) {
                 <TableRow className="hover:bg-transparent">
                   <TableHead>Dependencia</TableHead>
                   <TableHead className="w-28">Auditoría</TableHead>
-                  <TableHead className="w-40">Auditor</TableHead>
+                  {/* Al auditor no le dice nada una columna con su propio
+                      nombre repetido en cada fila. */}
+                  {mostrarAuditor && <TableHead className="w-40">Auditor</TableHead>}
                   <TableHead className="w-28 text-center">Hallazgos</TableHead>
                   <TableHead className="w-44">Plan validado</TableHead>
-                  <TableHead className="w-64 text-right">Acciones</TableHead>
+                  {/* Ancha a propósito: los dos botones con texto tienen que
+                      caber en una sola línea (ver la celda). */}
+                  <TableHead className="w-80 text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
 
               <TableBody>
                 {filtradas.length === 0 ? (
-                  <TableEmpty colSpan={6}>No hay auditorías para este filtro.</TableEmpty>
+                  <TableEmpty colSpan={columnas}>
+                    {usuarioId
+                      ? 'No tienes auditorías para este filtro.'
+                      : 'No hay auditorías para este filtro.'}
+                  </TableEmpty>
                 ) : (
                   filtradas.map((a) => {
                     const hallazgos =
@@ -280,10 +379,12 @@ export default function VistaPlanesMejora({ soloLectura = false }) {
                           {formatearDia(a.fecha_auditoria) || '—'}
                         </TableCell>
 
-                        <TableCell className="text-xs text-muted-foreground">
-                          {[a.usuarios?.nombre, a.usuarios?.apellido].filter(Boolean).join(' ') ||
-                            '—'}
-                        </TableCell>
+                        {mostrarAuditor && (
+                          <TableCell className="text-xs text-muted-foreground">
+                            {[a.usuarios?.nombre, a.usuarios?.apellido].filter(Boolean).join(' ') ||
+                              '—'}
+                          </TableCell>
+                        )}
 
                         <TableCell className="text-center">
                           <Badge variant={hallazgos ? 'secondary' : 'outline'}>{hallazgos}</Badge>
@@ -296,6 +397,7 @@ export default function VistaPlanesMejora({ soloLectura = false }) {
                             <span className="text-emerald-700 dark:text-emerald-400">
                               Cargado
                               {plan.subido_at ? ` el ${formatearDia(plan.subido_at)}` : ''}
+                              {plan.formato ? ` · ${plan.formato}` : ''}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">Sin cargar</span>
@@ -303,17 +405,25 @@ export default function VistaPlanesMejora({ soloLectura = false }) {
                         </TableCell>
 
                         <TableCell>
-                          <div className="flex flex-wrap justify-end gap-2">
+                          {/* Los dos pasos del plan —generar el formato y
+                              guardarlo validado— van juntos y en ese orden,
+                              que es el del trabajo. Antes «Ver» se colaba
+                              entre ellos y empujaba el de subir al renglón de
+                              abajo, así que la fila cambiaba de alto según si
+                              el plan estaba cargado. Ahora «Ver» es un icono
+                              al final y nada envuelve. */}
+                          <div className="flex flex-nowrap items-center justify-end gap-2">
                             {/* El formato sale de los hallazgos: sin ellos no
                                 hay plan que levantar. */}
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => descargarPlanMejora(a)}
+                              className="shrink-0"
+                              onClick={() => setAGenerar(a)}
                               disabled={!hallazgos}
                               title={
                                 hallazgos
-                                  ? 'Generar el formato del Plan de Mejoramiento'
+                                  ? 'Generar el formato del Plan de Mejoramiento con los datos de esta auditoría'
                                   : 'Esta auditoría no tiene oportunidades de mejora ni no conformidades'
                               }
                             >
@@ -321,23 +431,32 @@ export default function VistaPlanesMejora({ soloLectura = false }) {
                               Generar formato
                             </Button>
 
+                            {!soloLectura && (
+                              <Button
+                                size="sm"
+                                className="shrink-0"
+                                onClick={() => setASubir(a)}
+                                title={`Cargar el plan de mejora valorado en el último seguimiento${
+                                  plan?.url ? ' (reemplaza el que ya está cargado)' : ''
+                                }`}
+                              >
+                                <Upload />
+                                {plan?.url ? 'Reemplazar' : 'Subir validado'}
+                              </Button>
+                            )}
+
                             {plan?.url && (
                               <Button
                                 size="sm"
                                 variant="outline"
+                                className="w-8 shrink-0 px-0"
                                 onClick={() =>
                                   window.open(plan.url, '_blank', 'noopener,noreferrer')
                                 }
+                                title="Ver el plan cargado"
+                                aria-label={`Ver el plan cargado de la auditoría #${a.id}`}
                               >
                                 <ExternalLink />
-                                Ver
-                              </Button>
-                            )}
-
-                            {!soloLectura && (
-                              <Button size="sm" onClick={() => setASubir(a)}>
-                                <Upload />
-                                {plan?.url ? 'Reemplazar' : 'Subir validado'}
                               </Button>
                             )}
                           </div>
@@ -354,21 +473,44 @@ export default function VistaPlanesMejora({ soloLectura = false }) {
         <p className="flex items-start gap-2 text-xs text-muted-foreground">
           <ClipboardCheck className="h-4 w-4 shrink-0" />
           El formato se genera con las oportunidades de mejora y las no conformidades registradas en
-          el informe. El plan validado es el que devuelve firmado la dependencia auditada.
+          el informe. El plan validado es el que devuelve la dependencia auditada con la valoración
+          del último seguimiento, en {ETIQUETA_FORMATOS} (máx. {MAX_MB.PLAN_MEJORA} MB); se puede
+          volver a cargar cuando haya un seguimiento nuevo.
         </p>
       </section>
+
+      <ModalGenerarPlanMejora
+        auditoria={aGenerar}
+        onClose={() => setAGenerar(null)}
+        onConfirmar={generarFormato}
+        generando={generando}
+      />
 
       <DocumentUploadModal
         isOpen={Boolean(aSubir)}
         onClose={() => setASubir(null)}
-        title="Subir plan de mejoramiento validado"
+        /* Lo que se carga no es «un archivo»: es el plan tal como quedó
+           valorado en el último seguimiento, y conviene decirlo aquí para que
+           nadie suba el formato en blanco que acaba de generar. */
+        title="Cargar plan de mejora — valorado último seguimiento"
         description={
           aSubir
             ? `Auditoría #${aSubir.id} · ${aSubir.dependencias?.nombre ?? ''}`
             : undefined
         }
+        note={
+          <>
+            Sube el plan con la valoración del último seguimiento.{' '}
+            <strong className="font-medium text-foreground">
+              Se puede editar después de cargado:
+            </strong>{' '}
+            vuelve a entrar aquí y sube la versión nueva, que reemplaza la anterior.
+          </>
+        }
         currentFileUrl={aSubir?.plan?.url ?? null}
         viewCurrentLabel="Ver el plan cargado"
+        acceptedTypes={ACCEPT_PLAN_MEJORA}
+        acceptedLabel={ETIQUETA_FORMATOS}
         maxSizeMB={MAX_MB.PLAN_MEJORA}
         uploadButtonLabel="Subir plan"
         onUpload={subirPlan}

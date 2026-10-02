@@ -181,9 +181,58 @@ export const buildActaCompromisoPath = (a) =>
 export const buildValidationPath = (a) => 
   `Auditoria_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEPENDENCIA')}.pdf`
 
-/** El Plan de Mejoramiento firmado de una auditoría. */
-export const buildPlanMejoraPath = (a) =>
-  `PlanMejora_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}.pdf`
+/* ---- Plan de Mejoramiento ---- */
+
+/**
+ * Formatos que se aceptan como Plan de Mejoramiento validado.
+ *
+ * A diferencia del resto de documentos, este no es un PDF por defecto: el
+ * formato que genera el sistema sale de la plantilla `PlanMejora.xlsx`, así
+ * que la dependencia suele devolverlo como Excel —el mismo libro, con las
+ * acciones y los responsables rellenados—. Se admiten las dos cosas: el Excel
+ * trabajado y el PDF, por si lo imprimen y lo escanean firmado.
+ */
+export const FORMATOS_PLAN_MEJORA = {
+  xlsx: {
+    mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    etiqueta: 'Excel',
+  },
+  xls: { mime: 'application/vnd.ms-excel', etiqueta: 'Excel' },
+  pdf: { mime: 'application/pdf', etiqueta: 'PDF' },
+}
+
+/** Las extensiones admitidas, en el orden en que se prefieren al buscar. */
+export const EXTENSIONES_PLAN_MEJORA = Object.keys(FORMATOS_PLAN_MEJORA)
+
+/**
+ * Valor del `accept` del selector de archivos.
+ *
+ * Van las extensiones **y** los tipos MIME: Windows no siempre asocia el MIME
+ * de un .xlsx, y con solo el MIME el archivo aparecería en gris.
+ */
+export const ACCEPT_PLAN_MEJORA = [
+  ...EXTENSIONES_PLAN_MEJORA.map((ext) => `.${ext}`),
+  ...new Set(Object.values(FORMATOS_PLAN_MEJORA).map((f) => f.mime)),
+].join(',')
+
+/** La extensión de un nombre de archivo, en minúsculas y sin el punto. */
+export function extensionDe(nombre = '') {
+  const punto = String(nombre).lastIndexOf('.')
+  return punto === -1 ? '' : String(nombre).slice(punto + 1).toLowerCase()
+}
+
+/** El Plan de Mejoramiento validado de una auditoría, con la extensión dada. */
+export const buildPlanMejoraPath = (a, extension = 'xlsx') =>
+  `PlanMejora_${a.id}_${toSlugUpper(a?.dependencias?.nombre || 'SIN_DEP')}.${extension}`
+
+/**
+ * Todos los nombres con los que puede estar guardado el plan de una auditoría.
+ *
+ * El nombre lleva la extensión, así que al admitir dos formatos hay que
+ * buscar por los dos: el archivo no se llama igual según cómo lo entreguen.
+ */
+export const rutasPlanMejora = (a) =>
+  EXTENSIONES_PLAN_MEJORA.map((ext) => buildPlanMejoraPath(a, ext))
 
 /* ---- Validación de estado de informe ---- */
 export function getInformeStatus(informe) {

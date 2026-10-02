@@ -41,8 +41,11 @@ BEGIN
             'profesional',
             'magister',
             'magíster',
-            'profesional especializado',
-            'profecional especializado',
+            -- «Profesional especializado» se renombró a «Especialista»; para una
+            -- base que ya tenga el CHECK antiguo, el cambio está en
+            -- `tipo-estudio-especialista.sql` (este bloque no se vuelve a
+            -- aplicar si la restricción ya existe).
+            'especialista',
             'doctor'
           ]
         )

@@ -58,6 +58,10 @@ export const ADMIN_NAV = [
 export const AUDITOR_NAV = [
   { key: 'bienvenida', label: 'Inicio', icon: Home },
   { key: 'timeline', label: 'Auditoría Interna', icon: ClipboardList },
+  // El Plan de Mejoramiento se levanta después de cerrar la auditoría, así que
+  // va detrás de la línea de trabajo y no dentro de ella. Al salir de los pasos
+  // del timeline el auditor se quedaba sin forma de generar el formato.
+  { key: 'planes-mejora', label: 'Planes de Mejoramiento', icon: ClipboardCheck },
   { key: 'mi-dashboard', label: 'Mi Dashboard', icon: LayoutDashboard },
   { key: 'mis-evaluaciones', label: 'Mis Evaluaciones', icon: Award },
   { key: 'caja', label: 'Caja de Herramientas', icon: Wrench },

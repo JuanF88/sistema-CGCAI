@@ -9,6 +9,7 @@ import CajadeHerramientas from '@/features/herramientas/components/CajadeHerrami
 import AuditoriasTimeline from '@/features/auditorias/components/AuditoriasTimeline'
 import MiDashboardAuditor from '@/features/evaluaciones/components/MiDashboardAuditor'
 import MisEvaluaciones from '@/features/evaluaciones/components/MisEvaluaciones'
+import VistaPlanesMejora from '@/features/auditorias/components/VistaPlanesMejora'
 
 
 // `setReset` no se usa: el shell del auditor ya alterna `reset` al entrar en
@@ -41,6 +42,12 @@ export default function VistaActual({ usuario, reset }) {
       )}
       {vista === 'mis-evaluaciones' && (
         <MisEvaluaciones usuario={usuario} />
+      )}
+      {/* La misma pantalla del administrador, limitada a las auditorías de
+          este auditor: con `usuarioId` la consulta filtra y la columna del
+          auditor desaparece. */}
+      {vista === 'planes-mejora' && (
+        <VistaPlanesMejora usuarioId={usuario.usuario_id} />
       )}
     </>
   )

@@ -83,6 +83,45 @@ export function buscarDocumento(indice, bucket, path) {
 }
 
 /**
+ * Lo mismo, cuando el documento puede llamarse de varias formas.
+ *
+ * El Plan de Mejoramiento se admite en Excel o en PDF, y la extensión va en el
+ * nombre: hay que preguntar por los dos. Si por un cambio de formato quedaran
+ * las dos versiones, gana la más reciente y las otras salen en `sobrantes`
+ * para que quien suba pueda limpiarlas.
+ *
+ * @param {string[]} paths  Candidatos, en orden de preferencia
+ * @returns {{existe: boolean, desconocido: boolean, path: string, subido_at: string|null, sobrantes: string[]}}
+ *   `path` es el que existe —o el primer candidato, si no hay ninguno—, que es
+ *   el nombre con el que se guardaría.
+ */
+export function buscarDocumentoEntre(indice, bucket, paths) {
+  const candidatos = (paths ?? []).filter(Boolean)
+  const primero = candidatos[0] ?? ''
+
+  if (!indice?.[bucket]) {
+    return { existe: false, desconocido: true, path: primero, subido_at: null, sobrantes: [] }
+  }
+
+  const encontrados = candidatos
+    .map((path) => buscarDocumento(indice, bucket, path))
+    .filter((hallazgo) => hallazgo.existe)
+
+  if (!encontrados.length) {
+    return { existe: false, desconocido: false, path: primero, subido_at: null, sobrantes: [] }
+  }
+
+  // Sin fecha no se puede comparar: queda detrás, para que no gane por
+  // accidente a una entrega que sí sabemos cuándo llegó.
+  const ordenados = [...encontrados].sort(
+    (a, b) => (b.subido_at ? Date.parse(b.subido_at) : 0) - (a.subido_at ? Date.parse(a.subido_at) : 0)
+  )
+
+  const [ganador, ...resto] = ordenados
+  return { ...ganador, sobrantes: resto.map((h) => h.path) }
+}
+
+/**
  * Firma en bloque todas las rutas pedidas: una petición por bucket.
  *
  * @param {Record<string, string[]>} rutasPorBucket

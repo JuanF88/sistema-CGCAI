@@ -31,7 +31,9 @@ import { cn } from '@/lib/utils'
  * @param {(file: File) => Promise<void>} props.onUpload
  * @param {boolean} [props.isUploading]
  * @param {number} [props.maxSizeMB]
- * @param {string} [props.acceptedTypes]   MIME aceptado
+ * @param {string} [props.acceptedTypes]   Valor del `accept` del selector
+ * @param {string} [props.acceptedLabel]   Cómo se nombran esos formatos al auditor
+ * @param {React.ReactNode} [props.note]   Aclaración bajo el selector
  * @param {string} [props.viewCurrentLabel]
  * @param {string} [props.uploadButtonLabel]
  */
@@ -45,6 +47,8 @@ export default function DocumentUploadModal({
   isUploading = false,
   maxSizeMB = 2,
   acceptedTypes = 'application/pdf',
+  acceptedLabel,
+  note,
   viewCurrentLabel = 'Ver archivo actual',
   uploadButtonLabel = 'Subir',
 }) {
@@ -73,7 +77,10 @@ export default function DocumentUploadModal({
     onClose()
   }
 
-  const etiquetaTipo = acceptedTypes === 'application/pdf' ? 'PDF' : 'archivos'
+  // Quien admita más de un formato lo dice con `acceptedLabel`; deducirlo del
+  // `accept` solo acertaba con el PDF y para todo lo demás escribía «archivos».
+  const etiquetaTipo =
+    acceptedLabel || (acceptedTypes === 'application/pdf' ? 'PDF' : 'archivos')
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => (open ? null : handleClose())}>
@@ -126,6 +133,8 @@ export default function DocumentUploadModal({
             </>
           )}
         </label>
+
+        {note && <p className="text-xs text-muted-foreground">{note}</p>}
 
         <DialogFooter>
           <Button variant="outline" onClick={handleClose} disabled={isUploading}>

@@ -99,7 +99,7 @@ const TIPOS_PERSONAL = [
 const TIPOS_ESTUDIO = [
   { value: 'profesional', label: 'Profesional' },
   { value: 'magister', label: 'Magíster' },
-  { value: 'profesional especializado', label: 'Profesional especializado' },
+  { value: 'especialista', label: 'Especialista' },
   { value: 'doctor', label: 'Doctor' },
 ]
 
@@ -377,7 +377,7 @@ export default function VistaAdministrarUsuarios({ headerActions = null }) {
           tarjeta bajaba a unos 165 px y «Administradores» se salía. */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-6">
         <InfoCard tone="blue" label="Total usuarios" value={stats.total} />
-        <InfoCard
+        <InfoCard
           tone="green"
           label="Activos"
           value={stats.activos}
