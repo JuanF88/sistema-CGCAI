@@ -315,11 +315,6 @@ export default function AppShell({
               alt="Logo Universidad"
               className={cn('brightness-0 invert', plegado ? 'w-[26px]' : LOGO_ANCHO)}
             />
-            <img
-              src="/logosIcontec.png"
-              alt="Logo Icontec"
-              className={cn('brightness-0 invert', plegado ? 'w-[26px]' : LOGO_ANCHO)}
-            />
           </div>
 
           <button

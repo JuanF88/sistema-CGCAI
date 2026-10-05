@@ -160,15 +160,6 @@ export default function LoginForm() {
         </form>
       </div>
 
-      {/* El sello original es azul oscuro: sobre el fondo azul no se lee, así
-          que se pasa a blanco sólido igual que en el panel. */}
-      <Image
-        src="/logosIcontec2.png"
-        alt="Logo Icontec"
-        width={120}
-        height={40}
-        className="h-12 w-auto brightness-0 invert drop-shadow-lg"
-      />
     </div>
   )
 }
