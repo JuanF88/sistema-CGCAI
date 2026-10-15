@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { BellRing, LayoutGrid, RefreshCw } from 'lucide-react'
+import { BellRing, ClipboardCheck, Download, LayoutGrid, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Cargando } from '@/components/ui/loader'
 import { PageHeader } from '@/components/ui/page-header'
@@ -20,6 +20,8 @@ import { cn } from '@/lib/utils'
 import { toast } from 'react-toastify'
 import { avisarPendientes } from '@/features/alertas/api/alertas-api'
 import { ModalAvisoPendientes } from './ModalAvisoPendientes'
+import ModalEjecucion from './ModalEjecucion'
+import { exportarMallaControl } from '@/features/auditorias/lib/exportar-malla'
 import { PLAZOS } from '@/lib/catalogos/plazos'
 import { llegoTarde } from './timeline/etapas'
 import {
@@ -50,6 +52,11 @@ import {
  * orden y no había forma de leerlas juntas.
  */
 const DOCUMENTOS_MALLA = [
+  // Primera y aparte: no es un documento del expediente sino la pregunta de la
+  // que dependen las demás —si la auditoría se hizo—, y se marca a mano. Va a
+  // la izquierda de todo y con una celda más estrecha y sin porcentaje, para
+  // que se lea como lo que es: un control, no una entrega.
+  { key: 'ejecutada',  columna: 'Ejecutada',   tarjeta: 'Ejecutadas',         tono: 'rose',   plazo: null, manual: true },
   { key: 'actaComp',   columna: 'Carta Comp.', tarjeta: 'Cartas compromiso',  tono: 'pink',   plazo: 'actaCompromiso' },
   { key: 'plan',       columna: 'Plan',        tarjeta: 'Planes',             tono: 'purple', plazo: 'plan' },
   { key: 'asistencia', columna: 'Asistencia',  tarjeta: 'Asistencias',        tono: 'green',  plazo: 'asistencia' },
@@ -66,7 +73,23 @@ const ALERTA_POR_COLUMNA = Object.fromEntries(
   DOCUMENTOS_MALLA.filter((d) => d.plazo).map((d) => [d.key, PLAZOS[d.plazo].alerta])
 )
 
-const COLUMNAS = DOCUMENTOS_MALLA.map(({ key, columna }) => ({ key, title: columna }))
+const COLUMNAS = DOCUMENTOS_MALLA.map(({ key, columna, manual }) => ({
+  key,
+  title: columna,
+  manual: Boolean(manual),
+}))
+
+/**
+ * La rejilla de la malla: dependencia, avance, la columna de control y los
+ * siete documentos.
+ *
+ * Se escribe una sola vez porque la usan la cabecera y cada fila, y si las dos
+ * no dicen exactamente lo mismo las columnas dejan de cuadrar. Tiene que estar
+ * literal en el código para que Tailwind la vea: la hoja de estilos se genera
+ * leyendo el fuente como texto, así que una plantilla construida con
+ * `repeat(${n})` no existiría.
+ */
+const REJILLA = 'grid grid-cols-[minmax(220px,1.6fr)_140px_72px_repeat(7,minmax(96px,1fr))]'
 
 /**
  * Las ocho métricas de la cabecera.
@@ -99,6 +122,11 @@ export default function AuditoriasMallaControl() {
   const [selectedYear, setSelectedYear] = useState('') // '' = todos
   /** Celda sobre la que se está avisando: documento, dependencia y auditorías. */
   const [aviso, setAviso] = useState(null)
+  /** Celda de «Ejecutada» abierta: dependencia e ids de sus auditorías. */
+  const [ejecucion, setEjecucion] = useState(null)
+  /** La columna `ejecutada` no está en la base todavía. */
+  const [sinColumnaEjecucion, setSinColumnaEjecucion] = useState(false)
+  const [exportando, setExportando] = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true); setError(null)
@@ -128,6 +156,24 @@ export default function AuditoriasMallaControl() {
       const { indice, fallidos } = await leerBuckets(Object.values(BUCKETS_DOCUMENTO))
       if (fallidos.length) toast.warning(avisoDeFallidos(fallidos))
 
+      // `ejecutada` se pregunta aparte y con tolerancia. Pedirla dentro del
+      // `select` de arriba tiraría la pantalla completa mientras no se haya
+      // ejecutado `sql/ejecucion-auditorias.sql`; así solo se pierde esa
+      // columna, y la propia pantalla dice por qué.
+      const ejecucionPorId = new Map()
+      const consultaEjecucion = await supabase
+        .from('informes_auditoria')
+        .select('id, ejecutada, ejecutada_at')
+
+      if (consultaEjecucion.error) {
+        // 42703 = la columna no existe.
+        if (consultaEjecucion.error.code !== '42703') throw consultaEjecucion.error
+        setSinColumnaEjecucion(true)
+      } else {
+        setSinColumnaEjecucion(false)
+        for (const fila of consultaEjecucion.data ?? []) ejecucionPorId.set(fila.id, fila)
+      }
+
       const merged = rows.map((a) => {
         const fa = parseYMD(a.fecha_auditoria)
 
@@ -143,6 +189,9 @@ export default function AuditoriasMallaControl() {
           evaluacion:  addBusinessDays(fa, PLAZOS.evaluacion.dias),
           acta:        addBusinessDays(fa, PLAZOS.acta.dias),
           actaComp:    addBusinessDays(fa, PLAZOS.actaCompromiso.dias),
+          // La auditoría se ejecuta el día que está programada: ese es su
+          // propio plazo, sin desplazamiento.
+          ejecutada:   fa,
           informeOk:   addBusinessDays(fa, PLAZOS.validacion.dias),
           validado:    addBusinessDays(fa, PLAZOS.validacion.dias),
         } : {}
@@ -191,8 +240,17 @@ export default function AuditoriasMallaControl() {
           }
         }
 
+        const ejec = ejecucionPorId.get(a.id)
+        const ejecutada = ejec?.ejecutada === true
+        const ejecutadaAt = ejec?.ejecutada_at ?? null
+
         const _stages = {
           plan:       etapa(hasPlan,     due.plan,       planSentAt),
+          // `late: false` a mano: la marca se pone cuando alguien confirma que
+          // la auditoría se hizo, casi siempre días después de la fecha. Con
+          // el criterio normal todas saldrían «fuera de plazo» y la columna
+          // viviría en ámbar sin querer decir nada.
+          ejecutada:  { delivered: ejecutada, due: due.ejecutada, deliveredAt: ejecutadaAt ? new Date(ejecutadaAt) : null, late: false },
           asistencia: etapa(hasAsis,     due.asistencia, asistenciaAt),
           evaluacion: etapa(hasEval,     due.evaluacion, evaluacionAt),
           acta:       etapa(hasActa,     due.acta,       actaAt),
@@ -209,7 +267,9 @@ export default function AuditoriasMallaControl() {
 
         return {
           ...a,
-          _flags: { plan: hasPlan, asistencia: hasAsis, evaluacion: hasEval, acta: hasActa, actaComp: hasActaComp, informeOk, validado: validadoOk },
+          ejecutada,
+          ejecutada_at: ejecutadaAt,
+          _flags: { plan: hasPlan, ejecutada, asistencia: hasAsis, evaluacion: hasEval, acta: hasActa, actaComp: hasActaComp, informeOk, validado: validadoOk },
           _stages,
           _scores: { docScore, infoScore }
         }
@@ -301,22 +361,105 @@ export default function AuditoriasMallaControl() {
   }, [filtered])
 
   /* ===== KPIs globales ===== */
+  // Se cuentan recorriendo `DOCUMENTOS_MALLA` y no con una lista escrita a
+  // mano: así una columna nueva aparece en su tarjeta sola, y no puede pasar
+  // que la tarjeta exista y se quede a cero porque nadie la sumó.
   const kpis = useMemo(() => {
-    const t = { total: filtered.length, plan: 0, asistencia: 0, evaluacion: 0, acta: 0, actaComp: 0, informeOk: 0, validado: 0 }
-    filtered.forEach(a => {
-      const f = a._flags || {}
-      if (f.plan) t.plan++
-      if (f.asistencia) t.asistencia++
-      if (f.evaluacion) t.evaluacion++
-      if (f.acta) t.acta++
-      if (f.actaComp) t.actaComp++
-      if (f.informeOk) t.informeOk++
-      if (f.validado) t.validado++
-    })
+    const t = { total: filtered.length }
+    for (const { key } of DOCUMENTOS_MALLA) t[key] = 0
+
+    for (const a of filtered) {
+      for (const { key } of DOCUMENTOS_MALLA) {
+        if (a._flags?.[key]) t[key]++
+      }
+    }
+
     const pct = (n) => (t.total ? Math.round((n / t.total) * 100) : 0)
     return { ...t, pct }
   }, [filtered])
 
+  /**
+   * Las auditorías de la celda abierta, sacadas del estado y no copiadas.
+   *
+   * Si el modal se quedara con los objetos de cuando se abrió, al marcar una
+   * seguiría mostrando el valor viejo: la lista tiene que mirar al mismo sitio
+   * que pinta la malla.
+   */
+  const destinoEjecucion = useMemo(() => {
+    if (!ejecucion) return null
+    const ids = new Set(ejecucion.ids)
+    return {
+      dependencia: ejecucion.dependencia,
+      auditorias: filtered.filter((a) => ids.has(a.id)),
+    }
+  }, [ejecucion, filtered])
+
+  /**
+   * Marca o desmarca una auditoría como ejecutada.
+   *
+   * Se pide la fila de vuelta: bajo RLS un `update` que no encuentra fila que
+   * pueda tocar **no da error**, devuelve cero filas, y sin comprobarlo el
+   * fallo sería invisible —la celda cambiaría y la base no—.
+   *
+   * Al guardar se parchea el estado en lugar de recargar: una recarga volvería
+   * a listar los seis buckets para un booleano.
+   */
+  const marcarEjecutada = async (auditoria, ejecutada) => {
+    const cuando = ejecutada ? new Date().toISOString() : null
+
+    const { data, error } = await supabase
+      .from('informes_auditoria')
+      .update({ ejecutada, ejecutada_at: cuando })
+      .eq('id', auditoria.id)
+      .select('id')
+
+    if (error) {
+      toast.error(`No se pudo guardar: ${error.message}`)
+      return
+    }
+
+    if (!data?.length) {
+      toast.error(
+        `No se pudo marcar la auditoría #${auditoria.id}: la base no aceptó el cambio.`
+      )
+      return
+    }
+
+    setAuditorias((prev) =>
+      prev.map((a) =>
+        a.id === auditoria.id
+          ? {
+              ...a,
+              ejecutada,
+              ejecutada_at: cuando,
+              _flags: { ...a._flags, ejecutada },
+              _stages: {
+                ...a._stages,
+                ejecutada: {
+                  ...a._stages?.ejecutada,
+                  delivered: ejecutada,
+                  deliveredAt: cuando ? new Date(cuando) : null,
+                },
+              },
+            }
+          : a
+      )
+    )
+  }
+
+  const exportar = async () => {
+    setExportando(true)
+    try {
+      await exportarMallaControl({
+        documentos: DOCUMENTOS_MALLA,
+        matriz: matrix,
+        auditorias: filtered,
+        anio: selectedYear,
+      })
+    } finally {
+      setExportando(false)
+    }
+  }
 
   return (
     <div className={PAGE_SHELL}>
@@ -343,6 +486,16 @@ export default function AuditoriasMallaControl() {
             </Select>
 
             <Button
+              onClick={exportar}
+              disabled={loading || exportando || !filtered.length}
+              title="Descargar la malla en Excel: avance por dependencia y fechas de cada auditoría"
+              className="bg-white/15 text-white shadow-none backdrop-blur-sm hover:bg-white/25"
+            >
+              <Download />
+              {exportando ? 'Generando…' : 'Excel'}
+            </Button>
+
+            <Button
               size="icon"
               onClick={loadData}
               title="Recargar datos"
@@ -362,7 +515,7 @@ export default function AuditoriasMallaControl() {
           La escalera de columnas llega a ocho solo en 2xl (1536 px). Antes
           saltaba a ocho en xl (1280): en un portátil de 1366 eso dejaba 127 px
           por tarjeta y las etiquetas largas se salían. */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-9">
         {TARJETAS.map(({ key, label, tono, sinPorcentaje }) => (
           <InfoCard
             key={key}
@@ -406,14 +559,14 @@ export default function AuditoriasMallaControl() {
 
         {!loading && !error && matrix.length > 0 && (
           <div className="overflow-x-auto">
-            <div className="min-w-[1100px]">
+            <div className="min-w-[1200px]">
               {/* Cabecera.
                   La celda fija llevaba `bg-muted/60`, translúcido: al
                   desplazar, las columnas de debajo se veían a través del
                   nombre de la dependencia. Va opaca, con `bg-muted` sobre el
                   fondo de la tarjeta, y con borde derecho para que se lea como
                   una columna anclada y no como un solape. */}
-              <div className="grid grid-cols-[minmax(220px,1.6fr)_140px_repeat(7,minmax(96px,1fr))] border-b border-border bg-muted/60">
+              <div className={cn(REJILLA, 'border-b border-border bg-muted/60')}>
                 <div className="sticky left-0 z-20 border-r border-border bg-muted px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Dependencia
                 </div>
@@ -423,7 +576,10 @@ export default function AuditoriasMallaControl() {
                 {COLUMNAS.map((col) => (
                   <div
                     key={col.key}
-                    className="px-2 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                    className={cn(
+                      'py-2.5 text-center font-semibold uppercase tracking-wide text-muted-foreground',
+                      col.manual ? 'px-1 text-[0.65rem]' : 'px-2 text-xs'
+                    )}
                   >
                     {col.title}
                   </div>
@@ -437,7 +593,10 @@ export default function AuditoriasMallaControl() {
                 return (
                   <div
                     key={row.depId}
-                    className="grid grid-cols-[minmax(220px,1.6fr)_140px_repeat(7,minmax(96px,1fr))] border-b border-border transition-colors last:border-0 hover:bg-muted/40"
+                    className={cn(
+                      REJILLA,
+                      'border-b border-border transition-colors last:border-0 hover:bg-muted/40'
+                    )}
                   >
                     {/* `group-hover` no vale aquí: al fijar la columna hay que
                         repintar su fondo, y `hover:bg-muted/40` de la fila no
@@ -471,7 +630,7 @@ export default function AuditoriasMallaControl() {
                         lastDelivered: null,
                       }
                       const localPct = ag.total ? Math.round((ag.done / ag.total) * 100) : 0
-                      const tip = buildTooltip(col.title, ag)
+                      const tip = buildTooltip(col.title, ag, col.manual)
 
                       // El reloj marca la entrega que llegó fuera de plazo; el
                       // visto, la que llegó a tiempo.
@@ -485,24 +644,46 @@ export default function AuditoriasMallaControl() {
                         ALERTA_POR_COLUMNA[col.key] && ag.pendientes?.length
                       )
 
+                      // «Ejecutada» no se reclama, se marca; y se puede
+                      // desmarcar, así que la celda es pulsable aunque esté
+                      // completa. Sin la columna en la base no hay nada que
+                      // guardar y no se ofrece.
+                      const puedeMarcar = col.key === 'ejecutada' && !sinColumnaEjecucion
+
                       return (
                         <div
                           key={col.key}
                           title={tip}
                           aria-label={tip}
                           className={cn(
-                            'group relative m-1 flex flex-col items-center justify-center rounded-lg px-1 py-2 text-center',
-                            heatClass(localPct, ag.tardios)
+                            'group relative m-1 flex flex-col items-center justify-center rounded-lg text-center',
+                            col.manual
+                              ? ['px-0.5 py-1.5', claseControl(ag)]
+                              : ['px-1 py-2', heatClass(localPct, ag.tardios)]
                           )}
                         >
-                          <span className="text-sm font-bold tabular-nums">
+                          <span
+                            className={cn(
+                              'font-bold tabular-nums',
+                              col.manual ? 'text-xs' : 'text-sm'
+                            )}
+                          >
                             {ag.done}/{ag.total}
                           </span>
-                          <span className="text-[0.7rem] font-semibold tabular-nums opacity-80">
-                            {localPct}%
-                          </span>
-                          {dateInfo && (
-                            <span className="mt-0.5 text-[0.65rem] opacity-75">{dateInfo}</span>
+
+                          {/* La columna de control no lleva porcentaje ni
+                              fecha: con 72 px no caben, y las dos cosas están
+                              en el tooltip. Es parte de que se vea más
+                              pequeña que las de documentos. */}
+                          {!col.manual && (
+                            <>
+                              <span className="text-[0.7rem] font-semibold tabular-nums opacity-80">
+                                {localPct}%
+                              </span>
+                              {dateInfo && (
+                                <span className="mt-0.5 text-[0.65rem] opacity-75">{dateInfo}</span>
+                              )}
+                            </>
                           )}
 
                           {/* La campana tapa la celda entera, no una esquina:
@@ -538,6 +719,35 @@ export default function AuditoriasMallaControl() {
                               </span>
                             </button>
                           )}
+
+                          {puedeMarcar && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEjecucion({
+                                  dependencia: row.depName,
+                                  ids: filtered
+                                    .filter((a) => (a.dependencia_id ?? 'SIN_DEP') === row.depId)
+                                    .map((a) => a.id),
+                                })
+                              }
+                              title={`Marcar qué auditorías de ${row.depName} se ejecutaron (${ag.done} de ${ag.total})`}
+                              aria-label={`Marcar auditorías ejecutadas en ${row.depName}: ${ag.done} de ${ag.total}`}
+                              className={cn(
+                                'absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg',
+                                'bg-background/85 opacity-0 transition-opacity',
+                                'hover:bg-background focus-visible:opacity-100 group-hover:opacity-100'
+                              )}
+                            >
+                              <ClipboardCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                              <span
+                                className="text-[0.6rem] font-semibold leading-none"
+                                aria-hidden="true"
+                              >
+                                Marcar
+                              </span>
+                            </button>
+                          )}
                         </div>
                       )
                     })}
@@ -563,9 +773,29 @@ export default function AuditoriasMallaControl() {
               Sin entregar
             </span>
             <span>✓ entrega a tiempo · ⏱ entrega tardía · ⏰ próximo vencimiento</span>
+            <span className="flex items-center gap-1.5">
+              <span
+                className="h-3 w-3 rounded border border-dashed border-emerald-400 bg-emerald-50"
+                aria-hidden="true"
+              />
+              «Ejecutada»: control manual, pasa el ratón por la celda para marcarla
+            </span>
           </div>
         )}
       </section>
+
+      {sinColumnaEjecucion && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+          La columna «Ejecutada» todavía no existe en la base, así que sale en cero y no se puede
+          marcar. Ejecuta <code className="font-mono">sql/ejecucion-auditorias.sql</code> y recarga.
+        </p>
+      )}
+
+      <ModalEjecucion
+        destino={destinoEjecucion}
+        onClose={() => setEjecucion(null)}
+        onMarcar={marcarEjecutada}
+      />
 
       <ModalAvisoPendientes
         open={Boolean(aviso)}
@@ -609,6 +839,22 @@ export default function AuditoriasMallaControl() {
  * de un vistazo y, pintada de verde por estar completa, se perdía entre las
  * demás. El mismo ámbar que usa «Envío tardío» en la línea de trabajo.
  */
+/**
+ * Color de la celda de «Ejecutada».
+ *
+ * No usa el degradado del heatmap a propósito: no es una entrega que avance
+ * poco a poco, es un sí, un no o un «a medias» cuando la dependencia tiene
+ * varias auditorías. El borde discontinuo es la pista de que es lo único de la
+ * malla que se escribe a mano.
+ */
+function claseControl({ done, total }) {
+  const base = 'border border-dashed'
+  if (!total) return `${base} border-border bg-background text-muted-foreground`
+  if (done === total) return `${base} border-emerald-400 bg-emerald-50 text-emerald-800`
+  if (done > 0) return `${base} border-amber-400 bg-amber-50 text-amber-800`
+  return `${base} border-border bg-background text-muted-foreground`
+}
+
 function heatClass(pct, tardios = 0) {
   if (tardios > 0) return 'bg-amber-200 text-amber-900'
   if (pct >= 90) return 'bg-emerald-100 text-emerald-900'
@@ -628,17 +874,20 @@ function progressColorClass(pct) {
   return 'bg-gradient-to-r from-red-500 to-red-600'
 }
 
-function buildTooltip(title, ag) {
+function buildTooltip(title, ag, manual = false) {
   const parts = []
   parts.push(`${title}: ${ag.done}/${ag.total}`)
-  if (typeof ag.pending === 'number') parts.push(`Pendientes: ${ag.pending}`)
+  if (typeof ag.pending === 'number') parts.push(`${manual ? 'Sin marcar' : 'Pendientes'}: ${ag.pending}`)
   if (typeof ag.overdue === 'number') parts.push(`Vencidos: ${ag.overdue}`)
   if (ag.tardios) parts.push(`Fuera de plazo: ${ag.tardios}`)
-  if (ag.nextDue) parts.push(`Próximo límite: ${fmt(ag.nextDue)}`)
+  if (ag.nextDue) parts.push(`${manual ? 'Próxima auditoría' : 'Próximo límite'}: ${fmt(ag.nextDue)}`)
   // «Última» solo cuando la celda resume más de una auditoría; con una sola,
   // decir «última» hacía dudar de si había otra entrega escondida.
   if (ag.lastDelivered) {
-    parts.push(`${ag.total > 1 ? 'Última entrega' : 'Entregado'}: ${fmt(ag.lastDelivered)}`)
+    const etiqueta = manual
+      ? ag.total > 1 ? 'Última marca' : 'Marcada'
+      : ag.total > 1 ? 'Última entrega' : 'Entregado'
+    parts.push(`${etiqueta}: ${fmt(ag.lastDelivered)}`)
   }
   return parts.join(' · ')
 }
