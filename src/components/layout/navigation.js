@@ -17,6 +17,7 @@ import {
   Home,
   LayoutDashboard,
   Lightbulb,
+  ScrollText,
   UserRound,
   Wrench,
 } from 'lucide-react'
@@ -52,6 +53,10 @@ export const ADMIN_NAV = [
   { key: 'dashboardAuditores', label: 'Dashboard de Auditores', icon: UserRound },
   { key: 'alertasAuditoria', label: 'Alertas de Auditoría', icon: BellRing },
   { key: 'estadisticas', label: 'Estadísticas', icon: BarChart, alias: ['powerbi'] },
+  // Al final y aparte: no es una tarea del ciclo de auditoría sino la
+  // trazabilidad del sistema en sí, y se consulta cuando hay que averiguar
+  // quién tocó algo.
+  { key: 'registroActividad', label: 'Registro de Actividad', icon: ScrollText },
 ]
 
 /** Panel del auditor. */

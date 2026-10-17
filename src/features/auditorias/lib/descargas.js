@@ -14,7 +14,33 @@ import { generarPlanMejora2 } from '@/features/auditorias/utils/generarPlanMejor
 const RELACIONES = `*, iso:iso_id ( iso ), capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )`
 
 const hallazgosDe = (tabla, informeId) =>
-  supabase.from(tabla).select(RELACIONES).eq('informe_id', informeId)
+  supabase.from(tabla).select(RELACIONES).eq('informe_id', informeId).order('id')
+
+/**
+ * Los hallazgos de un informe, o un error que corta la descarga.
+ *
+ * Antes cada consulta se leía como `respuesta.data || []`, así que una lectura
+ * rechazada —un token caducado, un corte de red— producía un documento
+ * perfecto al que le faltaban hallazgos, sin un solo aviso. Un informe de
+ * auditoría que se firma y se entrega no puede salir incompleto en silencio:
+ * si una consulta falla, no hay documento.
+ */
+async function leerHallazgosParaDocumento(informeId, tablas) {
+  const respuestas = await Promise.all(tablas.map((t) => hallazgosDe(t, informeId)))
+
+  const fallos = tablas
+    .map((tabla, i) => (respuestas[i].error ? `${tabla}: ${respuestas[i].error.message}` : null))
+    .filter(Boolean)
+
+  if (fallos.length) {
+    throw new Error(
+      `No se pudieron leer todos los hallazgos del informe (${fallos.join(' · ')}). ` +
+        `El documento no se genera para que no salga incompleto.`
+    )
+  }
+
+  return respuestas.map((r) => r.data ?? [])
+}
 
 /** Opciones de la plantilla del Plan de Mejoramiento (`/plantillas/PlanMejora.xlsx`). */
 const OPCIONES_PM = {
@@ -37,10 +63,10 @@ const OPCIONES_PM = {
  */
 export async function descargarInformeAuditoria(informe, usuario) {
   try {
-    const [fort, opor, noConfor] = await Promise.all([
-      hallazgosDe('fortalezas', informe.id),
-      hallazgosDe('oportunidades_mejora', informe.id),
-      hallazgosDe('no_conformidades', informe.id),
+    const [fort, opor, noConfor] = await leerHallazgosParaDocumento(informe.id, [
+      'fortalezas',
+      'oportunidades_mejora',
+      'no_conformidades',
     ])
 
     const firmante = usuario || {
@@ -48,16 +74,10 @@ export async function descargarInformeAuditoria(informe, usuario) {
       apellido: informe.usuarios?.apellido || '',
     }
 
-    await generarInformeAuditoria(
-      informe,
-      fort.data || [],
-      opor.data || [],
-      noConfor.data || [],
-      firmante
-    )
+    await generarInformeAuditoria(informe, fort, opor, noConfor, firmante)
   } catch (err) {
     console.error('Descargar informe (borrador) error:', err)
-    toast.error('No se pudo generar/descargar el informe.')
+    toast.error(err?.message || 'No se pudo generar/descargar el informe.')
   }
 }
 
@@ -67,13 +87,10 @@ export async function descargarInformeAuditoria(informe, usuario) {
  */
 export async function descargarPlanMejora(informe) {
   try {
-    const [opor, noConfor] = await Promise.all([
-      hallazgosDe('oportunidades_mejora', informe.id),
-      hallazgosDe('no_conformidades', informe.id),
+    const [om, nc] = await leerHallazgosParaDocumento(informe.id, [
+      'oportunidades_mejora',
+      'no_conformidades',
     ])
-
-    const om = Array.isArray(opor.data) ? opor.data : []
-    const nc = Array.isArray(noConfor.data) ? noConfor.data : []
 
     if (!om.length && !nc.length) {
       toast.info('Este informe no tiene oportunidades de mejora ni no conformidades.')
@@ -83,6 +100,6 @@ export async function descargarPlanMejora(informe) {
     await generarPlanMejora2(informe, om, nc, null, OPCIONES_PM)
   } catch (err) {
     console.error('Descargar Plan de Mejora error:', err)
-    toast.error('No se pudo generar/descargar el Plan de Mejora.')
+    toast.error(err?.message || 'No se pudo generar/descargar el Plan de Mejora.')
   }
 }

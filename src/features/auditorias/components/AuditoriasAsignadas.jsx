@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'react-toastify'
 import { supabase } from '@/lib/supabase/client'
 import FormularioRegistro from '@/features/auditorias/components/FormularioRegistro'
-import { generarInformeAuditoria } from '@/features/auditorias/utils/generarInformeAuditoria'
+import { descargarInformeAuditoria } from '@/features/auditorias/lib/descargas'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Eye, FilePen, Pencil } from 'lucide-react'
 
@@ -332,25 +332,14 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
     100: '✅ Validado',
   }
 
-  /** Descarga el informe (borrador) de una auditoría. */
-  const descargarBorrador = async (a) => {
-    const [fort, opor, noConfor] = await Promise.all([
-      supabase
-        .from('fortalezas')
-        .select(`*, iso:iso_id ( iso ), capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )`)
-        .eq('informe_id', a.id),
-      supabase
-        .from('oportunidades_mejora')
-        .select(`*, iso:iso_id ( iso ), capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )`)
-        .eq('informe_id', a.id),
-      supabase
-        .from('no_conformidades')
-        .select(`*, iso:iso_id ( iso ), capitulo:capitulo_id ( capitulo ), numeral:numeral_id ( numeral )`)
-        .eq('informe_id', a.id),
-    ])
-
-    await generarInformeAuditoria(a, fort.data || [], opor.data || [], noConfor.data || [], usuario)
-  }
+  /**
+   * Descarga el informe (borrador) de una auditoría.
+   *
+   * Pasa por `lib/descargas` y no repite las consultas aquí: esta copia leía
+   * los hallazgos como `data || []`, así que una consulta rechazada generaba
+   * un informe al que le faltaban hallazgos sin avisar de nada.
+   */
+  const descargarBorrador = (a) => descargarInformeAuditoria(a, usuario)
 
   const SeccionAuditorias = ({ titulo, lista }) => (
     <section className={cn(SECTION_CARD, 'flex flex-col gap-3 p-4')}>

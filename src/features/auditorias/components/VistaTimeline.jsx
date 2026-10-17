@@ -33,6 +33,7 @@ import FormularioRegistro from '@/features/auditorias/components/FormularioRegis
 import { DOCUMENTOS_ADMIN } from '@/features/auditorias/lib/documentos'
 import { computeFlags, isAuditValidated } from '@/features/auditorias/lib/estado-auditoria'
 import { descargarInformeAuditoria } from '@/features/auditorias/lib/descargas'
+import { etiquetaAsistencia } from '@/features/auditorias/lib/asistencia'
 import { useNovedades } from '@/features/auditorias/hooks/useNovedades'
 import { useAnioInicial } from '@/hooks/useAnioInicial'
 import { useSubidaDocumento } from '@/features/auditorias/hooks/useSubidaDocumento'
@@ -951,7 +952,7 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
                     {selected.asistencia_tipo && (
                       <span>
                         · Asistencia:{' '}
-                        <strong className="text-foreground">{selected.asistencia_tipo}</strong>
+                        <strong className="text-foreground">{etiquetaAsistencia(selected.asistencia_tipo)}</strong>
                       </span>
                     )}
                   </div>

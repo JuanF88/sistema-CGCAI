@@ -17,6 +17,18 @@ import { ArrowLeft, CircleHelp, Lock, Plus, Save, Sparkles, X } from 'lucide-rea
 
 import { supabase } from '@/lib/supabase/client'
 import { validarAlineacion } from '@/features/auditorias/api/informes-api'
+import {
+  leerHallazgos,
+  nuevoUid,
+  resumenEscrito,
+  sincronizarHallazgos,
+} from '@/features/auditorias/lib/hallazgos-informe'
+import { useGuardadoAutomatico } from '@/features/auditorias/hooks/useGuardadoAutomatico'
+import {
+  ASISTENCIA_TIPOS,
+  asistenciaCanonica,
+  esAsistenciaConocida,
+} from '@/features/auditorias/lib/asistencia'
 import { enfocarNuevo } from '@/lib/dom/desplazar'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -117,6 +129,10 @@ const TIPOS_HALLAZGO = [
 
 /** Fila vacía de un tipo de hallazgo. */
 const hallazgoVacio = (tipo) => ({
+  // `uid` identifica la tarjeta en el navegador y `id` la fila en la base, que
+  // todavía no existe. Ver `lib/hallazgos-informe.js`.
+  uid: nuevoUid(),
+  id: null,
   iso: '',
   capitulo: '',
   numeral: '',
@@ -196,12 +212,63 @@ const CAMPOS_CIERRE = [
   },
 ]
 
-/** `''` → `null`: Postgres rechaza la cadena vacía en columnas enteras. */
-const idONulo = (v) => (v === '' || v === undefined ? null : v)
-
 /* ------------------------------------------------------------------ *
  * Piezas de UI
  * ------------------------------------------------------------------ */
+
+/**
+ * Cómo va el guardado automático.
+ *
+ * Se enseña siempre, también cuando no hay nada que guardar. Un indicador que
+ * solo aparece al fallar no se distingue de uno que no existe, y la pregunta
+ * que el auditor necesita responder de un vistazo es «¿esto está guardado?».
+ */
+function EstadoAutoguardado({ estado, guardadoEn, error }) {
+  const hora = guardadoEn
+    ? guardadoEn.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+    : null
+
+  const textos = {
+    inactivo: 'Se guarda solo mientras escribes',
+    pendiente: 'Cambios sin guardar…',
+    guardando: 'Guardando…',
+    guardado: hora ? `Guardado a las ${hora}` : 'Guardado',
+    // El motivo va en el propio texto. Dejarlo solo en el `title` convertía
+    // cualquier fallo en «no se pudo guardar solo» y punto: ni el auditor
+    // podía saber si era cosa suya ni nosotros diagnosticarlo sin pedirle que
+    // pasara el ratón por encima.
+    error: 'No se pudo guardar solo',
+  }
+
+  return (
+    <span
+      className={cn(
+        'flex items-center gap-1.5 text-xs',
+        estado === 'error' ? 'font-medium text-destructive' : 'text-muted-foreground'
+      )}
+      // El motivo completo en el título: en la barra no cabe y tampoco se
+      // quiere un párrafo rojo fijo por un corte de red de un segundo.
+      title={
+        estado === 'error'
+          ? `${error} · Se reintenta al seguir escribiendo; usa «Guardar» para forzarlo.`
+          : undefined
+      }
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          'h-1.5 w-1.5 rounded-full',
+          estado === 'guardando' && 'animate-pulse bg-primary',
+          estado === 'pendiente' && 'bg-amber-500',
+          estado === 'guardado' && 'bg-emerald-500',
+          estado === 'error' && 'bg-destructive',
+          estado === 'inactivo' && 'bg-muted-foreground/40'
+        )}
+      />
+      {textos[estado] ?? textos.inactivo}
+    </span>
+  )
+}
 
 /**
  * Textarea que crece con su contenido.
@@ -543,7 +610,30 @@ export default function FormularioRegistro({
   const [loading, setLoading] = useState(false)
   const [ayudaImagen, setAyudaImagen] = useState(null)
 
+  /**
+   * Por qué no se pudieron leer los hallazgos guardados, si pasó.
+   *
+   * Mientras valga algo, el formulario no deja guardar: lo que hay en pantalla
+   * no es lo que hay en la base, y guardar reescribe la lista entera.
+   */
+  const [errorCarga, setErrorCarga] = useState(null)
+
   const router = useRouter()
+
+  /**
+   * La auditoría, para leerla dentro del efecto de hidratación sin que su
+   * identidad lo dispare. Ver el comentario de ese efecto.
+   */
+  const auditoriaRef = useRef(auditoria)
+  auditoriaRef.current = auditoria
+
+  /**
+   * Lo escrito, para que `persistir` lea siempre lo último sin recrearse en
+   * cada tecla: el guardado automático lo tiene guardado por referencia y una
+   * función nueva por pulsación reiniciaría su temporizador.
+   */
+  const formRef = useRef({ form, hallazgos })
+  formRef.current = { form, hallazgos }
 
   /** Tarjeta de cada hallazgo, indexada por `${tipo}-${posición}`. */
   const tarjetas = useRef({})
@@ -576,12 +666,32 @@ export default function FormularioRegistro({
 
   /* ── Carga del informe existente ── */
 
+  /**
+   * Trae a la pantalla el informe que ya está guardado. **Una sola vez por
+   * auditoría.**
+   *
+   * La dependencia es el `id` y no el objeto `auditoria`, y eso es lo
+   * importante. Las dos vistas de línea de tiempo lo derivan con
+   * `auditorias.find(...)` dentro de un `useMemo`, así que es un objeto nuevo
+   * cada vez que se refresca la lista —o cada vez que se sube un documento,
+   * que la parchea en sitio—. Con el objeto como dependencia, este efecto
+   * volvía a correr en medio de la redacción, `setForm` y `setHallazgos`
+   * reemplazaban lo escrito por lo que hubiera en la base, y el siguiente
+   * guardado lo hacía definitivo. Es lo que vació los hallazgos del informe
+   * #352: el auditor había escrito cuatro fortalezas y se guardaron las dos
+   * que quedaban en la base.
+   *
+   * Mientras el `id` no cambie, lo que hay en pantalla manda.
+   */
   useEffect(() => {
+    const auditoria = auditoriaRef.current
     if (!auditoria) return
 
     setForm({
       fecha_auditoria: auditoria.fecha_auditoria || '',
-      asistencia_tipo: auditoria.asistencia_tipo || 'Digital',
+      // Casado con su opción: en la base hay un `FÍSICO` en mayúsculas que el
+      // selector no sabía enseñar. Ver `lib/asistencia.js`.
+      asistencia_tipo: asistenciaCanonica(auditoria.asistencia_tipo),
       auditores_acompanantes: (auditoria.auditores_acompanantes || []).join(', '),
       objetivo: auditoria.objetivo || '',
       criterios: auditoria.criterios || '',
@@ -591,43 +701,62 @@ export default function FormularioRegistro({
     })
 
     const cargarHallazgos = async () => {
-      const respuestas = await Promise.all(
-        TIPOS_HALLAZGO.map((t) =>
-          supabase.from(t.tabla).select('*').eq('informe_id', auditoria.id)
-        )
+      const { hallazgos: cargados, error } = await leerHallazgos(
+        supabase,
+        TIPOS_HALLAZGO,
+        auditoria.id
       )
 
-      const cargados = {}
-      TIPOS_HALLAZGO.forEach((tipo, i) => {
-        cargados[tipo.key] = (respuestas[i].data || []).map((fila) => ({
-          iso: fila.iso_id ?? '',
-          capitulo: fila.capitulo_id ?? '',
-          numeral: fila.numeral_id ?? '',
-          ...Object.fromEntries(tipo.campos.map((c) => [c.name, fila[c.name] ?? ''])),
-        }))
-      })
+      // Un fallo de lectura no se pinta como «no hay hallazgos»: se avisa y se
+      // bloquea el guardado, porque guardar reescribiría la lista entera con
+      // lo poco que se haya podido leer.
+      setErrorCarga(error)
+      if (error) {
+        toast.error(`No se pudieron cargar los hallazgos guardados. ${error}`)
+      }
+
       setHallazgos(cargados)
 
       // Los catálogos de los hallazgos ya guardados se piden en dos consultas,
       // no una por fila: antes el bucle con `await` disparaba una consulta por
       // hallazgo y la caché en estado aún no se había aplicado, así que las
       // repetía.
+      //
+      // Si una de las dos falla se avisa. Sin el catálogo, los selectores de
+      // norma, capítulo y numeral se pintan vacíos aunque la fila tenga su
+      // valor guardado: la tarjeta parece en blanco y no lo está.
       const filas = Object.values(cargados).flat()
       const isos = [...new Set(filas.map((f) => f.iso).filter(Boolean))]
       const capitulos = [...new Set(filas.map((f) => f.capitulo).filter(Boolean))]
 
       if (isos.length) {
-        const { data } = await supabase.from('capitulos').select('*').in('iso_id', isos)
+        const { data, error: errorCapitulos } = await supabase
+          .from('capitulos')
+          .select('*')
+          .in('iso_id', isos)
         if (data) setListaCapitulos((prev) => ({ ...prev, ...agruparPor(data, 'iso_id') }))
+        if (errorCapitulos) {
+          toast.warning(
+            'No se pudieron cargar los capítulos de las normas. Los hallazgos guardados conservan su numeral, pero los selectores se verán vacíos: recarga la página antes de tocarlos.'
+          )
+        }
       }
       if (capitulos.length) {
-        const { data } = await supabase.from('numerales').select('*').in('capitulo_id', capitulos)
+        const { data, error: errorNumerales } = await supabase
+          .from('numerales')
+          .select('*')
+          .in('capitulo_id', capitulos)
         if (data) setListaNumerales((prev) => ({ ...prev, ...agruparPor(data, 'capitulo_id') }))
+        if (errorNumerales) {
+          toast.warning(
+            'No se pudieron cargar los numerales de las normas. Los hallazgos guardados conservan el suyo, pero los selectores se verán vacíos: recarga la página antes de tocarlos.'
+          )
+        }
       }
     }
 
     cargarHallazgos()
-  }, [auditoria])
+  }, [auditoria?.id])
 
   /* ── Cambios en el informe ── */
 
@@ -680,21 +809,6 @@ export default function FormularioRegistro({
   /* ── Guardado ── */
 
   /**
-   * Una tarjeta de hallazgo que se añadió y no se llegó a tocar.
-   *
-   * Antes el formulario se negaba a guardar mientras hubiera una así. Ahora que
-   * nada bloquea, se descartan en el momento de escribir: son tarjetas abiertas
-   * por error, y una fila en blanco acabaría figurando como hallazgo real en el
-   * Plan de Mejoramiento. Con que tenga algo —una palabra o una norma
-   * seleccionada— se guarda tal cual, a medio escribir si así está.
-   */
-  const enBlanco = (tipo, hallazgo) =>
-    !hallazgo.iso &&
-    !hallazgo.capitulo &&
-    !hallazgo.numeral &&
-    tipo.campos.every((c) => !String(hallazgo[c.name] || '').trim())
-
-  /**
    * `''` → `null` antes de escribir.
    *
    * Sin campos obligatorios, `fecha_auditoria` y `fecha_seguimiento` pueden
@@ -704,66 +818,137 @@ export default function FormularioRegistro({
    */
   const limpiar = (valor) => (typeof valor === 'string' && !valor.trim() ? null : valor)
 
+  /**
+   * Escribe el informe y sus hallazgos. Lo usan el botón y el guardado
+   * automático, para que no haya dos caminos que puedan divergir.
+   *
+   * No avisa ni navega: eso es de quien lo llame. Lanza si algo falla.
+   *
+   * @returns {Promise<Record<string, number>>} filas escritas por tipo
+   */
+  const persistir = useCallback(async () => {
+    const actual = formRef.current
+    const payload = {
+      ...Object.fromEntries(Object.entries(actual.form).map(([campo, v]) => [campo, limpiar(v)])),
+      auditores_acompanantes: actual.form.auditores_acompanantes
+        ? actual.form.auditores_acompanantes.split(',').map((s) => s.trim())
+        : [],
+    }
+
+    let informeId
+
+    if (auditoriaRef.current) {
+      const { error } = await supabase
+        .from('informes_auditoria')
+        .update(payload)
+        .eq('id', auditoriaRef.current.id)
+      if (error) throw error
+      informeId = auditoriaRef.current.id
+    } else {
+      const { data: nueva, error } = await supabase
+        .from('informes_auditoria')
+        .insert({
+          ...payload,
+          usuario_id: usuario.usuario_id,
+          dependencia_id: usuario.dependencia_id,
+        })
+        .select()
+        .single()
+      if (error) throw error
+      informeId = nueva.id
+    }
+
+    // Los hallazgos se sincronizan fila por fila: se inserta lo nuevo, se
+    // actualiza lo que ya existe y se borra solo lo que el auditor quitó. Ver
+    // `lib/hallazgos-informe.js`.
+    const { escritos, ids } = await sincronizarHallazgos(
+      supabase,
+      TIPOS_HALLAZGO,
+      informeId,
+      actual.hallazgos
+    )
+
+    // Las tarjetas recién insertadas se quedan con el `id` que les dio la
+    // base, emparejado por `uid` y no por posición: si el auditor añadió o
+    // quitó tarjetas mientras se guardaba, cada una recibe el suyo y el
+    // siguiente guardado las actualiza en vez de duplicarlas.
+    if (Object.keys(ids).length) {
+      setHallazgos((prev) =>
+        Object.fromEntries(
+          Object.entries(prev).map(([clave, lista]) => [
+            clave,
+            lista.map((h) => (h.id == null && ids[h.uid] ? { ...h, id: ids[h.uid] } : h)),
+          ])
+        )
+      )
+    }
+
+    return escritos
+  }, [usuario])
+
+  /**
+   * Guardado automático mientras escribe.
+   *
+   * Solo sobre un informe que ya existe: en uno nuevo, cada tecla crearía una
+   * fila. Y nunca si la carga de hallazgos falló, porque entonces la pantalla
+   * no refleja la base y escribirla la estropearía.
+   *
+   * La firma retrata **solo el contenido**: ni `uid` ni `id`. Esos los asigna
+   * el propio guardado, y si contaran, cada guardado cambiaría la firma y
+   * pediría otro guardado detrás, en bucle.
+   */
+  const firma = useMemo(
+    () =>
+      JSON.stringify({
+        form,
+        hallazgos: TIPOS_HALLAZGO.map((tipo) =>
+          (hallazgos[tipo.key] ?? []).map((h) => [
+            h.iso,
+            h.capitulo,
+            h.numeral,
+            ...tipo.campos.map((c) => h[c.name]),
+          ])
+        ),
+      }),
+    [form, hallazgos]
+  )
+
+  const autoguardado = useGuardadoAutomatico({
+    activo: Boolean(auditoria) && !errorCarga,
+    firma,
+    guardar: persistir,
+  })
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (loading) return
 
-    setLoading(true)
-
-    const payload = {
-      ...Object.fromEntries(Object.entries(form).map(([campo, v]) => [campo, limpiar(v)])),
-      auditores_acompanantes: form.auditores_acompanantes
-        ? form.auditores_acompanantes.split(',').map((s) => s.trim())
-        : [],
+    // Si los hallazgos guardados no se pudieron leer, la pantalla no refleja
+    // la base y guardar los reescribiría con lo que haya cargado: es
+    // exactamente la forma de perderlos.
+    if (errorCarga) {
+      toast.error(
+        'No se guarda: los hallazgos guardados no se pudieron leer, y guardar ahora los reemplazaría. Recarga la página y vuelve a abrir el informe.'
+      )
+      return
     }
 
+    setLoading(true)
+
     try {
-      let informeId
+      const escritos = await persistir()
 
-      if (auditoria) {
-        const { error } = await supabase
-          .from('informes_auditoria')
-          .update(payload)
-          .eq('id', auditoria.id)
-        if (error) throw error
-        informeId = auditoria.id
+      // Para que el automático no repita este mismo guardado al cerrar.
+      autoguardado.marcarGuardado()
 
-        // Los hallazgos se reescriben enteros en cada guardado.
-        await Promise.all(
-          TIPOS_HALLAZGO.map((t) => supabase.from(t.tabla).delete().eq('informe_id', informeId))
-        )
-      } else {
-        const { data: nueva, error } = await supabase
-          .from('informes_auditoria')
-          .insert({
-            ...payload,
-            usuario_id: usuario.usuario_id,
-            dependencia_id: usuario.dependencia_id,
-          })
-          .select()
-          .single()
-        if (error) throw error
-        informeId = nueva.id
-      }
-
-      // Un `insert` por tipo con todas sus filas, en lugar de uno por hallazgo.
-      for (const tipo of TIPOS_HALLAZGO) {
-        const filas = hallazgos[tipo.key]
-          .filter((h) => !enBlanco(tipo, h))
-          .map((h) => ({
-            informe_id: informeId,
-            iso_id: idONulo(h.iso),
-            capitulo_id: idONulo(h.capitulo),
-            numeral_id: idONulo(h.numeral),
-            ...Object.fromEntries(tipo.campos.map((c) => [c.name, h[c.name] || null])),
-          }))
-        if (!filas.length) continue
-
-        const { error } = await supabase.from(tipo.tabla).insert(filas)
-        if (error) throw error
-      }
-
-      toast.success('Informe y hallazgos guardados correctamente')
+      // El aviso dice qué se escribió, con los ceros incluidos. Antes decía
+      // «guardados correctamente» pasara lo que pasara, así que un guardado
+      // que no insertó ni una fila se veía idéntico a uno completo: es lo que
+      // hizo que la pérdida de hallazgos del informe #352 tardara días en
+      // notarse.
+      toast.success(
+        `Informe guardado · ${resumenEscrito(TIPOS_HALLAZGO, escritos)}`
+      )
 
       if (onSuccess) {
         onSuccess()
@@ -929,8 +1114,20 @@ export default function FormularioRegistro({
                   <SelectValue placeholder="Selecciona el tipo" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Digital">Digital</SelectItem>
-                  <SelectItem value="Físico">Físico</SelectItem>
+                  {ASISTENCIA_TIPOS.map((tipo) => (
+                    <SelectItem key={tipo.value} value={tipo.value}>
+                      {tipo.label}
+                    </SelectItem>
+                  ))}
+
+                  {/* Un valor guardado que no esté en la lista se añade como
+                      opción para que se vea. Sin esto el campo aparece vacío y
+                      el auditor no tiene forma de saber qué había. */}
+                  {form.asistencia_tipo && !esAsistenciaConocida(form.asistencia_tipo) && (
+                    <SelectItem value={form.asistencia_tipo}>
+                      {form.asistencia_tipo} (como está guardado)
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </Field>
@@ -1027,7 +1224,10 @@ export default function FormularioRegistro({
             <section key={tipo.key} className="space-y-3">
               {hallazgos[tipo.key].map((hallazgo, i) => (
                 <article
-                  key={`${tipo.key}-${i}`}
+                  // Por `uid` y no por posición: al borrar una tarjeta del
+                  // medio, con la posición React reutilizaba el nodo y el
+                  // texto de la siguiente aparecía en la caja anterior.
+                  key={hallazgo.uid ?? `${tipo.key}-${i}`}
                   ref={(el) => {
                     tarjetas.current[`${tipo.key}-${i}`] = el
                   }}
@@ -1191,22 +1391,51 @@ export default function FormularioRegistro({
           </FieldGrid>
         </FormSection>
 
+        {/* Si el guardado automático falla, el motivo se enseña entero y
+            fijo. Un aviso que se desvanece no sirve: el auditor sigue
+            escribiendo y lo que necesita saber es si su trabajo está a salvo. */}
+        {autoguardado.estado === 'error' && autoguardado.error && (
+          <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            <strong className="font-semibold">No se pudo guardar automáticamente.</strong>{' '}
+            {autoguardado.error}
+            <span className="mt-1 block text-xs">
+              Lo que has escrito sigue en pantalla. Se reintenta al seguir escribiendo; también
+              puedes pulsar «Guardar informe» para forzarlo.
+            </span>
+          </p>
+        )}
+
+        {/* Si los hallazgos guardados no se pudieron leer, se dice aquí y no
+            solo en un aviso que se desvanece: guardar en ese estado los
+            reemplazaría por lo que haya en pantalla. */}
+        {errorCarga && (
+          <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            No se pudieron cargar los hallazgos ya guardados de esta auditoría ({errorCarga}). El
+            guardado está bloqueado para no reemplazarlos: recarga la página y vuelve a abrir el
+            informe.
+          </p>
+        )}
+
         {/* Guardar siempre a la vista: el formulario es largo. */}
         <StickyBar
           info={
-            <span className="flex items-center gap-2">
-              <span className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-muted sm:block">
-                <span
-                  className={cn(
-                    'block h-full rounded-full transition-[width] duration-300',
-                    faltan === 0 ? 'bg-emerald-500' : 'bg-primary'
-                  )}
-                  style={{ width: `${progreso}%` }}
-                />
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="flex items-center gap-2">
+                <span className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-muted sm:block">
+                  <span
+                    className={cn(
+                      'block h-full rounded-full transition-[width] duration-300',
+                      faltan === 0 ? 'bg-emerald-500' : 'bg-primary'
+                    )}
+                    style={{ width: `${progreso}%` }}
+                  />
+                </span>
+                {faltan === 0
+                  ? 'Informe completo'
+                  : `${faltan} campo${faltan === 1 ? '' : 's'} sin escribir · puedes guardar igual`}
               </span>
-              {faltan === 0
-                ? 'Informe completo'
-                : `${faltan} campo${faltan === 1 ? '' : 's'} sin escribir · puedes guardar igual`}
+
+              {auditoria && !errorCarga && <EstadoAutoguardado {...autoguardado} />}
             </span>
           }
         >
@@ -1215,9 +1444,9 @@ export default function FormularioRegistro({
               Cancelar
             </Button>
           )}
-          <Button type="submit" disabled={loading}>
+          <Button type="submit" disabled={loading || Boolean(errorCarga)}>
             <Save />
-            {loading ? 'Guardando…' : auditoria ? 'Actualizar informe' : 'Guardar informe'}
+            {loading ? 'Guardando…' : 'Guardar informe'}
           </Button>
         </StickyBar>
       </form>

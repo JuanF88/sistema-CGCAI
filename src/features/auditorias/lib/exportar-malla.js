@@ -7,9 +7,10 @@
  *  - «Avance por dependencia» responde cómo va cada dependencia: un porcentaje
  *    por documento, que es lo que se ve en la pantalla.
  *  - «Detalle por auditoría» responde cuándo: una fila por auditoría con la
- *    fecha de entrega y la fecha límite de cada documento. Los promedios de la
- *    primera hoja no tienen fecha que mostrar —resumen varias auditorías—, así
- *    que las fechas viven aquí.
+ *    fecha de entrega y la fecha límite de cada documento **que tenga plazo**
+ *    (ver `documentosConFechas`). Los promedios de la primera hoja no tienen
+ *    fecha que mostrar —resumen varias auditorías—, así que las fechas viven
+ *    aquí.
  *
  * Los porcentajes van como número (0-100) y las fechas como texto
  * «YYYY-MM-DD» a propósito: ordenan bien, se filtran bien y no dependen de la
@@ -145,6 +146,45 @@ function estadoDe(etapa, diaDeHoy) {
 }
 
 /**
+ * Los documentos que tienen algo que contar en la hoja de detalle.
+ *
+ * Esa hoja existe para responder **cuándo**: una columna de estado, otra de
+ * entrega y otra de fecha límite por documento. Un documento sin plazo no
+ * tiene ninguna de las dos fechas, así que sus tres columnas salían vacías o
+ * con un estado que no significaba nada, y solo estorbaban al leer la hoja.
+ *
+ * Son dos los que quedan fuera:
+ *
+ *  - **Ejecutada** no es un documento: es un control que se marca a mano, y ya
+ *    tiene sus dos columnas propias —«Ejecutada» y «Fecha de ejecución»— justo
+ *    antes. Sus tres columnas repetían eso mismo sin fecha que mostrar.
+ *  - **Informe** no es un archivo que se entregue, sino tener los campos y los
+ *    hallazgos escritos. No hay fecha de entrega ni plazo que incumplir, así
+ *    que de la pareja Informe/Validado el que sirve es Validado.
+ *
+ * Los dos siguen contando en la hoja «Avance por dependencia», donde la
+ * pregunta es cuánto se ha hecho y no cuándo.
+ */
+export const documentosConFechas = (documentos) => (documentos ?? []).filter((d) => d.plazo)
+
+/** Las columnas de la hoja de detalle, en su orden. */
+export function columnasDetalle(documentos) {
+  return [
+    { header: 'Auditoría', key: 'id', width: 11 },
+    { header: 'Dependencia', key: 'dependencia', width: 38 },
+    { header: 'Auditor', key: 'auditor', width: 26 },
+    { header: 'Fecha auditoría', key: 'fecha', width: 15 },
+    { header: 'Ejecutada', key: 'ejecutada', width: 11 },
+    { header: 'Fecha de ejecución', key: 'ejecutadaAt', width: 17 },
+    ...documentosConFechas(documentos).flatMap((d) => [
+      { header: `${d.columna} · estado`, key: `est_${d.key}`, width: 15 },
+      { header: `${d.columna} · entrega`, key: `ent_${d.key}`, width: 14 },
+      { header: `${d.columna} · límite`, key: `lim_${d.key}`, width: 14 },
+    ]),
+  ]
+}
+
+/**
  * Descarga el Excel de la malla.
  *
  * @param {Object} args
@@ -202,19 +242,9 @@ export async function exportarMallaControl({ documentos, matriz, auditorias, ani
     /* ---- Hoja 2: una fila por auditoría, con las fechas ---- */
     const detalle = libro.addWorksheet('Detalle por auditoría')
 
-    detalle.columns = [
-      { header: 'Auditoría', key: 'id', width: 11 },
-      { header: 'Dependencia', key: 'dependencia', width: 38 },
-      { header: 'Auditor', key: 'auditor', width: 26 },
-      { header: 'Fecha auditoría', key: 'fecha', width: 15 },
-      { header: 'Ejecutada', key: 'ejecutada', width: 11 },
-      { header: 'Fecha de ejecución', key: 'ejecutadaAt', width: 17 },
-      ...documentos.flatMap((d) => [
-        { header: `${d.columna} · estado`, key: `est_${d.key}`, width: 15 },
-        { header: `${d.columna} · entrega`, key: `ent_${d.key}`, width: 14 },
-        { header: `${d.columna} · límite`, key: `lim_${d.key}`, width: 14 },
-      ]),
-    ]
+    const conFechas = documentosConFechas(documentos)
+
+    detalle.columns = columnasDetalle(documentos)
 
     prepararHoja(detalle, {
       titulo: 'Centro de Control de Auditorías · Detalle por auditoría',
@@ -231,7 +261,7 @@ export async function exportarMallaControl({ documentos, matriz, auditorias, ani
         ejecutada: a.ejecutada ? 'Sí' : 'No',
         ejecutadaAt: diaDe(a.ejecutada_at),
         ...Object.fromEntries(
-          documentos.flatMap((d) => {
+          conFechas.flatMap((d) => {
             const etapa = a._stages?.[d.key]
             return [
               [`est_${d.key}`, estadoDe(etapa, diaDeHoy)],

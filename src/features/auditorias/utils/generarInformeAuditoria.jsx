@@ -1,5 +1,7 @@
 import { createReport } from 'docx-templates'
 
+import { etiquetaAsistencia } from '@/features/auditorias/lib/asistencia'
+
 export async function generarInformeAuditoria(
   auditoria,
   fortalezas = [],
@@ -19,7 +21,9 @@ export async function generarInformeAuditoria(
   const datos = {
     fecha: auditoria.fecha_auditoria || '',
     dependencia: auditoria.dependencias?.nombre || 'N/A',
-    tipo_proceso: auditoria.asistencia_tipo || 'N/A',
+    // Normalizado: hay un informe guardado como «FÍSICO» en mayúsculas y el
+    // documento lo imprimía así. Ver `lib/asistencia.js`.
+    tipo_proceso: etiquetaAsistencia(auditoria.asistencia_tipo) || 'N/A',
     auditor: usuario?.nombre || 'N/A',
     responsable: usuario?.nombre || 'N/A',
     auditor_acompanante: (auditoria.auditores_acompanantes || []).join(', '),

@@ -32,7 +32,6 @@ export default function ModalEjecucion({ destino, onClose, onMarcar }) {
   const [guardando, setGuardando] = useState(null)
 
   const auditorias = destino?.auditorias ?? []
-  const marcadas = auditorias.filter((a) => a.ejecutada).length
 
   const cambiar = async (auditoria, ejecutada) => {
     setGuardando(auditoria.id)
@@ -48,14 +47,19 @@ export default function ModalEjecucion({ destino, onClose, onMarcar }) {
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Auditorías ejecutadas</DialogTitle>
+          {/* Sin recuento: además de no aportar nada —se ve en la lista—, el
+              «0 de 1» cambiaba de ancho al marcar, y con la descripción a dos
+              líneas eso movía la altura del modal y asomaba la barra de
+              desplazamiento. */}
           <DialogDescription>
-            {destino?.dependencia} · {marcadas} de {auditorias.length} marcada
-            {auditorias.length === 1 ? '' : 's'} como ejecutada
-            {auditorias.length === 1 ? '' : 's'}.
+            Marca si se ejecutó la auditoría. {destino?.dependencia}
           </DialogDescription>
         </DialogHeader>
 
-        <ul className="flex flex-col gap-2">
+        {/* La lista tiene su propio desplazamiento y un alto máximo: así el
+            modal mide lo mismo con una auditoría que con ocho, y marcar una no
+            le cambia el tamaño. */}
+        <ul className="-mx-1 flex max-h-[min(55vh,22rem)] flex-col gap-2 overflow-y-auto px-1">
           {auditorias.map((a) => {
             const ocupada = guardando === a.id
 
@@ -63,7 +67,9 @@ export default function ModalEjecucion({ destino, onClose, onMarcar }) {
               <li
                 key={a.id}
                 className={cn(
-                  'flex items-center justify-between gap-3 rounded-xl border p-3',
+                  // `shrink-0`: dentro de una lista con desplazamiento, flex
+                  // aplasta las filas antes de sacar la barra.
+                  'flex shrink-0 items-center justify-between gap-3 rounded-xl border p-3',
                   a.ejecutada
                     ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/50 dark:bg-emerald-950/30'
                     : 'border-border bg-muted/30'
@@ -113,10 +119,6 @@ export default function ModalEjecucion({ destino, onClose, onMarcar }) {
           })}
         </ul>
 
-        <p className="text-xs text-muted-foreground">
-          Es un control manual: no se deduce de los documentos cargados. Se puede cambiar cuantas
-          veces haga falta.
-        </p>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>

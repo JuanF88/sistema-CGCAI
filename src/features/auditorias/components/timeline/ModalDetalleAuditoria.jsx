@@ -2,6 +2,7 @@
 
 /** Ficha completa de una auditoría: campos del informe y enlaces a sus documentos. */
 import { cn } from '@/lib/utils'
+import { etiquetaAsistencia } from '@/features/auditorias/lib/asistencia'
 import {
   Dialog,
   DialogContent,
@@ -52,7 +53,7 @@ export function ModalDetalleAuditoria({ auditoria, open, onOpenChange, onAbrirUr
               'N/A'}
           </Item>
           <Item label="Fecha de auditoría">{auditoria.fecha_auditoria || 'N/A'}</Item>
-          <Item label="Asistencia">{auditoria.asistencia_tipo || 'N/A'}</Item>
+          <Item label="Asistencia">{etiquetaAsistencia(auditoria.asistencia_tipo) || 'N/A'}</Item>
 
           <Item label="Objetivo" ancho>
             {auditoria.objetivo || '—'}
