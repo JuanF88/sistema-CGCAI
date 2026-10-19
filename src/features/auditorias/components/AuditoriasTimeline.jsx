@@ -560,6 +560,11 @@ export default function AuditoriasTimeline({ usuario }) {
             embebido
             usuario={usuario}
             auditoria={selected}
+            onGuardado={(fila) =>
+              setAuditorias((prev) =>
+                prev.map((a) => (a.id === fila.id ? { ...a, ...fila } : a))
+              )
+            }
             onSuccess={() => {
               setInformeAbierto(false)
               loadData()

@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { toast } from 'react-toastify'
-import { ArrowLeft, CircleHelp, Lock, Plus, Save, Sparkles, X } from 'lucide-react'
+import { ArrowLeft, CircleHelp, Plus, Save, Sparkles, X } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase/client'
 import { validarAlineacion } from '@/features/auditorias/api/informes-api'
@@ -24,11 +24,13 @@ import {
   sincronizarHallazgos,
 } from '@/features/auditorias/lib/hallazgos-informe'
 import { useGuardadoAutomatico } from '@/features/auditorias/hooks/useGuardadoAutomatico'
+import { ASISTENCIA_TIPOS, esAsistenciaConocida } from '@/features/auditorias/lib/asistencia'
 import {
-  ASISTENCIA_TIPOS,
-  asistenciaCanonica,
-  esAsistenciaConocida,
-} from '@/features/auditorias/lib/asistencia'
+  COLUMNAS_DEL_FORMULARIO,
+  FORM_INICIAL,
+  aFormulario,
+  mezclarConfirmado,
+} from '@/features/auditorias/lib/informe-formulario'
 import { enfocarNuevo } from '@/lib/dom/desplazar'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -142,17 +144,6 @@ const hallazgoVacio = (tipo) => ({
 /** Estado inicial: un array vacío por tipo. */
 const HALLAZGOS_INICIALES = Object.fromEntries(TIPOS_HALLAZGO.map((t) => [t.key, []]))
 
-const FORM_INICIAL = {
-  fecha_auditoria: '',
-  asistencia_tipo: 'Digital',
-  auditores_acompanantes: '',
-  objetivo: '',
-  criterios: '',
-  conclusiones: '',
-  fecha_seguimiento: '',
-  recomendaciones: '',
-}
-
 /**
  * Los campos que cuentan para el indicador de avance.
  *
@@ -215,60 +206,6 @@ const CAMPOS_CIERRE = [
 /* ------------------------------------------------------------------ *
  * Piezas de UI
  * ------------------------------------------------------------------ */
-
-/**
- * Cómo va el guardado automático.
- *
- * Se enseña siempre, también cuando no hay nada que guardar. Un indicador que
- * solo aparece al fallar no se distingue de uno que no existe, y la pregunta
- * que el auditor necesita responder de un vistazo es «¿esto está guardado?».
- */
-function EstadoAutoguardado({ estado, guardadoEn, error }) {
-  const hora = guardadoEn
-    ? guardadoEn.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
-    : null
-
-  const textos = {
-    inactivo: 'Se guarda solo mientras escribes',
-    pendiente: 'Cambios sin guardar…',
-    guardando: 'Guardando…',
-    guardado: hora ? `Guardado a las ${hora}` : 'Guardado',
-    // El motivo va en el propio texto. Dejarlo solo en el `title` convertía
-    // cualquier fallo en «no se pudo guardar solo» y punto: ni el auditor
-    // podía saber si era cosa suya ni nosotros diagnosticarlo sin pedirle que
-    // pasara el ratón por encima.
-    error: 'No se pudo guardar solo',
-  }
-
-  return (
-    <span
-      className={cn(
-        'flex items-center gap-1.5 text-xs',
-        estado === 'error' ? 'font-medium text-destructive' : 'text-muted-foreground'
-      )}
-      // El motivo completo en el título: en la barra no cabe y tampoco se
-      // quiere un párrafo rojo fijo por un corte de red de un segundo.
-      title={
-        estado === 'error'
-          ? `${error} · Se reintenta al seguir escribiendo; usa «Guardar» para forzarlo.`
-          : undefined
-      }
-    >
-      <span
-        aria-hidden="true"
-        className={cn(
-          'h-1.5 w-1.5 rounded-full',
-          estado === 'guardando' && 'animate-pulse bg-primary',
-          estado === 'pendiente' && 'bg-amber-500',
-          estado === 'guardado' && 'bg-emerald-500',
-          estado === 'error' && 'bg-destructive',
-          estado === 'inactivo' && 'bg-muted-foreground/40'
-        )}
-      />
-      {textos[estado] ?? textos.inactivo}
-    </span>
-  )
-}
 
 /**
  * Textarea que crece con su contenido.
@@ -600,6 +537,7 @@ export default function FormularioRegistro({
   auditoria,
   onSuccess,
   onVolver,
+  onGuardado,
   embebido = false,
 }) {
   const [form, setForm] = useState(FORM_INICIAL)
@@ -618,6 +556,15 @@ export default function FormularioRegistro({
    */
   const [errorCarga, setErrorCarga] = useState(null)
 
+  /**
+   * ¿Ya se confirmó contra la base lo que hay en pantalla?
+   *
+   * Hasta entonces el guardado automático no se activa: lo primero que se
+   * pinta viene de la lista de la vista padre y puede estar atrasado, así que
+   * escribirlo reescribiría el informe con valores viejos.
+   */
+  const [hidratado, setHidratado] = useState(false)
+
   const router = useRouter()
 
   /**
@@ -628,12 +575,35 @@ export default function FormularioRegistro({
   auditoriaRef.current = auditoria
 
   /**
+   * El aviso a la vista de atrás, por referencia: las tres la pasan como
+   * función suelta, nueva en cada render, y `persistir` no debe rehacerse por
+   * eso.
+   */
+  const onGuardadoRef = useRef(onGuardado)
+  onGuardadoRef.current = onGuardado
+
+  /**
    * Lo escrito, para que `persistir` lea siempre lo último sin recrearse en
    * cada tecla: el guardado automático lo tiene guardado por referencia y una
    * función nueva por pulsación reiniciaría su temporizador.
    */
   const formRef = useRef({ form, hallazgos })
   formRef.current = { form, hallazgos }
+
+  /**
+   * Los campos que el auditor ya tocó desde que se abrió el informe.
+   *
+   * La confirmación contra la base llega unos milisegundos después de que el
+   * formulario se abra, y lo que se haya escrito en ese hueco no se pisa: se
+   * confirman solo los campos que nadie ha tocado.
+   */
+  const tocados = useRef(new Set())
+
+  /** Un cambio del auditor. Pasa por aquí para quedar anotado como tocado. */
+  const cambiarCampo = useCallback((campo, valor) => {
+    tocados.current.add(campo)
+    setForm((prev) => ({ ...prev, [campo]: valor }))
+  }, [])
 
   /** Tarjeta de cada hallazgo, indexada por `${tipo}-${posición}`. */
   const tarjetas = useRef({})
@@ -682,30 +652,59 @@ export default function FormularioRegistro({
    * que quedaban en la base.
    *
    * Mientras el `id` no cambie, lo que hay en pantalla manda.
+   *
+   * Y lo que se pinta al abrir se confirma contra la base antes de dejar que
+   * el guardado automático escriba nada, porque esa copia de la lista se queda
+   * vieja en cuanto el guardado automático toca el informe.
    */
   useEffect(() => {
     const auditoria = auditoriaRef.current
     if (!auditoria) return
 
-    setForm({
-      fecha_auditoria: auditoria.fecha_auditoria || '',
-      // Casado con su opción: en la base hay un `FÍSICO` en mayúsculas que el
-      // selector no sabía enseñar. Ver `lib/asistencia.js`.
-      asistencia_tipo: asistenciaCanonica(auditoria.asistencia_tipo),
-      auditores_acompanantes: (auditoria.auditores_acompanantes || []).join(', '),
-      objetivo: auditoria.objetivo || '',
-      criterios: auditoria.criterios || '',
-      conclusiones: auditoria.conclusiones || '',
-      fecha_seguimiento: auditoria.fecha_seguimiento || '',
-      recomendaciones: auditoria.recomendaciones || '',
-    })
+    tocados.current = new Set()
+    setHidratado(false)
+
+    // Si el auditor cambia de informe antes de que esta carga termine, su
+    // respuesta no se pinta. Sin esto, abrir uno y pasar rápido a otro dejaba
+    // los hallazgos del primero en el formulario del segundo, y el siguiente
+    // guardado los escribía ahí.
+    let vigente = true
+
+    // Se pinta ya con la copia que trae la lista: la pantalla no debe salir en
+    // blanco mientras se consulta la base.
+    setForm(aFormulario(auditoria))
 
     const cargarHallazgos = async () => {
+      // Y se confirma contra la base, porque la copia de la lista se queda
+      // vieja en cuanto el guardado automático escribe. Es lo que devolvía el
+      // tipo de asistencia a `null` después de elegir «Físico»: el porqué
+      // entero está en `lib/informe-formulario.js`.
+      const { data: enLaBase, error: errorInforme } = await supabase
+        .from('informes_auditoria')
+        .select(COLUMNAS_DEL_FORMULARIO.join(', '))
+        .eq('id', auditoria.id)
+        .maybeSingle()
+
+      if (!vigente) return
+
+      if (errorInforme) {
+        // No se bloquea el guardado: lo que trajo la lista es un punto de
+        // partida válido, solo puede estar atrasado. Pero el auditor debe
+        // saberlo antes de escribir encima.
+        toast.warning(
+          `No se pudo confirmar lo que hay guardado del informe (${errorInforme.message}). Lo que ves viene de la lista y puede estar atrasado: recarga la página antes de escribir.`
+        )
+      } else if (enLaBase) {
+        setForm((previo) => mezclarConfirmado(previo, aFormulario(enLaBase), tocados.current))
+      }
+
       const { hallazgos: cargados, error } = await leerHallazgos(
         supabase,
         TIPOS_HALLAZGO,
         auditoria.id
       )
+
+      if (!vigente) return
 
       // Un fallo de lectura no se pinta como «no hay hallazgos»: se avisa y se
       // bloquea el guardado, porque guardar reescribiría la lista entera con
@@ -755,7 +754,17 @@ export default function FormularioRegistro({
       }
     }
 
+    // Al terminar, no antes: el punto de partida del guardado automático es lo
+    // que se acaba de confirmar, no lo que trajo la lista.
     cargarHallazgos()
+      .catch((err) => console.error('[informe] no se pudo cargar:', err))
+      .finally(() => {
+        if (vigente) setHidratado(true)
+      })
+
+    return () => {
+      vigente = false
+    }
   }, [auditoria?.id])
 
   /* ── Cambios en el informe ── */
@@ -769,7 +778,7 @@ export default function FormularioRegistro({
     */
   const handleChange = (e) => {
     const { name, value } = e.target
-    setForm((prev) => ({ ...prev, [name]: value }))
+    cambiarCampo(name, value)
   }
 
   /* ── Cambios en los hallazgos ── */
@@ -883,6 +892,35 @@ export default function FormularioRegistro({
       )
     }
 
+    // La lista de la vista de atrás se entera de lo escrito.
+    //
+    // Sin esto solo se recargaba al pulsar «Guardar informe», así que todo lo
+    // que escribía el guardado automático le faltaba: al cerrar el panel
+    // —incluso clicando fuera— la línea de tiempo seguía enseñando el informe
+    // como estaba al abrirlo, los pasos sin marcar y el tipo de asistencia en
+    // blanco. Visto desde la silla del auditor, eso es «no me guardó».
+    //
+    // Se parchea en sitio y no se vuelve a consultar: son los valores que
+    // acaban de escribirse, y una consulta por cada guardado automático sería
+    // una recarga de la lista entera cada pocos segundos.
+    if (onGuardadoRef.current) {
+      onGuardadoRef.current({
+        id: informeId,
+        ...payload,
+        // Las filas que han quedado en la base, para los contadores de
+        // hallazgos: solo las tarjetas vivas entran en `ids`, las vacías no.
+        ...Object.fromEntries(
+          TIPOS_HALLAZGO.map((tipo) => [
+            tipo.tabla,
+            (actual.hallazgos[tipo.key] ?? [])
+              .map((h) => ids[h.uid])
+              .filter((id) => id != null)
+              .map((id) => ({ id })),
+          ])
+        ),
+      })
+    }
+
     return escritos
   }, [usuario])
 
@@ -914,10 +952,23 @@ export default function FormularioRegistro({
   )
 
   const autoguardado = useGuardadoAutomatico({
-    activo: Boolean(auditoria) && !errorCarga,
+    activo: Boolean(auditoria) && !errorCarga && hidratado,
     firma,
     guardar: persistir,
   })
+
+  // Suelta y no `autoguardado.guardarYa`: como dependencia de un efecto, esa
+  // forma hace que la regla de dependencias pida el objeto entero, que es
+  // nuevo en cada render.
+  const { guardarYa } = autoguardado
+
+  // Si el auditor escribió mientras se confirmaba el informe, eso no está
+  // guardado y el guardado automático acaba de tomar la pantalla como punto de
+  // partida, así que por sí solo no lo escribiría nunca. Se fuerza una vez.
+  useEffect(() => {
+    if (!hidratado || !tocados.current.size) return
+    guardarYa().catch(() => {})
+  }, [hidratado, guardarYa])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -943,7 +994,7 @@ export default function FormularioRegistro({
       // quedaron las fortalezas 2522 y 2523, idénticas, con 139 ms entre una
       // y otra. Además deja la firma marcada, así que al cerrar el formulario
       // no sale un guardado gemelo detrás de este.
-      const escritos = await autoguardado.guardarYa()
+      const escritos = await guardarYa()
 
       // El aviso dice qué se escribió, con los ceros incluidos. Antes decía
       // «guardados correctamente» pasara lo que pasara, así que un guardado
@@ -991,19 +1042,20 @@ export default function FormularioRegistro({
   const faltan = CAMPOS_DEL_AVANCE.length - camposCompletos
 
   /**
-   * Los acompañantes vienen fijados por el cronograma del programa.
+   * Los acompañantes vienen propuestos por el cronograma del programa.
    *
-   * Quién acompaña cada auditoría se decide al planificar el programa, no al
-   * rellenar el informe; si el auditor pudiera cambiarlo aquí, el informe
-   * dejaría de coincidir con el cronograma aprobado y no habría forma de saber
-   * cuál de los dos es el bueno. Se muestra bloqueado y se cambia donde se
-   * decidió: en el programa.
+   * Se enseña de dónde salen, pero **el campo se puede escribir**. El
+   * cronograma dice quién iba a acompañar; el informe cuenta quién acompañó de
+   * verdad, y las dos cosas se separan a menudo: alguien se enferma, entra
+   * otro auditor, va uno más. Bloqueado, el auditor no tenía forma de dejar
+   * constancia de lo que pasó y el informe quedaba contando el plan en vez de
+   * la auditoría.
+   *
+   * Que el informe y el cronograma puedan discrepar es el precio, y es el
+   * precio correcto: el informe es el registro de lo ocurrido.
    *
    * Se mira `auditoria` y no `form` a propósito: el estado del formulario se
-   * puede vaciar y eso desbloquearía el campo.
-   *
-   * Si el programa no asignó ninguno, el campo sigue abierto —no hay nada del
-   * programa que proteger y el auditor puede haber ido acompañado igualmente—.
+   * puede vaciar y entonces la nota del programa desaparecería.
    */
   const acompanantesDelPrograma =
     Boolean(auditoria?.programa?.id) && (auditoria?.auditores_acompanantes?.length ?? 0) > 0
@@ -1105,14 +1157,14 @@ export default function FormularioRegistro({
               <DatePicker
                 id="fecha_auditoria"
                 value={form.fecha_auditoria}
-                onChange={(v) => setForm((prev) => ({ ...prev, fecha_auditoria: v }))}
+                onChange={(v) => cambiarCampo('fecha_auditoria', v)}
               />
             </Field>
 
             <Field label="Asistencia" htmlFor="asistencia_tipo">
               <Select
                 value={form.asistencia_tipo}
-                onValueChange={(v) => setForm((prev) => ({ ...prev, asistencia_tipo: v }))}
+                onValueChange={(v) => cambiarCampo('asistencia_tipo', v)}
               >
                 <SelectTrigger id="asistencia_tipo">
                   <SelectValue placeholder="Selecciona el tipo" />
@@ -1143,7 +1195,7 @@ export default function FormularioRegistro({
           title="Acompañamiento"
           description={
             acompanantesDelPrograma
-              ? 'Los acompañantes ya vienen asignados desde el cronograma del programa.'
+              ? 'Vienen del cronograma del programa. Ajústalos si al final acompañó otra persona.'
               : 'Puedes dejarlo en blanco si auditaste en solitario.'
           }
         >
@@ -1151,35 +1203,24 @@ export default function FormularioRegistro({
             <Field
               label="Auditores acompañantes"
               htmlFor="auditores_acompanantes"
-              help={
-                acompanantesDelPrograma
-                  ? 'Para cambiarlos hay que editar el cronograma del programa.'
-                  : 'Separa cada nombre con una coma.'
-              }
+              help="Separa cada nombre con una coma."
+              // La nota dice de dónde vienen los nombres, no que estén
+              // cerrados: sin candado y sin campo apagado, que es lo que hacía
+              // pensar que no se podían tocar.
               action={
                 acompanantesDelPrograma && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                    <Lock className="h-3 w-3" aria-hidden="true" />
-                    {auditoria?.programa?.nombre || 'Definido en el programa'}
+                  <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    Según {auditoria?.programa?.nombre || 'el programa'}
                   </span>
                 )
               }
             >
-              {/* `readOnly` y no `disabled`: se pueden leer y copiar los nombres,
-                  y el valor se sigue enviando al guardar. */}
               <Input
                 id="auditores_acompanantes"
                 name="auditores_acompanantes"
                 value={form.auditores_acompanantes}
                 onChange={handleChange}
                 placeholder="Ana Pérez, Luis Gómez"
-                readOnly={acompanantesDelPrograma}
-                aria-readonly={acompanantesDelPrograma || undefined}
-                className={
-                  acompanantesDelPrograma
-                    ? 'cursor-default bg-muted text-muted-foreground focus-visible:ring-0'
-                    : undefined
-                }
               />
             </Field>
           </FieldGrid>
@@ -1389,22 +1430,24 @@ export default function FormularioRegistro({
               <DatePicker
                 id="fecha_seguimiento"
                 value={form.fecha_seguimiento}
-                onChange={(v) => setForm((prev) => ({ ...prev, fecha_seguimiento: v }))}
+                onChange={(v) => cambiarCampo('fecha_seguimiento', v)}
               />
             </Field>
           </FieldGrid>
         </FormSection>
 
-        {/* Si el guardado automático falla, el motivo se enseña entero y
-            fijo. Un aviso que se desvanece no sirve: el auditor sigue
-            escribiendo y lo que necesita saber es si su trabajo está a salvo. */}
+        {/* El guardado ya no se anuncia en la pantalla: ocurre sin decir
+            nada. Un fallo sí se dice, y entero y fijo —un aviso que se
+            desvanece no sirve—, porque es lo único que separa «tu trabajo
+            está a salvo» de «no lo está». Sin mencionar que es automático:
+            lo que el auditor necesita es saber qué hacer. */}
         {autoguardado.estado === 'error' && autoguardado.error && (
           <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-            <strong className="font-semibold">No se pudo guardar automáticamente.</strong>{' '}
+            <strong className="font-semibold">No se pudo guardar.</strong>{' '}
             {autoguardado.error}
             <span className="mt-1 block text-xs">
-              Lo que has escrito sigue en pantalla. Se reintenta al seguir escribiendo; también
-              puedes pulsar «Guardar informe» para forzarlo.
+              Lo que has escrito sigue en pantalla. Pulsa «Guardar informe» para intentarlo otra
+              vez.
             </span>
           </p>
         )}
@@ -1438,8 +1481,6 @@ export default function FormularioRegistro({
                   ? 'Informe completo'
                   : `${faltan} campo${faltan === 1 ? '' : 's'} sin escribir · puedes guardar igual`}
               </span>
-
-              {auditoria && !errorCarga && <EstadoAutoguardado {...autoguardado} />}
             </span>
           }
         >

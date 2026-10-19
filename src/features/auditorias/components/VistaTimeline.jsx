@@ -1076,6 +1076,11 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
             embebido
             usuario={usuario}
             auditoria={selected}
+            onGuardado={(fila) =>
+              setAuditorias((prev) =>
+                prev.map((a) => (a.id === fila.id ? { ...a, ...fila } : a))
+              )
+            }
             onSuccess={() => {
               setEditModalOpen(false)
               loadData()

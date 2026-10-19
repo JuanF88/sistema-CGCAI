@@ -579,6 +579,12 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
             embebido
             usuario={usuario}
             auditoria={auditoriaSeleccionada}
+            onGuardado={(fila) => {
+              setAuditorias((prev) => prev.map((a) => (a.id === fila.id ? { ...a, ...fila } : a)))
+              setAuditoriaSeleccionada((prev) =>
+                prev && prev.id === fila.id ? { ...prev, ...fila } : prev
+              )
+            }}
             onSuccess={() => {
               handleVolver()
               setRecarga((n) => n + 1)
