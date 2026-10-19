@@ -936,10 +936,14 @@ export default function FormularioRegistro({
     setLoading(true)
 
     try {
-      const escritos = await persistir()
-
-      // Para que el automático no repita este mismo guardado al cerrar.
-      autoguardado.marcarGuardado()
+      // Por la cola del automático, no llamando a `persistir` a pelo. Si hay
+      // un guardado en vuelo, este espera a que acabe en vez de escribir a la
+      // vez: dos `sincronizarHallazgos` simultáneos veían la misma tarjeta
+      // todavía sin `id` y la insertaban dos veces. En el informe #354
+      // quedaron las fortalezas 2522 y 2523, idénticas, con 139 ms entre una
+      // y otra. Además deja la firma marcada, así que al cerrar el formulario
+      // no sale un guardado gemelo detrás de este.
+      const escritos = await autoguardado.guardarYa()
 
       // El aviso dice qué se escribió, con los ceros incluidos. Antes decía
       // «guardados correctamente» pasara lo que pasara, así que un guardado
