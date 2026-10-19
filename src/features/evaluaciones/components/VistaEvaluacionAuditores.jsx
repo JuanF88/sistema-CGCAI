@@ -34,6 +34,7 @@ import {
   exportarEvaluacionManual,
   exportarResumenGeneral,
 } from '@/features/evaluaciones/lib/exportar-excel'
+import { anioActual } from '@/lib/fechas/anio'
 import { ImportarEncuestas } from './evaluacion/ImportarEncuestas'
 import { MatrizRubrica } from './evaluacion/MatrizRubrica'
 import { ModalDesgloseArchivos } from './evaluacion/ModalDesgloseArchivos'
@@ -128,9 +129,9 @@ export default function VistaEvaluacionAuditores() {
       } catch (err) {
         console.error('Error cargando periodos disponibles:', err)
         toast.error('No se pudieron cargar los periodos disponibles')
-        const anioActual = new Date().getFullYear()
-        setAniosDisponibles([anioActual, anioActual - 1])
-        setAnioSeleccionado(anioActual)
+        const esteAnio = anioActual()
+        setAniosDisponibles([esteAnio, esteAnio - 1])
+        setAnioSeleccionado(esteAnio)
         setSemestreSeleccionado('S2')
       } finally {
         setCargandoPeriodos(false)

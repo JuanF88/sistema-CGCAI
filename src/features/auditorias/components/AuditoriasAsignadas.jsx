@@ -14,7 +14,7 @@ import { MAX_MB } from '@/features/auditorias/hooks/useAuditTimeline'
 import { FormDrawer } from '@/components/ui/form-drawer'
 import { PageHeader } from '@/components/ui/page-header'
 import { InfoCard } from '@/components/ui/info-card'
-import { anioDe, toYMD } from '@/lib/fechas'
+import { anioDe, aDia, toYMD } from '@/lib/fechas'
 import {
   EMPTY_STATE,
   PAGE_SHELL,
@@ -302,13 +302,20 @@ export default function AuditoriasAsignadas({ usuario, reset }) {
     completadas: auditorias.filter(a => progresoAuditoria(a) === 100),
   }
 
-  const formatFecha = (isoDate) => {
-    if (!isoDate) return ''
-    const d = new Date(isoDate)
-    const dd = String(d.getDate()).padStart(2, '0')
-    const mm = String(d.getMonth() + 1).padStart(2, '0')
-    const yyyy = d.getFullYear()
-    return `${dd}/${mm}/${yyyy}`
+  /**
+   * «27/07/2026», partiendo el día de la cadena.
+   *
+   * Antes pasaba por `new Date(...)` y leía los campos locales: una fecha sin
+   * hora se interpreta como medianoche UTC, y en Bogotá eso es el día
+   * anterior, así que el auditor veía su auditoría fechada un día antes de lo
+   * que dice la base. `aDia` lo resuelve para los dos formatos que llegan
+   * aquí: «2026-07-27» y el instante ISO completo.
+   */
+  const formatFecha = (valor) => {
+    const dia = aDia(valor)
+    if (!dia) return ''
+    const [anio, mes, numero] = dia.split('-')
+    return `${numero}/${mes}/${anio}`
   }
 
   const estadoPill = (progreso) => {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api/guard'
 import { ROLES } from '@/lib/auth/roles'
-import { anioDe } from '@/lib/fechas'
+import { anioDe, periodoDe } from '@/lib/fechas'
 
 export async function GET(request) {
   const guard = await requireAuth()
@@ -127,7 +127,11 @@ export async function GET(request) {
         asistencia_tipo: informe.asistencia_tipo,
         dependencia_nombre: informe.dependencias?.nombre || 'Sin dependencia',
         anio,
-        periodo: evaluacion?.periodo || (anio ? `${anio}-${fecha.getMonth() < 6 ? 'S1' : 'S2'}` : null),
+        // `periodoDe` y no `fecha.getMonth()`: `fecha` no existía en este
+        // ámbito —quedó de cuando el año se saca de la cadena con `anioDe`— y
+        // cualquier auditoría sin evaluación registrada reventaba la ruta con
+        // «fecha is not defined», o sea el panel entero en blanco.
+        periodo: evaluacion?.periodo || periodoDe(informe.fecha_auditoria),
         estado_evaluacion: evaluacion?.estado || 'sin_evaluacion',
         nota_archivos: evaluacion?.nota_archivos ?? null,
         nota_encuesta: evaluacion?.nota_encuesta ?? null,

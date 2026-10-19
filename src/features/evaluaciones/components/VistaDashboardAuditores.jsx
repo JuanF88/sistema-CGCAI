@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { PAGE_SHELL, SECTION_CARD } from '@/components/ui/tokens'
-import { anioPorDefecto } from '@/lib/fechas/anio'
+import { anioActual, anioPorDefecto } from '@/lib/fechas/anio'
 import { useAnioInicial } from '@/hooks/useAnioInicial'
 import { cn } from '@/lib/utils'
 import { Cargando } from '@/components/ui/loader'
@@ -53,7 +53,7 @@ export default function VistaDashboardAuditores() {
   const [dashboard, setDashboard] = useState(null)
   const [anioFiltro, setAnioFiltro] = useState('todos')
   const [aniosGenerales, setAniosGenerales] = useState([])
-  const [anioGeneral, setAnioGeneral] = useState(String(new Date().getFullYear()))
+  const [anioGeneral, setAnioGeneral] = useState(String(anioActual()))
   const [resumenGeneral, setResumenGeneral] = useState(null)
   const [loadingAuditores, setLoadingAuditores] = useState(true)
   const [loadingDashboard, setLoadingDashboard] = useState(false)

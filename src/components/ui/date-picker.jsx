@@ -19,9 +19,17 @@
  * En posición absoluta dentro del campo, como el `Combobox`, y con la capa de
  * los desplegables: así funciona dentro de un panel lateral y de un diálogo.
  * Ver `tokens.js`.
+ *
+ * ── Por qué tres niveles ──
+ * Solo había flechas de mes en mes. Para fechar algo del año anterior hacían
+ * falta doce clics, y para el año siguiente otros tantos: en la práctica el
+ * calendario no salía del año en curso. Pulsando el título se pasa a los
+ * meses, y desde ahí a los años, así que cualquier fecha queda a tres clics.
+ * No se usa un `<select>` nativo porque su lista la dibuja el sistema
+ * operativo, que es justo lo que se evitó al dejar el `<input type="date">`.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { Z_POPOVER } from '@/components/ui/tokens'
@@ -69,6 +77,17 @@ function desplazarMes(anio, mes, saltos) {
   return { anio: Math.floor(total / 12), mes: (total % 12) + 1 }
 }
 
+/** Cuántos años se ven de una vez en la rejilla de años. */
+const ANIOS_POR_PAGINA = 12
+
+/**
+ * El primer año de la página que contiene `anio`.
+ *
+ * Se ancla a múltiplos de doce —2016, 2028…— y no al año que se esté viendo:
+ * así las flechas pasan de página sin que los años se desplacen de sitio.
+ */
+const inicioPagina = (anio) => anio - (((anio % ANIOS_POR_PAGINA) + ANIOS_POR_PAGINA) % ANIOS_POR_PAGINA)
+
 /**
  * @param {Object} props
  * @param {string} props.value        `YYYY-MM-DD`, o `''`
@@ -91,6 +110,8 @@ export function DatePicker({
   ...props
 }) {
   const [abierto, setAbierto] = useState(false)
+  /** Qué rejilla se está mirando: `'dias'`, `'meses'` o `'anios'`. */
+  const [nivel, setNivel] = useState('dias')
   const contenedor = useRef(null)
 
   const elegido = partes(value)
@@ -109,6 +130,9 @@ export function DatePicker({
     if (!abierto) return
     const p = partes(value) ?? partes(hoyIso())
     setVista({ anio: p.anio, mes: p.mes })
+    // Y se vuelve a los días: reabrir en la rejilla de años, porque fue lo
+    // último que se tocó, no se entiende al volver al campo.
+    setNivel('dias')
   }, [abierto, value])
 
   useEffect(() => {
@@ -155,6 +179,41 @@ export function DatePicker({
   }, [vista])
 
   const fueraDeRango = (iso) => (min && iso < min) || (max && iso > max)
+
+  /**
+   * Un mes o un año sobran solo si ninguno de sus días entra en el rango.
+   *
+   * Se compara el primer día con `max` y el último con `min`, y no el día 1
+   * con los dos: con un mínimo a mitad de mes, mirar solo el día 1 habría
+   * tapado un mes que sí tiene días elegibles.
+   */
+  const mesFueraDeRango = (anio, mes) => {
+    const primero = aIso(anio, mes, 1)
+    const ultimo = aIso(anio, mes, diasDelMes(anio, mes))
+    return Boolean((max && primero > max) || (min && ultimo < min))
+  }
+
+  const anioFueraDeRango = (anio) =>
+    Boolean((max && aIso(anio, 1, 1) > max) || (min && aIso(anio, 12, 31) < min))
+
+  const anioDeHoy = Number(hoy.slice(0, 4))
+  const primerAnio = inicioPagina(vista.anio)
+
+  /** Las flechas saltan lo que se esté viendo: un mes, un año o una página. */
+  const saltar = (signo) => {
+    if (nivel === 'dias') return setVista((v) => desplazarMes(v.anio, v.mes, signo))
+    const paso = nivel === 'meses' ? 1 : ANIOS_POR_PAGINA
+    setVista((v) => ({ ...v, anio: v.anio + signo * paso }))
+  }
+
+  const titulo =
+    nivel === 'dias'
+      ? `${MESES[vista.mes - 1]} ${vista.anio}`
+      : nivel === 'meses'
+        ? String(vista.anio)
+        : `${primerAnio} – ${primerAnio + ANIOS_POR_PAGINA - 1}`
+
+  const queSalta = nivel === 'dias' ? 'mes' : nivel === 'meses' ? 'año' : 'periodo'
 
   const elegir = (iso) => {
     if (fueraDeRango(iso)) return
@@ -203,26 +262,108 @@ export function DatePicker({
           {/* Azul institucional y no el degradado de la IA: aquí no hay nada
               de IA, es un campo del formulario como cualquier otro. */}
           <header className="flex items-center justify-between gap-1 bg-primary px-2 py-2 text-primary-foreground">
-            <BotonMes
-              titulo="Mes anterior"
-              onClick={() => setVista((v) => desplazarMes(v.anio, v.mes, -1))}
-            >
+            <BotonMes titulo={`${queSalta.charAt(0).toUpperCase()}${queSalta.slice(1)} anterior`} onClick={() => saltar(-1)}>
               <ChevronLeft className="h-4 w-4" />
             </BotonMes>
 
-            <p className="flex-1 text-center text-sm font-semibold capitalize">
-              {MESES[vista.mes - 1]} {vista.anio}
-            </p>
-
-            <BotonMes
-              titulo="Mes siguiente"
-              onClick={() => setVista((v) => desplazarMes(v.anio, v.mes, 1))}
+            <button
+              type="button"
+              // Desde los años no hay a dónde subir, así que el título baja de
+              // vuelta a los meses en vez de quedarse sin hacer nada.
+              onClick={() =>
+                setNivel(nivel === 'dias' ? 'meses' : nivel === 'meses' ? 'anios' : 'meses')
+              }
+              title={
+                nivel === 'dias'
+                  ? 'Elegir mes y año'
+                  : nivel === 'meses'
+                    ? 'Elegir año'
+                    : 'Volver a los meses'
+              }
+              aria-label={`${titulo}. Cambiar de ${nivel === 'dias' ? 'mes' : nivel === 'meses' ? 'año' : 'periodo'}`}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-0.5',
+                'text-sm font-semibold capitalize tabular-nums transition-colors hover:bg-white/20'
+              )}
             >
+              {titulo}
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-80" />
+            </button>
+
+            <BotonMes titulo={`${queSalta.charAt(0).toUpperCase()}${queSalta.slice(1)} siguiente`} onClick={() => saltar(1)}>
               <ChevronRight className="h-4 w-4" />
             </BotonMes>
           </header>
 
-          <div className="grid grid-cols-7 gap-0.5 px-2 pb-1 pt-2">
+          {/* Altura fija para los tres niveles: si cada rejilla midiera lo
+              suyo, el panel daría un salto al cambiar de nivel. */}
+          <div className="min-h-[15rem] px-2 pb-1 pt-2">
+          {nivel === 'anios' ? (
+            <div className="grid h-full grid-cols-3 content-center gap-1.5">
+              {Array.from({ length: ANIOS_POR_PAGINA }, (_, i) => primerAnio + i).map((anio) => {
+                const bloqueado = anioFueraDeRango(anio)
+                const esElVisto = anio === vista.anio
+
+                return (
+                  <button
+                    key={anio}
+                    type="button"
+                    disabled={bloqueado}
+                    aria-pressed={esElVisto}
+                    onClick={() => {
+                      setVista((v) => ({ ...v, anio }))
+                      setNivel('meses')
+                    }}
+                    className={cn(
+                      'h-9 rounded-md text-sm tabular-nums transition-colors',
+                      'hover:bg-accent hover:text-accent-foreground',
+                      anio === anioDeHoy &&
+                        !esElVisto &&
+                        'font-semibold text-primary ring-1 ring-primary/50',
+                      esElVisto &&
+                        'bg-primary font-semibold text-primary-foreground shadow-sm hover:bg-primary hover:text-primary-foreground',
+                      bloqueado && 'cursor-not-allowed opacity-30 hover:bg-transparent'
+                    )}
+                  >
+                    {anio}
+                  </button>
+                )
+              })}
+            </div>
+          ) : nivel === 'meses' ? (
+            <div className="grid h-full grid-cols-3 content-center gap-1.5">
+              {MESES.map((nombre, i) => {
+                const mes = i + 1
+                const bloqueado = mesFueraDeRango(vista.anio, mes)
+                // Resaltado el mes de la fecha elegida, no el que se está
+                // viendo: el que se ve ya lo dice el título.
+                const esElElegido = elegido?.anio === vista.anio && elegido?.mes === mes
+
+                return (
+                  <button
+                    key={nombre}
+                    type="button"
+                    disabled={bloqueado}
+                    aria-pressed={esElElegido}
+                    onClick={() => {
+                      setVista({ anio: vista.anio, mes })
+                      setNivel('dias')
+                    }}
+                    className={cn(
+                      'h-9 rounded-md text-sm capitalize transition-colors',
+                      'hover:bg-accent hover:text-accent-foreground',
+                      esElElegido &&
+                        'bg-primary font-semibold text-primary-foreground shadow-sm hover:bg-primary hover:text-primary-foreground',
+                      bloqueado && 'cursor-not-allowed opacity-30 hover:bg-transparent'
+                    )}
+                  >
+                    {nombre.slice(0, 3)}
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+          <div className="grid grid-cols-7 gap-0.5">
             {DIAS.map((d, i) => (
               <span
                 key={`${d}-${i}`}
@@ -261,11 +402,19 @@ export function DatePicker({
               )
             })}
           </div>
+          )}
+          </div>
 
           <footer className="flex items-center justify-between gap-2 border-t border-border px-2 py-1.5">
             <button
               type="button"
-              onClick={() => elegir(hoy)}
+              onClick={() => {
+                // También devuelve a los días: si se pulsa desde la rejilla de
+                // años, se ve dónde ha caído la fecha.
+                setVista({ anio: anioDeHoy, mes: Number(hoy.slice(5, 7)) })
+                setNivel('dias')
+                elegir(hoy)
+              }}
               disabled={fueraDeRango(hoy)}
               className="rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-accent disabled:opacity-40"
             >

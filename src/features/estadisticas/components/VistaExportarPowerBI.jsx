@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select'
 import { PAGE_SHELL, SECTION_CARD } from '@/components/ui/tokens'
 import { cn } from '@/lib/utils'
+import { anioDe, mesDe } from '@/lib/fechas'
 
 /** Pasos para refrescar el informe de Power BI con el archivo generado. */
 const PASOS = [
@@ -81,9 +82,11 @@ export default function VistaExportarPowerBI() {
 
         data.forEach(item => {
           if (item.fecha_auditoria) {
-            const fecha = new Date(item.fecha_auditoria)
-            const anio = fecha.getFullYear()
-            const mes = fecha.getMonth() + 1
+            // De la cadena y no de un `Date`: `new Date('2027-01-01')` es
+            // medianoche UTC y en Bogotá retrocede a 2026, así que el año
+            // faltaba del desplegable. Ver `lib/fechas`.
+            const anio = anioDe(item.fecha_auditoria)
+            const mes = mesDe(item.fecha_auditoria)
             const semestre = mes <= 6 ? 1 : 2
 
             anios.add(anio)
@@ -152,9 +155,8 @@ export default function VistaExportarPowerBI() {
 
           if (!informe?.fecha_auditoria) return false
 
-          const fecha = new Date(informe.fecha_auditoria)
-          const anio = fecha.getFullYear()
-          const mes = fecha.getMonth() + 1
+          const anio = anioDe(informe.fecha_auditoria)
+          const mes = mesDe(informe.fecha_auditoria)
           const semestre = mes <= 6 ? 1 : 2
 
           // Filtrar por año
@@ -216,8 +218,7 @@ export default function VistaExportarPowerBI() {
         if (!informe) continue
 
         // Extraer datos
-        const fecha = informe.fecha_auditoria ? new Date(informe.fecha_auditoria) : null
-        const anio = fecha ? fecha.getFullYear() : ''
+        const anio = anioDe(informe.fecha_auditoria) ?? ''
         
         const iso = hallazgo?.iso?.iso || ''
         const tipoHallazgo = hallazgo.tipo || ''

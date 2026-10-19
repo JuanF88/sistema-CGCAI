@@ -44,7 +44,7 @@ import {
   TABLE_TOOLBAR,
 } from '@/components/ui/tokens'
 import { cn } from '@/lib/utils'
-import { formatearDia } from '@/lib/fechas'
+import { anioDe, formatearDia, mesDe } from '@/lib/fechas'
 
 /**
  * Valor centinela de los selects de filtro: el estado usa `''` para "sin
@@ -113,18 +113,22 @@ const makeKey = (id, label) => {
 }
 
 /* ===================== Getters de campos ===================== */
-const getYear = (row) => {
-  const inf = getInforme(row)
-  const f = inf?.fecha_auditoria ? new Date(inf.fecha_auditoria) : null
-  return f ? f.getFullYear() : null
-}
+/**
+ * El año de la auditoría, leído de la cadena y no de un `Date`.
+ *
+ * `new Date('2027-01-01')` es medianoche UTC, y en Bogotá eso todavía es el 31
+ * de diciembre de 2026. El informe #354 —tres fortalezas fechadas el 1 de
+ * enero de 2027— se contaba como 2026, así que 2027 no llegaba a aparecer en
+ * el desplegable de años y no había manera de ver sus hallazgos. `anioDe` lee
+ * los cuatro primeros caracteres de la cadena y da el mismo resultado en el
+ * navegador y en el servidor. Ver `lib/fechas`.
+ */
+const getYear = (row) => anioDe(getInforme(row)?.fecha_auditoria)
 
+/** Con el mismo criterio: el 1 de julio es S2, no el 30 de junio. */
 const getSemester = (row) => {
-  const inf = getInforme(row)
-  const f = inf?.fecha_auditoria ? new Date(inf.fecha_auditoria) : null
-  if (!f) return null
-  const month = f.getMonth() + 1
-  return month <= 6 ? '1' : '2'
+  const mes = mesDe(getInforme(row)?.fecha_auditoria)
+  return mes ? (mes <= 6 ? '1' : '2') : null
 }
 
 /* ===== Auditores ===== */
@@ -214,9 +218,10 @@ export const exportarExcel = async (hallazgos) => {
   // Agregar datos
   for (const hallazgo of hallazgos) {
     const informe = getInforme(hallazgo)
-    const fecha = new Date(informe?.fecha_auditoria)
-    const anio = fecha.getFullYear()
-    const semestre = fecha.getMonth() < 6 ? '1' : '2'
+    // Por los mismos getters que los filtros: si cada uno sacara el año a su
+    // manera, el Excel diría un año distinto del que se usó para filtrarlo.
+    const anio = getYear(hallazgo)
+    const semestre = getSemester(hallazgo)
     const auditor = getAuditorLabel(hallazgo)
     const dependencia = getDependenciaLabel(hallazgo)
     const tipo = hallazgo.tipo || inferirTipoDesdeTabla(hallazgo)
