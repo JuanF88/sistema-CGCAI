@@ -30,6 +30,8 @@ import {
   FORM_INICIAL,
   aFormulario,
   mezclarConfirmado,
+  payloadCompleto,
+  payloadTocado,
 } from '@/features/auditorias/lib/informe-formulario'
 import { enfocarNuevo } from '@/lib/dom/desplazar'
 import { cn } from '@/lib/utils'
@@ -501,7 +503,11 @@ function SelectCatalogo({ id, label, value, onChange, opciones, etiquetaOpcion, 
   return (
     <Field label={label} htmlFor={id} className="min-w-[180px] flex-1">
       <Select
-        value={value ? String(value) : undefined}
+        // Siempre controlado: `''` pinta el texto de relleno igual que
+        // `undefined`, pero sin que Radix pase a «no controlado» al vaciarse.
+        // Ese paso era el que mandaba un `''` que, con el `Number` de abajo,
+        // dejaba el capítulo en `0` al cambiar la norma.
+        value={value ? String(value) : ''}
         onValueChange={(v) => onChange(Number(v))}
         disabled={disabled}
       >
@@ -532,7 +538,24 @@ function SelectCatalogo({ id, label, value, onChange, opciones, etiquetaOpcion, 
  * @param {Function} [props.onVolver]  Botón de volver / cancelar
  * @param {boolean} [props.embebido]   Dentro de un drawer: sin PageHeader propio
  */
-export default function FormularioRegistro({
+export default function FormularioRegistro(props) {
+  // **Una instancia por informe.** Si la auditoría cambia, el formulario se
+  // monta de nuevo en vez de reutilizarse.
+  //
+  // Las dos líneas de tiempo dejan `selected` puesto al cerrar el panel, y el
+  // panel tarda unos tres segundos en desmontar lo que lleva dentro. Elegir
+  // otra auditoría en la lista durante ese rato le cambiaba la auditoría al
+  // formulario vivo: el guardado automático lo tomaba por un cambio pendiente
+  // y guardaba con el `id` nuevo los hallazgos que aún tenía en pantalla, los
+  // del informe anterior. Así se copiaban los hallazgos de un informe a otro,
+  // y se borraban los del segundo cuando el primero no tenía ninguno.
+  //
+  // Con la `key`, la instancia vieja se desmonta con su propio informe —si le
+  // quedaba algo sin guardar, lo guarda ahí— y la nueva empieza de cero.
+  return <FormularioDeUnInforme key={props.auditoria?.id ?? 'nuevo'} {...props} />
+}
+
+function FormularioDeUnInforme({
   usuario,
   auditoria,
   onSuccess,
@@ -676,9 +699,8 @@ export default function FormularioRegistro({
 
     const cargarHallazgos = async () => {
       // Y se confirma contra la base, porque la copia de la lista se queda
-      // vieja en cuanto el guardado automático escribe. Es lo que devolvía el
-      // tipo de asistencia a `null` después de elegir «Físico»: el porqué
-      // entero está en `lib/informe-formulario.js`.
+      // vieja en cuanto el guardado automático escribe: el porqué está en
+      // `lib/informe-formulario.js`.
       const { data: enLaBase, error: errorInforme } = await supabase
         .from('informes_auditoria')
         .select(COLUMNAS_DEL_FORMULARIO.join(', '))
@@ -715,6 +737,14 @@ export default function FormularioRegistro({
       }
 
       setHallazgos(cargados)
+
+      // El punto de partida del guardado automático es lo que se acaba de
+      // confirmar, y desde aquí ya está todo en pantalla. Se fija ahora y no
+      // al terminar los catálogos: esos solo pintan las etiquetas de norma,
+      // capítulo y numeral. Esperarlos dejaba un hueco en el que las tarjetas
+      // ya se podían tocar y lo escrito entraba en el punto de partida como si
+      // ya estuviera guardado, así que no se guardaba nunca.
+      setHidratado(true)
 
       // Los catálogos de los hallazgos ya guardados se piden en dos consultas,
       // no una por fila: antes el bucle con `await` disparaba una consulta por
@@ -754,10 +784,15 @@ export default function FormularioRegistro({
       }
     }
 
-    // Al terminar, no antes: el punto de partida del guardado automático es lo
-    // que se acaba de confirmar, no lo que trajo la lista.
     cargarHallazgos()
-      .catch((err) => console.error('[informe] no se pudo cargar:', err))
+      .catch((err) => {
+        console.error('[informe] no se pudo cargar:', err)
+        // Un fallo inesperado puede llegar antes de leer los hallazgos, y
+        // entonces la pantalla los tiene vacíos. Guardar así los borraría
+        // todos de la base, así que se bloquea como cualquier otra lectura
+        // fallida.
+        if (vigente) setErrorCarga(err?.message || 'error inesperado al cargar el informe')
+      })
       .finally(() => {
         if (vigente) setHidratado(true)
       })
@@ -818,18 +853,12 @@ export default function FormularioRegistro({
   /* ── Guardado ── */
 
   /**
-   * `''` → `null` antes de escribir.
-   *
-   * Sin campos obligatorios, `fecha_auditoria` y `fecha_seguimiento` pueden
-   * quedar vacías, y Postgres rechaza la cadena vacía en una columna `date`. De
-   * paso los textos en blanco entran como `null`, que es lo que comprueba el
-   * resto del sistema para saber si un apartado está escrito.
-   */
-  const limpiar = (valor) => (typeof valor === 'string' && !valor.trim() ? null : valor)
-
-  /**
    * Escribe el informe y sus hallazgos. Lo usan el botón y el guardado
    * automático, para que no haya dos caminos que puedan divergir.
+   *
+   * **Del informe se escriben solo las columnas que el auditor tocó.** Ver
+   * `payloadTocado` en `lib/informe-formulario.js`: escribir las ocho en cada
+   * guardado convertía cualquier pantalla atrasada en una sobreescritura.
    *
    * No avisa ni navega: eso es de quien lo llame. Lanza si algo falla.
    *
@@ -837,27 +866,42 @@ export default function FormularioRegistro({
    */
   const persistir = useCallback(async () => {
     const actual = formRef.current
-    const payload = {
-      ...Object.fromEntries(Object.entries(actual.form).map(([campo, v]) => [campo, limpiar(v)])),
-      auditores_acompanantes: actual.form.auditores_acompanantes
-        ? actual.form.auditores_acompanantes.split(',').map((s) => s.trim())
-        : [],
-    }
 
     let informeId
+    /** Lo que de verdad se ha escrito del informe, para avisar con eso. */
+    let escrito
 
     if (auditoriaRef.current) {
-      const { error } = await supabase
-        .from('informes_auditoria')
-        .update(payload)
-        .eq('id', auditoriaRef.current.id)
-      if (error) throw error
+      escrito = payloadTocado(actual.form, tocados.current)
       informeId = auditoriaRef.current.id
+
+      // Sin nada tocado no hay UPDATE: puede haber hallazgos que sincronizar
+      // igualmente, y un `update({})` sería una petición para nada.
+      if (Object.keys(escrito).length) {
+        // Se pide la fila de vuelta, como al validar el informe o al marcarlo
+        // ejecutado: bajo RLS, un `update` que no puede tocar la fila no da
+        // error, devuelve cero filas. Sin comprobarlo el guardado se daba por
+        // bueno —el aviso de «guardado» y el panel cerrándose— y el cambio no
+        // llegaba nunca a la base.
+        const { data: actualizadas, error } = await supabase
+          .from('informes_auditoria')
+          .update(escrito)
+          .eq('id', informeId)
+          .select('id')
+        if (error) throw error
+        if (!actualizadas?.length) {
+          throw new Error(
+            `La base no aceptó el cambio del informe #${informeId}: puede que tu usuario no tenga permiso para editarlo. No se ha guardado.`
+          )
+        }
+      }
     } else {
+      // Un informe nuevo sí lleva las ocho columnas: no hay fila que respetar.
+      escrito = payloadCompleto(actual.form)
       const { data: nueva, error } = await supabase
         .from('informes_auditoria')
         .insert({
-          ...payload,
+          ...escrito,
           usuario_id: usuario.usuario_id,
           dependencia_id: usuario.dependencia_id,
         })
@@ -906,7 +950,7 @@ export default function FormularioRegistro({
     if (onGuardadoRef.current) {
       onGuardadoRef.current({
         id: informeId,
-        ...payload,
+        ...escrito,
         // Las filas que han quedado en la base, para los contadores de
         // hallazgos: solo las tarjetas vivas entran en `ids`, las vacías no.
         ...Object.fromEntries(
@@ -965,10 +1009,14 @@ export default function FormularioRegistro({
   // Si el auditor escribió mientras se confirmaba el informe, eso no está
   // guardado y el guardado automático acaba de tomar la pantalla como punto de
   // partida, así que por sí solo no lo escribiría nunca. Se fuerza una vez.
+  //
+  // Nunca con la carga fallida: `guardarYa` no pasa por el `activo` del
+  // guardado automático, y guardar sincroniza la lista de hallazgos entera.
+  // Con la que se pudo leer a medias, borraría de la base las que no llegaron.
   useEffect(() => {
-    if (!hidratado || !tocados.current.size) return
+    if (!hidratado || errorCarga || !tocados.current.size) return
     guardarYa().catch(() => {})
-  }, [hidratado, guardarYa])
+  }, [hidratado, errorCarga, guardarYa])
 
   const handleSubmit = async (e) => {
     e.preventDefault()

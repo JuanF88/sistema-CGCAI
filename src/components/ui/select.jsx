@@ -6,7 +6,47 @@ import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Z_POPOVER } from '@/components/ui/tokens'
 
-const Select = SelectPrimitive.Root
+/**
+ * La raíz de Radix, con una sola diferencia: **nunca avisa de un valor vacío**.
+ *
+ * Dentro de un `<form>`, Radix monta un `<select>` nativo oculto para que el
+ * valor viaje con el formulario, y cada vez que el valor cambia lo copia ahí y
+ * dispara un `change`. Las `<option>` de ese nativo se registran unos renders
+ * después de montar, así que si el valor cambia en ese hueco —un formulario
+ * que se rellena en un efecto, como el del informe— el nativo no tiene la
+ * opción, se queda en blanco y Radix lo toma por una elección:
+ * `onValueChange('')`.
+ *
+ * Es lo que borraba el tipo de asistencia: un informe guardado como «Físico»
+ * se abría con «Selecciona el tipo», el campo quedaba como tocado y el
+ * guardado automático escribía `null` en la base. «Digital» se salvaba solo
+ * porque es el valor con el que arranca el formulario, y sin cambio no hay
+ * `change`.
+ *
+ * Lo mismo pasa al vaciar un selector pasándole `undefined`, como hace
+ * `SelectCatalogo` al cambiar la norma de un hallazgo: el `''` llegaba como
+ * `Number('')`, el capítulo quedaba en `0` y el guardado intentaba escribirlo
+ * como `capitulo_id`.
+ *
+ * Filtrarlo aquí es seguro: Radix no admite una opción con valor `''` —lanza
+ * un error—, así que ninguna elección real puede llegar vacía. Las vistas que
+ * necesitan «ninguno» ya usan un centinela (`'todos'`, `'sin-definir'`).
+ */
+function Select({ onValueChange, ...props }) {
+  return (
+    <SelectPrimitive.Root
+      {...props}
+      onValueChange={
+        onValueChange &&
+        ((valor) => {
+          if (valor !== '') onValueChange(valor)
+        })
+      }
+    />
+  )
+}
+Select.displayName = 'Select'
+
 const SelectGroup = SelectPrimitive.Group
 const SelectValue = SelectPrimitive.Value
 
