@@ -6,7 +6,7 @@
  * cabecera y primera columna fijas al hacer scroll en las dos direcciones.
  */
 import { useState } from 'react'
-import { Download, Edit3, Info, Save } from 'lucide-react'
+import { AlertCircle, Check, Download, Edit3, Info, Loader2, RotateCcw } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,7 @@ import {
   notaDeCalificaciones,
 } from '@/features/evaluaciones/lib/rubrica'
 
-import { InfoBox } from './InfoBox'
+import { InfoBox } from './InfoBox'
 import { Cargando } from '@/components/ui/loader'
 
 /** Guía de niveles del criterio bajo el cursor, anclada junto a la celda. */
@@ -53,12 +53,64 @@ function GuiaCriterio({ tooltip }) {
   )
 }
 
+/** Cómo se dice, en la fila, en qué va su guardado. */
+const ESTADO_FILA = {
+  pendiente: { texto: 'Guardando…', icono: Loader2, clase: 'text-muted-foreground', gira: true },
+  guardando: { texto: 'Guardando…', icono: Loader2, clase: 'text-muted-foreground', gira: true },
+  guardado: { texto: 'Guardado', icono: Check, clase: 'text-emerald-600 dark:text-emerald-400' },
+  error: { texto: 'No se guardó', icono: AlertCircle, clase: 'text-destructive' },
+}
+
+/** El resumen de arriba de la tabla: lo peor que esté pasando manda. */
+function EstadoGuardado({ estadoFilas, onReintentar }) {
+  const estados = Object.values(estadoFilas)
+  const fallidas = estados.filter((e) => e === 'error').length
+  const enCurso = estados.some((e) => e === 'pendiente' || e === 'guardando')
+  const algunoGuardado = estados.includes('guardado')
+
+  if (fallidas) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 text-sm text-destructive">
+        <AlertCircle className="h-4 w-4" />
+        {fallidas === 1 ? 'Una fila no se pudo guardar.' : `${fallidas} filas no se pudieron guardar.`}
+        <Button size="sm" variant="outline" onClick={onReintentar}>
+          <RotateCcw />
+          Reintentar
+        </Button>
+      </div>
+    )
+  }
+
+  if (enCurso) {
+    return (
+      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Guardando cambios…
+      </p>
+    )
+  }
+
+  return (
+    <p
+      className={cn(
+        'flex items-center gap-2 text-sm',
+        algunoGuardado ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'
+      )}
+    >
+      <Check className="h-4 w-4" />
+      {algunoGuardado
+        ? 'Todos los cambios están guardados.'
+        : 'Los cambios se guardan automáticamente.'}
+    </p>
+  )
+}
+
 export function MatrizRubrica({
   evaluaciones,
   calificaciones,
   onCalificar,
-  onGuardar,
-  guardando,
+  estadoFilas = {},
+  onReintentar,
   loading,
   onExportar,
 }) {
@@ -92,6 +144,9 @@ export function MatrizRubrica({
           💡 La nota final (escala 1 a 5) se calcula como el promedio escalado de los criterios
           calificados. No hace falta calificarlos todos.
         </p>
+        <p>
+          💾 Cada calificación se guarda sola al elegirla; no hace falta pulsar ningún botón.
+        </p>
       </InfoBox>
 
       {loading ? (
@@ -105,6 +160,8 @@ export function MatrizRubrica({
         </p>
       ) : (
         <>
+          <EstadoGuardado estadoFilas={estadoFilas} onReintentar={onReintentar} />
+
           <div className={cn(TABLE_CONTAINER, 'max-h-[65vh] overflow-auto')}>
             <table className="w-full border-collapse text-sm">
               <thead>
@@ -130,6 +187,7 @@ export function MatrizRubrica({
                 {evaluaciones.map((ev) => {
                   const fila = calificaciones[ev.id] || {}
                   const notaFinal = notaDeCalificaciones(fila)
+                  const guardado = ESTADO_FILA[estadoFilas[ev.id]]
 
                   return (
                     <tr key={ev.id} className="border-b border-border">
@@ -143,6 +201,19 @@ export function MatrizRubrica({
                         <div className="text-xs text-muted-foreground">
                           ID: {ev.informe_auditoria_id} | {ev.fecha_auditoria || '-'}
                         </div>
+                        {guardado && (
+                          <div
+                            className={cn(
+                              'mt-1 flex items-center gap-1 text-xs font-medium',
+                              guardado.clase
+                            )}
+                          >
+                            <guardado.icono
+                              className={cn('h-3.5 w-3.5', guardado.gira && 'animate-spin')}
+                            />
+                            {guardado.texto}
+                          </div>
+                        )}
                       </td>
 
                       {RUBRICA_CRITERIOS.map((criterio) => {
@@ -200,13 +271,6 @@ export function MatrizRubrica({
                 })}
               </tbody>
             </table>
-          </div>
-
-          <div className="flex justify-end">
-            <Button onClick={onGuardar} disabled={guardando}>
-              <Save />
-              {guardando ? 'Guardando…' : 'Guardar todas las evaluaciones'}
-            </Button>
           </div>
         </>
       )}

@@ -9,7 +9,7 @@
  *
  * La nota final combina archivos entregados, encuesta y rúbrica.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertCircle, Calculator, Calendar, Edit3, Filter, RefreshCw, Scale, TrendingUp, Upload } from 'lucide-react'
 import { toast } from 'react-toastify'
 
@@ -35,6 +35,7 @@ import {
   exportarResumenGeneral,
 } from '@/features/evaluaciones/lib/exportar-excel'
 import { anioActual } from '@/lib/fechas/anio'
+import { crearCola } from '@/features/auditorias/hooks/useGuardadoAutomatico'
 import { ImportarEncuestas } from './evaluacion/ImportarEncuestas'
 import { MatrizRubrica } from './evaluacion/MatrizRubrica'
 import { ModalDesgloseArchivos } from './evaluacion/ModalDesgloseArchivos'
@@ -56,6 +57,13 @@ const TABS = [
   { key: 'rubrica', label: 'Evaluación manual', icon: Edit3 },
   { key: 'importar', label: 'Importar encuestas', icon: Upload },
 ]
+
+/**
+ * Cuánto esperar tras el último cambio de una fila antes de guardarla. Cada
+ * cambio es una elección en un desplegable, no una tecla: basta con agrupar
+ * los que se hacen seguidos en la misma fila.
+ */
+const ESPERA_RUBRICA_MS = 800
 
 export default function VistaEvaluacionAuditores() {
   // Periodo
@@ -79,7 +87,11 @@ export default function VistaEvaluacionAuditores() {
 
   // Matriz de rúbrica: { evaluacion_id: { c1: 4, c2: 3.5, … } }
   const [calificacionesMatriz, setCalificacionesMatriz] = useState({})
-  const [guardandoRubricas, setGuardandoRubricas] = useState(false)
+  /**
+   * Cómo va el guardado de cada fila de la matriz:
+   * 'pendiente' | 'guardando' | 'guardado' | 'error'.
+   */
+  const [estadoFilas, setEstadoFilas] = useState({})
 
   // Modal de desglose de archivos
   const [evaluacionArchivos, setEvaluacionArchivos] = useState(null)
@@ -143,6 +155,10 @@ export default function VistaEvaluacionAuditores() {
   const cargarEvaluaciones = async () => {
     if (!periodo) return
 
+    // Lo que quedara por guardar va antes de leer: si no, la lectura traería
+    // las notas de antes y la matriz las pintaría encima de lo elegido.
+    await guardarPendientes()
+
     setLoading(true)
     setError('')
     try {
@@ -155,7 +171,9 @@ export default function VistaEvaluacionAuditores() {
       data.evaluaciones?.forEach((ev) => {
         matrizInicial[ev.id] = ev.rubrica_respuestas || {}
       })
+      matrizRef.current = matrizInicial
       setCalificacionesMatriz(matrizInicial)
+      setEstadoFilas({})
     } catch (err) {
       console.error('Error cargando evaluaciones:', err)
       setError(err.message)
@@ -340,59 +358,125 @@ export default function VistaEvaluacionAuditores() {
 
   /* eslint-enable @typescript-eslint/no-unused-vars */
 
-  /* ── Matriz de rúbrica ── */
+  /* ── Matriz de rúbrica: se guarda sola ──
+   *
+   * Cada fila se guarda por su cuenta un momento después de su último cambio.
+   * Antes todo dependía del botón «Guardar todas las evaluaciones» del final
+   * de la tabla: quien calificaba a veinte auditores y cambiaba de pestaña, de
+   * periodo o cerraba sin pulsarlo, lo perdía todo.
+   *
+   * - `matrizRef` es la copia que leen los guardados. El estado de React solo
+   *   está al día en el siguiente render, y un temporizador que lo leyera por
+   *   cierre guardaría la elección anterior.
+   * - Cada guardado se lleva una **foto** de la fila en el momento de salir,
+   *   no la lee al ejecutarse: si entre tanto se carga otro periodo, la cola
+   *   no guarda la fila vacía del periodo nuevo en lugar de la elegida.
+   * - Una sola cola para todos: los guardados van de uno en uno y en orden, así
+   *   que dos cambios seguidos de la misma fila nunca llegan al revés.
+   */
+  const matrizRef = useRef({})
+  const temporizadores = useRef(new Map())
+  const enVuelo = useRef(0)
+  const colaRubrica = useRef(null)
+  if (!colaRubrica.current) colaRubrica.current = crearCola()
+  /** Hubo guardados desde la última lectura: el resumen tiene notas viejas. */
+  const huboGuardados = useRef(false)
+
+  const marcarFila = (evaluacionId, estado) =>
+    setEstadoFilas((prev) => ({ ...prev, [evaluacionId]: estado }))
+
+  const guardarFila = useCallback((evaluacionId) => {
+    clearTimeout(temporizadores.current.get(evaluacionId))
+    temporizadores.current.delete(evaluacionId)
+
+    const respuestas = { ...(matrizRef.current[evaluacionId] || {}) }
+
+    // Una fila sin ninguna nota no se envía, igual que con el botón de antes:
+    // la nota de rúbrica sería 0 y bajaría la nota final del auditor.
+    if (!Object.keys(respuestas).length) {
+      marcarFila(evaluacionId, null)
+      return Promise.resolve()
+    }
+
+    enVuelo.current++
+    return colaRubrica.current(async () => {
+      marcarFila(evaluacionId, 'guardando')
+      try {
+        await guardarRubrica({
+          evaluacionId,
+          respuestas,
+          nota: notaDeCalificaciones(respuestas),
+        })
+        huboGuardados.current = true
+        // Si se volvió a cambiar mientras se guardaba, aún hay otro en camino.
+        marcarFila(
+          evaluacionId,
+          temporizadores.current.has(evaluacionId) ? 'pendiente' : 'guardado'
+        )
+      } catch (err) {
+        console.error(`Error guardando la rúbrica ${evaluacionId}:`, err)
+        marcarFila(evaluacionId, 'error')
+        // Un solo aviso aunque fallen varias filas a la vez.
+        toast.error(`No se pudo guardar la rúbrica: ${err.message}`, {
+          toastId: 'rubrica-error',
+        })
+      } finally {
+        enVuelo.current--
+      }
+    })
+  }, [])
+
+  /** Guarda ya todo lo que esté esperando su turno. */
+  const guardarPendientes = useCallback(
+    () => Promise.all([...temporizadores.current.keys()].map(guardarFila)),
+    [guardarFila]
+  )
 
   const cambiarCalificacion = (evaluacionId, criterioId, valor) => {
-    setCalificacionesMatriz((prev) => {
-      const fila = { ...(prev[evaluacionId] || {}) }
-      if (valor === '') delete fila[criterioId]
-      else fila[criterioId] = parseFloat(valor)
-      return { ...prev, [evaluacionId]: fila }
-    })
-  }
+    const fila = { ...(matrizRef.current[evaluacionId] || {}) }
+    if (valor === '') delete fila[criterioId]
+    else fila[criterioId] = parseFloat(valor)
 
-  const guardarTodasRubricas = async () => {
-    const conCalificaciones = Object.entries(calificacionesMatriz).filter(
-      ([, calif]) => Object.keys(calif).length > 0
+    matrizRef.current = { ...matrizRef.current, [evaluacionId]: fila }
+    setCalificacionesMatriz(matrizRef.current)
+
+    clearTimeout(temporizadores.current.get(evaluacionId))
+    temporizadores.current.set(
+      evaluacionId,
+      setTimeout(() => guardarFila(evaluacionId), ESPERA_RUBRICA_MS)
     )
-
-    if (!conCalificaciones.length) {
-      toast.warning('No hay calificaciones para guardar')
-      return
-    }
-
-    setGuardandoRubricas(true)
-    let exitosas = 0
-    let fallidas = 0
-
-    try {
-      for (const [evaluacionId, respuestas] of conCalificaciones) {
-        try {
-          await guardarRubrica({
-            evaluacionId,
-            respuestas,
-            nota: notaDeCalificaciones(respuestas),
-          })
-          exitosas++
-        } catch (err) {
-          fallidas++
-          console.error(`Error guardando evaluación ${evaluacionId}:`, err)
-        }
-      }
-
-      if (exitosas > 0) toast.success(`${exitosas} evaluación(es) guardada(s)`)
-      if (fallidas > 0) {
-        toast.error(`${fallidas} evaluación(es) fallaron. Revisa la consola para detalles.`)
-      }
-
-      await cargarEvaluaciones()
-    } catch (err) {
-      console.error('Error general guardando evaluaciones:', err)
-      toast.error(`Error al guardar: ${err.message}`)
-    } finally {
-      setGuardandoRubricas(false)
-    }
+    marcarFila(evaluacionId, 'pendiente')
   }
+
+  const reintentarFallidas = () => {
+    Object.entries(estadoFilas)
+      .filter(([, estado]) => estado === 'error')
+      .forEach(([evaluacionId]) => guardarFila(evaluacionId))
+  }
+
+  // Al salir de la pantalla no se espera al temporizador: se guarda ya.
+  useEffect(() => () => void guardarPendientes(), [guardarPendientes])
+
+  // Y si se cierra la pestaña con algo sin guardar, el navegador pregunta.
+  useEffect(() => {
+    const avisar = (e) => {
+      if (!temporizadores.current.size && !enVuelo.current) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', avisar)
+    return () => window.removeEventListener('beforeunload', avisar)
+  }, [])
+
+  // La nota final la recalcula la base al guardar cada rúbrica, así que el
+  // resumen se vuelve a leer al salir de la matriz si se guardó algo.
+  useEffect(() => {
+    if (tabActiva === 'rubrica' || !huboGuardados.current) return
+    huboGuardados.current = false
+    cargarEvaluaciones()
+    // `cargarEvaluaciones` se redefine en cada render; el disparador es la pestaña.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabActiva])
 
   /* ── Desglose de archivos ── */
 
@@ -548,10 +632,11 @@ export default function VistaEvaluacionAuditores() {
           {periodo && <Badge variant="secondary">{periodo}</Badge>}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:max-w-lg">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="eval-anio">
-              <Calendar className="h-3.5 w-3.5" />
+        {/* Icono, rótulo y desplegable en una sola línea por campo. */}
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="eval-anio" className="flex shrink-0 items-center gap-1.5">
+              <Calendar className="h-4 w-4 text-primary" />
               Año
             </Label>
             <Select
@@ -559,7 +644,7 @@ export default function VistaEvaluacionAuditores() {
               onValueChange={(v) => setAnioSeleccionado(Number(v))}
               disabled={cargandoPeriodos || aniosDisponibles.length === 0}
             >
-              <SelectTrigger id="eval-anio">
+              <SelectTrigger id="eval-anio" className="w-36">
                 <SelectValue placeholder={cargandoPeriodos ? 'Cargando…' : 'No hay datos'} />
               </SelectTrigger>
               <SelectContent>
@@ -572,9 +657,9 @@ export default function VistaEvaluacionAuditores() {
             </Select>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="eval-semestre">
-              <Calendar className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-2">
+            <Label htmlFor="eval-semestre" className="flex shrink-0 items-center gap-1.5">
+              <Calendar className="h-4 w-4 text-primary" />
               Semestre
             </Label>
             <Select
@@ -582,7 +667,7 @@ export default function VistaEvaluacionAuditores() {
               onValueChange={setSemestreSeleccionado}
               disabled={cargandoPeriodos || semestresDisponibles.length === 0}
             >
-              <SelectTrigger id="eval-semestre">
+              <SelectTrigger id="eval-semestre" className="w-40">
                 <SelectValue placeholder={cargandoPeriodos ? 'Cargando…' : 'Semestre'} />
               </SelectTrigger>
               <SelectContent>
@@ -621,8 +706,8 @@ export default function VistaEvaluacionAuditores() {
           evaluaciones={evaluaciones}
           calificaciones={calificacionesMatriz}
           onCalificar={cambiarCalificacion}
-          onGuardar={guardarTodasRubricas}
-          guardando={guardandoRubricas}
+          estadoFilas={estadoFilas}
+          onReintentar={reintentarFallidas}
           loading={loading}
           onExportar={() =>
             exportarEvaluacionManual({ evaluaciones, calificacionesMatriz, periodo: periodoLabel })
