@@ -31,6 +31,7 @@ const ENTIDADES = {
   evaluaciones_pesos: { singular: 'los pesos de la evaluación', grupo: 'Evaluación' },
   rubricas_evaluacion: { singular: 'una rúbrica de evaluación', grupo: 'Evaluación' },
   encuestas_auditores: { singular: 'una encuesta de auditor', grupo: 'Evaluación' },
+  evaluaciones_auditados: { singular: 'la evaluación de un auditado', grupo: 'Evaluación' },
   notas_etapa_auditoria: { singular: 'una nota de etapa', grupo: 'Informes' },
   alertas_historial: { singular: 'una alerta enviada', grupo: 'Alertas' },
   alertas_procesos_config: { singular: 'la configuración de alertas', grupo: 'Alertas' },

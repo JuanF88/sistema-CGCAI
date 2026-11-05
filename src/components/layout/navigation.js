@@ -17,6 +17,7 @@ import {
   Home,
   LayoutDashboard,
   Lightbulb,
+  MessageSquareText,
   ScrollText,
   UserRound,
   Wrench,
@@ -30,6 +31,8 @@ import { ROLES } from '@/lib/auth/roles'
  * @property {string} label      Texto visible
  * @property {Function} icon     Componente de icono de lucide
  * @property {string[]} [alias]  Otras vistas que deben marcar este ítem como activo
+ * @property {boolean} [nuevo]   Pinta la etiqueta «Nuevo» junto al rótulo. Se
+ *                               quita a mano cuando la función deje de serlo.
  */
 
 /** Panel de administración. */
@@ -50,6 +53,14 @@ export const ADMIN_NAV = [
   // levanta con las oportunidades de mejora y las no conformidades.
   { key: 'planesMejora', label: 'Planes de Mejoramiento', icon: ClipboardCheck },
   { key: 'evaluacionAuditores', label: 'Evaluación de Auditores', icon: Award },
+  // Al lado de la de auditores: es la misma idea en sentido contrario, el
+  // auditor valorando al proceso que auditó.
+  {
+    key: 'evaluacionAuditados',
+    label: 'Evaluación de Auditados',
+    icon: MessageSquareText,
+    nuevo: true,
+  },
   { key: 'dashboardAuditores', label: 'Dashboard de Auditores', icon: UserRound },
   { key: 'alertasAuditoria', label: 'Alertas de Auditoría', icon: BellRing },
   { key: 'estadisticas', label: 'Estadísticas', icon: BarChart, alias: ['powerbi'] },
@@ -67,6 +78,13 @@ export const AUDITOR_NAV = [
   // va detrás de la línea de trabajo y no dentro de ella. Al salir de los pasos
   // del timeline el auditor se quedaba sin forma de generar el formato.
   { key: 'planes-mejora', label: 'Planes de Mejoramiento', icon: ClipboardCheck },
+  // Una por auditoría asignada, cuando el informe ya está diligenciado.
+  {
+    key: 'evaluacion-auditados',
+    label: 'Evaluación de Auditados',
+    icon: MessageSquareText,
+    nuevo: true,
+  },
   { key: 'mi-dashboard', label: 'Mi Dashboard', icon: LayoutDashboard },
   { key: 'mis-evaluaciones', label: 'Mis Evaluaciones', icon: Award },
   { key: 'caja', label: 'Caja de Herramientas', icon: Wrench },

@@ -268,6 +268,7 @@ DECLARE
     'rubricas_evaluacion',
     'encuestas_auditores',
     'notas_etapa_auditoria',
+    'evaluaciones_auditados',
     'alertas_historial',
     'alertas_procesos_config'
   ];

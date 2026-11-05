@@ -283,9 +283,9 @@ export default function AppShell({
                   aria-current={activo ? 'page' : undefined}
                   // Plegado, el rótulo del sistema es lo único que dice qué es
                   // cada icono.
-                  title={plegado ? item.label : undefined}
+                  title={plegado ? `${item.label}${item.nuevo ? ' (nuevo)' : ''}` : undefined}
                   className={cn(
-                    'flex items-center whitespace-nowrap rounded-xl py-2 text-left',
+                    'relative flex items-center whitespace-nowrap rounded-xl py-2 text-left',
                     'pantalla-baja:py-1.5 pantalla-muy-baja:py-1',
                     'font-medium transition-all duration-200 cursor-pointer',
                     'hover:bg-white/20',
@@ -295,6 +295,21 @@ export default function AppShell({
                 >
                   <Icon className={cn('shrink-0', plegado ? 'h-5 w-5' : 'h-[15px] w-[15px]')} />
                   {!plegado && <span className="text-[0.85rem] leading-tight">{item.label}</span>}
+                  {/* «Nuevo» va en la esquina y no en la línea: el rótulo ya
+                      llena el ancho del panel en su tamaño más estrecho, y una
+                      pastilla más al lado lo desbordaba. Plegado no cabe ni
+                      eso y queda un punto sobre el icono. */}
+                  {item.nuevo &&
+                    (plegado ? (
+                      <span
+                        className="absolute right-3 top-1.5 h-2 w-2 rounded-full bg-amber-300 ring-2 ring-white/40"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <span className="absolute -top-1.5 right-1 rounded-full bg-amber-300 px-1.5 py-px text-[0.6rem] font-bold uppercase leading-tight tracking-wide text-amber-950 shadow-sm">
+                        Nuevo
+                      </span>
+                    ))}
                 </button>
               )
             })}

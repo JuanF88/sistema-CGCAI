@@ -12,6 +12,7 @@ import VistaAdministrarHallazgos from '@/features/hallazgos/components/VistaAdmi
 import VistaEstadisticasPanel from '@/features/estadisticas/components/VistaEstadisticasPanel'
 import VistaEvaluacionAuditores from '@/features/evaluaciones/components/VistaEvaluacionAuditores'
 import VistaDashboardAuditores from '@/features/evaluaciones/components/VistaDashboardAuditores'
+import VistaEvaluacionAuditados from '@/features/evaluaciones/components/VistaEvaluacionAuditados'
 import VistaAlertasAuditoria from '@/features/alertas/components/VistaAlertasAuditoria'
 import VistaProgramaAuditoria from '@/features/programa/components/VistaProgramaAuditoria'
 import VistaPlanesMejora from '@/features/auditorias/components/VistaPlanesMejora'
@@ -47,6 +48,9 @@ export default function AdminDashboard({ usuario }) {
       {vista === 'administrarHallazgos' && <VistaAdministrarHallazgos />}
       {vista === 'planesMejora' && <VistaPlanesMejora />}
       {vista === 'evaluacionAuditores' && <VistaEvaluacionAuditores />}
+      {vista === 'evaluacionAuditados' && usuario && (
+        <VistaEvaluacionAuditados usuario={usuario} todas />
+      )}
       {vista === 'dashboardAuditores' && <VistaDashboardAuditores />}
       {vista === 'alertasAuditoria' && <VistaAlertasAuditoria />}
       {(vista === 'estadisticas' || vista === 'powerbi') && <VistaEstadisticasPanel />}
