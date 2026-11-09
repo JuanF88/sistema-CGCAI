@@ -3,16 +3,17 @@
 --
 -- La valoración que hace el auditor del proceso que auditó: cómo se preparó,
 -- si estuvo disponible, si entregó la información a tiempo, cómo atendió el
--- cierre… Es la «Propuesta Evaluación de Auditados»: ocho aspectos con una
+-- cierre… Es la «Propuesta Evaluación de Auditados»: nueve aspectos con una
 -- escala de 1 (deficiente) a 5 (excelente) y unas observaciones.
 --
 -- Una por auditoría. La fecha y la dependencia NO se guardan aquí: salen del
 -- informe, que es la fuente, y copiarlas haría que se desincronizaran el día
--- que alguien corrija la fecha de la auditoría. El líder y el proceso sí, porque
--- no están en ninguna otra parte (el proceso se propone desde el programa de
--- auditoría, pero el auditor lo puede corregir).
+-- que alguien corrija la fecha de la auditoría. El líder sí, porque no está en
+-- ninguna otra parte. El proceso no se le pide al auditor: se deduce de la
+-- dependencia con el programa de auditoría y queda vacío si no aparece en él.
 --
--- Ejecutar completo en el SQL Editor de Supabase. Es idempotente.
+-- Ejecutar completo en el SQL Editor de Supabase. Es idempotente y sirve tanto
+-- si la tabla no existe como si ya se creó con el formato anterior.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS evaluaciones_auditados (
@@ -24,7 +25,7 @@ CREATE TABLE IF NOT EXISTS evaluaciones_auditados (
                        REFERENCES informes_auditoria(id) ON DELETE CASCADE,
 
   lider_proceso        text NOT NULL,
-  proceso_auditado     text NOT NULL,
+  proceso_auditado     text,
 
   -- Una columna por aspecto, y no un JSON: así se puede promediar cada uno en
   -- SQL o en el Excel sin desempaquetar nada. El nombre de cada columna es la
@@ -49,6 +50,24 @@ CREATE TABLE IF NOT EXISTS evaluaciones_auditados (
 
 COMMENT ON TABLE evaluaciones_auditados IS
   'Valoración del proceso auditado hecha por el auditor. Una por auditoría. Ver sql/evaluacion-auditados.sql.';
+
+-- ------------------------------------------------------------
+-- Formato actualizado
+--
+-- Para las tablas creadas con el formato de ocho aspectos: el proceso deja de
+-- ser obligatorio y entra «Gestión de la documentación». Esa columna admite
+-- vacío porque las evaluaciones ya guardadas no la respondieron; el formulario
+-- sí la exige, también al editar una de ellas.
+-- ------------------------------------------------------------
+ALTER TABLE evaluaciones_auditados
+  ALTER COLUMN proceso_auditado DROP NOT NULL;
+
+ALTER TABLE evaluaciones_auditados
+  ADD COLUMN IF NOT EXISTS gestion_documentacion smallint
+  CHECK (gestion_documentacion BETWEEN 1 AND 5);
+
+-- Para que la API reconozca la columna nueva sin esperar.
+NOTIFY pgrst, 'reload schema';
 
 -- ------------------------------------------------------------
 -- RLS
@@ -115,8 +134,13 @@ BEGIN
   END IF;
 END $$;
 
--- Comprobación: la tabla, sus dos políticas y el disparador.
-SELECT 'políticas' AS comprobacion, count(*)::text AS total
+-- Comprobación: la columna nueva (1), sus dos políticas y el disparador (1).
+SELECT 'columna gestion_documentacion' AS comprobacion, count(*)::text AS total
+  FROM information_schema.columns
+ WHERE table_name = 'evaluaciones_auditados'
+   AND column_name = 'gestion_documentacion'
+UNION ALL
+SELECT 'políticas', count(*)::text
   FROM pg_policies
  WHERE tablename = 'evaluaciones_auditados'
 UNION ALL

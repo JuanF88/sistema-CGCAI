@@ -12,9 +12,9 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { EMPTY_STATE, SECTION_CARD, TABLE_CONTAINER } from '@/components/ui/tokens'
 import {
-  RUBRICA_CRITERIOS,
   nivelesOrdenados,
   notaDeCalificaciones,
+  rubricaDelPeriodo,
 } from '@/features/evaluaciones/lib/rubrica'
 
 import { InfoBox } from './InfoBox'
@@ -108,6 +108,7 @@ function EstadoGuardado({ estadoFilas, onReintentar }) {
 export function MatrizRubrica({
   evaluaciones,
   calificaciones,
+  periodo,
   onCalificar,
   estadoFilas = {},
   onReintentar,
@@ -116,6 +117,7 @@ export function MatrizRubrica({
 }) {
   const [tooltip, setTooltip] = useState(null)
   const vacio = !loading && evaluaciones.length === 0
+  const { criterios, maximo } = rubricaDelPeriodo(periodo)
 
   return (
     <section className="flex flex-col gap-4">
@@ -137,12 +139,13 @@ export function MatrizRubrica({
 
       <InfoBox icon={Edit3} title="Instrucciones de evaluación">
         <p>
-          Califica cada criterio en la escala de 1 a 4. Pasa el cursor sobre una celda para ver la
-          descripción de cada nivel <Info className="inline h-3.5 w-3.5 align-middle" />.
+          Califica cada criterio en la escala de 1 a {maximo}. Pasa el cursor sobre una celda para
+          ver la descripción de cada nivel <Info className="inline h-3.5 w-3.5 align-middle" />.
         </p>
         <p>
-          💡 La nota final (escala 1 a 5) se calcula como el promedio escalado de los criterios
-          calificados. No hace falta calificarlos todos.
+          💡 La nota final (escala 1 a 5) se calcula como el promedio
+          {maximo === 5 ? '' : ' escalado'} de los criterios calificados. No hace falta calificarlos
+          todos.
         </p>
         <p>
           💾 Cada calificación se guarda sola al elegirla; no hace falta pulsar ningún botón.
@@ -169,7 +172,7 @@ export function MatrizRubrica({
                   <th className="sticky left-0 top-0 z-20 min-w-[200px] border-r-2 border-border bg-muted px-4 py-3 text-left font-semibold">
                     Auditor / Auditoría
                   </th>
-                  {RUBRICA_CRITERIOS.map((criterio) => (
+                  {criterios.map((criterio) => (
                     <th
                       key={criterio.id}
                       className="sticky top-0 z-10 min-w-[160px] bg-muted px-2 py-3 text-center text-xs font-semibold leading-snug"
@@ -186,7 +189,7 @@ export function MatrizRubrica({
               <tbody>
                 {evaluaciones.map((ev) => {
                   const fila = calificaciones[ev.id] || {}
-                  const notaFinal = notaDeCalificaciones(fila)
+                  const notaFinal = notaDeCalificaciones(fila, periodo)
                   const guardado = ESTADO_FILA[estadoFilas[ev.id]]
 
                   return (
@@ -216,8 +219,9 @@ export function MatrizRubrica({
                         )}
                       </td>
 
-                      {RUBRICA_CRITERIOS.map((criterio) => {
+                      {criterios.map((criterio) => {
                         const valor = fila[criterio.id]
+                        const niveles = nivelesOrdenados(criterio)
                         return (
                           <td
                             key={criterio.id}
@@ -244,7 +248,12 @@ export function MatrizRubrica({
                               )}
                             >
                               <option value="">-</option>
-                              {nivelesOrdenados(criterio).map((nivel) => (
+                              {/* Una nota guardada con la escala anterior (3.3, 3.8): sin
+                                  su opción el desplegable la pintaría como «-». */}
+                              {valor && !niveles.includes(String(valor)) && (
+                                <option value={valor}>{valor}</option>
+                              )}
+                              {niveles.map((nivel) => (
                                 <option key={nivel} value={nivel}>
                                   {nivel}
                                 </option>

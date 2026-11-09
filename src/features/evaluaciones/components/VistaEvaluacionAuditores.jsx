@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/select'
 import { PAGE_SHELL, SECTION_CARD } from '@/components/ui/tokens'
 
-import { RUBRICA_CRITERIOS, notaDeCalificaciones } from '@/features/evaluaciones/lib/rubrica'
+import { notaDeCalificaciones, rubricaDelPeriodo } from '@/features/evaluaciones/lib/rubrica'
 import { recalcularDetalle } from '@/features/evaluaciones/lib/archivos'
 import {
   exportarEvaluacionManual,
@@ -172,6 +172,7 @@ export default function VistaEvaluacionAuditores() {
         matrizInicial[ev.id] = ev.rubrica_respuestas || {}
       })
       matrizRef.current = matrizInicial
+      periodoMatriz.current = periodo
       setCalificacionesMatriz(matrizInicial)
       setEstadoFilas({})
     } catch (err) {
@@ -291,7 +292,9 @@ export default function VistaEvaluacionAuditores() {
     if (evaluacion.rubrica_respuestas) {
       setCalificaciones(evaluacion.rubrica_respuestas)
     } else {
-      setCalificaciones(Object.fromEntries(RUBRICA_CRITERIOS.map((c) => [c.id, null])))
+      setCalificaciones(
+        Object.fromEntries(rubricaDelPeriodo(periodo).criterios.map((c) => [c.id, null]))
+      )
     }
   }
 
@@ -299,15 +302,7 @@ export default function VistaEvaluacionAuditores() {
     setCalificaciones((prev) => ({ ...prev, [criterioId]: valor }))
   }
 
-  /** Promedio sobre los 6 criterios, normalizado a escala 5. */
-  const calcularNotaRubrica = () => {
-    const suma = RUBRICA_CRITERIOS.reduce((acc, criterio) => {
-      const c = calificaciones[criterio.id]
-      return c !== null && c !== undefined ? acc + parseFloat(c) : acc
-    }, 0)
-    if (suma === 0) return 0
-    return (suma / RUBRICA_CRITERIOS.length / 4) * 5
-  }
+  const calcularNotaRubrica = () => notaDeCalificaciones(calificaciones, periodo)
 
   const guardarEvaluacionRubrica = async () => {
     if (!auditorSeleccionado) {
@@ -315,7 +310,7 @@ export default function VistaEvaluacionAuditores() {
       return
     }
 
-    const sinCalificar = RUBRICA_CRITERIOS.filter(
+    const sinCalificar = rubricaDelPeriodo(periodo).criterios.filter(
       (c) => calificaciones[c.id] === null || calificaciones[c.id] === undefined
     )
     if (sinCalificar.length > 0) {
@@ -375,6 +370,8 @@ export default function VistaEvaluacionAuditores() {
    *   que dos cambios seguidos de la misma fila nunca llegan al revés.
    */
   const matrizRef = useRef({})
+  /** El periodo de lo que hay en `matrizRef`: de él depende la escala de la nota. */
+  const periodoMatriz = useRef(null)
   const temporizadores = useRef(new Map())
   const enVuelo = useRef(0)
   const colaRubrica = useRef(null)
@@ -390,13 +387,9 @@ export default function VistaEvaluacionAuditores() {
     temporizadores.current.delete(evaluacionId)
 
     const respuestas = { ...(matrizRef.current[evaluacionId] || {}) }
-
-    // Una fila sin ninguna nota no se envía, igual que con el botón de antes:
-    // la nota de rúbrica sería 0 y bajaría la nota final del auditor.
-    if (!Object.keys(respuestas).length) {
-      marcarFila(evaluacionId, null)
-      return Promise.resolve()
-    }
+    // Sin ninguna nota se guarda vacía (`null`), no 0: un 0 bajaría la nota
+    // final, y no enviarla dejaría en la base la nota que se acaba de quitar.
+    const nota = notaDeCalificaciones(respuestas, periodoMatriz.current) || null
 
     enVuelo.current++
     return colaRubrica.current(async () => {
@@ -405,7 +398,7 @@ export default function VistaEvaluacionAuditores() {
         await guardarRubrica({
           evaluacionId,
           respuestas,
-          nota: notaDeCalificaciones(respuestas),
+          nota,
         })
         huboGuardados.current = true
         // Si se volvió a cambiar mientras se guardaba, aún hay otro en camino.
@@ -705,6 +698,7 @@ export default function VistaEvaluacionAuditores() {
         <MatrizRubrica
           evaluaciones={evaluaciones}
           calificaciones={calificacionesMatriz}
+          periodo={periodo}
           onCalificar={cambiarCalificacion}
           estadoFilas={estadoFilas}
           onReintentar={reintentarFallidas}

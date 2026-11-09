@@ -21,7 +21,7 @@
  * explicación.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ClipboardList, Lock, PencilLine, RefreshCw } from 'lucide-react'
+import { ClipboardList, Download, Lock, PencilLine, RefreshCw } from 'lucide-react'
 import { toast } from 'react-toastify'
 import {
   Bar,
@@ -82,6 +82,7 @@ import {
   ASPECTOS,
   COLUMNAS_EVALUACION,
   ESCALA,
+  GUIA_OBSERVACIONES,
   INTRODUCCION,
   OBJETIVO,
   aFila,
@@ -96,6 +97,7 @@ import {
   promedioPorAspecto,
   validarEvaluacion,
 } from '@/features/evaluaciones/lib/evaluacion-auditados'
+import { exportarConsolidadoAuditados } from '@/features/evaluaciones/lib/exportar-excel'
 
 /** Orden de la tabla: primero lo que hay que hacer. */
 const ESTADOS = {
@@ -171,7 +173,7 @@ export default function VistaEvaluacionAuditados({ usuario, todas = false }) {
       if (resEvaluaciones.error) {
         if (esTablaInexistente(resEvaluaciones.error)) {
           throw new Error(
-            'La tabla de evaluaciones de auditados todavía no existe. Hay que ejecutar sql/evaluacion-auditados.sql en Supabase.'
+            'La tabla de evaluaciones de auditados no existe o está desactualizada. Hay que ejecutar sql/evaluacion-auditados.sql en Supabase.'
           )
         }
         throw resEvaluaciones.error
@@ -181,30 +183,19 @@ export default function VistaEvaluacionAuditados({ usuario, todas = false }) {
       setInformes(filas)
       setEvaluaciones(new Map((resEvaluaciones.data ?? []).map((e) => [e.informe_id, e])))
 
-      // El proceso es una ayuda, no un requisito: si el cronograma no se puede
-      // leer, el auditor lo escribe y la pantalla sigue.
-      const programas = [...new Set(filas.map((f) => f.programa_auditoria_id).filter(Boolean))]
-      if (programas.length) {
-        const { data: cronograma, error: errorCronograma } = await supabase
-          .from('programa_auditoria_cronograma')
-          .select('programa_id, proceso, dependencias:programa_auditoria_cronograma_dependencias ( auditado )')
-          .in('programa_id', programas)
+      // El proceso sale solo de la dependencia y no es requisito: si el
+      // cronograma no se puede leer, queda en blanco y la pantalla sigue. Del
+      // programa más reciente al más antiguo, para que las auditorías creadas
+      // a mano tomen el proceso vigente.
+      const { data: cronograma, error: errorCronograma } = await supabase
+        .from('programa_auditoria_cronograma')
+        .select('programa_id, proceso, dependencias:programa_auditoria_cronograma_dependencias ( auditado )')
+        .order('programa_id', { ascending: false })
 
-        if (errorCronograma) {
-          console.warn('No se pudo leer el cronograma para proponer el proceso:', errorCronograma)
-        } else {
-          setProcesos(
-            new Map(
-              filas.map((f) => [
-                f.id,
-                procesoDelPrograma(
-                  f,
-                  (cronograma ?? []).filter((c) => c.programa_id === f.programa_auditoria_id)
-                ),
-              ])
-            )
-          )
-        }
+      if (errorCronograma) {
+        console.warn('No se pudo leer el cronograma para deducir el proceso:', errorCronograma)
+      } else {
+        setProcesos(new Map(filas.map((f) => [f.id, procesoDelPrograma(f, cronograma ?? [])])))
       }
     } catch (e) {
       console.error(e)
@@ -274,8 +265,20 @@ export default function VistaEvaluacionAuditados({ usuario, todas = false }) {
 
   const abierto = delAnio.find(({ informe }) => informe.id === abiertoId) ?? null
 
-  /** ID, dependencia, fecha, ocho preguntas, promedio, estado y acción. */
+  /** ID, dependencia, fecha, las preguntas, promedio, estado y acción. */
   const columnas = (todas ? 1 : 0) + 3 + ASPECTOS.length + 3
+
+  /** Lo del año elegido, sin la búsqueda: el consolidado es del año entero. */
+  const descargarConsolidado = () =>
+    exportarConsolidadoAuditados({
+      filas: delAnio.map(({ informe, evaluacion, estado }) => ({
+        informe,
+        evaluacion,
+        proceso: evaluacion?.proceso_auditado || procesos.get(informe.id) || '',
+        auditor: nombreDe(informe.usuarios),
+        estado: ESTADOS[estado].etiqueta,
+      })),
+    })
 
   /* ── Render ── */
 
@@ -330,11 +333,25 @@ export default function VistaEvaluacionAuditados({ usuario, todas = false }) {
 
             <Button
               variant="outline"
+              onClick={descargarConsolidado}
+              disabled={cargando || !delAnio.length}
+              title={
+                anio === 'todos'
+                  ? 'Descarga un Excel con una hoja por cada año'
+                  : `Descarga el Excel del año ${anio}`
+              }
+              className="ml-auto"
+            >
+              <Download />
+              {anio === 'todos' ? 'Descargar consolidado' : `Descargar consolidado ${anio}`}
+            </Button>
+
+            <Button
+              variant="outline"
               size="icon"
               onClick={cargar}
               disabled={cargando}
               title="Recargar"
-              className="ml-auto"
             >
               <RefreshCw className={cn(cargando && 'animate-spin')} />
             </Button>
@@ -415,8 +432,8 @@ export default function VistaEvaluacionAuditados({ usuario, todas = false }) {
                   <div className={TABLE_TOOLBAR}>
                     <h3 className="text-sm font-semibold">Detalle por auditoría</h3>
                     <p className="text-xs text-muted-foreground">
-                      Valoración de 1 (deficiente) a 5 (excelente). Pasa el cursor por P1…P8 para ver
-                      la pregunta.
+                      Valoración de 1 (deficiente) a 5 (excelente). Pasa el cursor por P1…P
+                      {ASPECTOS.length} para ver la pregunta.
                     </p>
                   </div>
 
@@ -845,24 +862,12 @@ function FormularioEvaluacion({
               placeholder="Nombre de quien lidera el proceso"
             />
           </Field>
-          <Field
-            label="Proceso auditado"
-            htmlFor="proceso_auditado"
-            required
-            error={errores.proceso_auditado}
-            help={
-              procesoSugerido && !errores.proceso_auditado
-                ? 'Propuesto desde el programa de auditoría; puedes corregirlo.'
-                : undefined
-            }
-          >
-            <Input
-              id="proceso_auditado"
-              value={form.proceso_auditado}
-              onChange={(e) => cambiar('proceso_auditado', e.target.value)}
-              placeholder="Proceso al que pertenece la dependencia"
-            />
-          </Field>
+          {/* No se pide: sale de la dependencia. Sin programa que lo diga, no se muestra. */}
+          {form.proceso_auditado && (
+            <Field label="Proceso auditado" help="Según la dependencia auditada.">
+              <Input value={form.proceso_auditado} readOnly disabled />
+            </Field>
+          )}
           {mostrarAuditor && (
             <Field label="Auditor" wide>
               <Input value={nombreDe(informe.usuarios)} readOnly disabled />
@@ -873,7 +878,7 @@ function FormularioEvaluacion({
 
       <FormSection
         title="Valoración"
-        description="Marca la valoración que corresponda para cada aspecto, según tu criterio."
+        description="Marca la valoración que corresponda para cada una de las preguntas, según tu criterio (escala de 1 a 5)."
       >
         <p className="text-xs text-muted-foreground">
           <strong className="font-semibold">Objetivo:</strong> {OBJETIVO}
@@ -893,12 +898,11 @@ function FormularioEvaluacion({
         </ol>
       </FormSection>
 
-      <FormSection title="Observaciones" tone="optional">
+      <FormSection title="Observaciones" description={GUIA_OBSERVACIONES} tone="optional">
         <Textarea
           value={form.observaciones}
           onChange={(e) => cambiar('observaciones', e.target.value)}
           rows={4}
-          placeholder="Lo que quieras añadir sobre la participación del proceso (opcional)"
           aria-label="Observaciones"
         />
       </FormSection>

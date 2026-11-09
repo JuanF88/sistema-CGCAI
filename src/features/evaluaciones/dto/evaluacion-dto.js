@@ -7,6 +7,10 @@ import { periodo, requiredText, uuidId } from '@/lib/dto/common'
  * `evaluacion_id` es un UUID, no un entero. Estaba declarado como id numérico,
  * así que la validación rechazaba toda petición antes de llegar a la base y
  * guardar la rúbrica devolvía «Datos inválidos».
+ *
+ * `nota_rubrica` admite `null`: es lo que llega cuando se quitan todas las notas
+ * de una fila. `.nullable()` va por fuera del `coerce` porque este convertiría
+ * el `null` en un 0, que sí bajaría la nota final.
  */
 export const guardarRubricaSchema = z.object({
   evaluacion_id: uuidId('evaluacion_id es requerido'),
@@ -16,7 +20,8 @@ export const guardarRubricaSchema = z.object({
   nota_rubrica: z.coerce
     .number({ message: 'nota_rubrica es requerida' })
     .min(0, 'nota_rubrica debe estar entre 0 y 5')
-    .max(5, 'nota_rubrica debe estar entre 0 y 5'),
+    .max(5, 'nota_rubrica debe estar entre 0 y 5')
+    .nullable(),
 })
 
 /** POST /api/evaluaciones-auditores/calcular-archivos */

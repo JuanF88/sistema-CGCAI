@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
 
 import { obtenerDashboardAuditor } from '@/features/evaluaciones/api/evaluaciones-api'
-import { RUBRICA_CRITERIOS, colorNota } from '@/features/evaluaciones/lib/rubrica'
+import { colorNota, rubricaDelPeriodo } from '@/features/evaluaciones/lib/rubrica'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -28,18 +28,10 @@ import {
 } from '@/components/ui/select'
 import { EMPTY_STATE, PAGE_SHELL, SECTION_CARD, STATUS_BADGE_TONES } from '@/components/ui/tokens'
 import { cn } from '@/lib/utils'
-import { useAnioInicial } from '@/hooks/useAnioInicial'
+import { useAnioInicial } from '@/hooks/useAnioInicial'
 import { Cargando } from '@/components/ui/loader'
 
 const nota = (valor) => (typeof valor === 'number' ? valor.toFixed(2) : '—')
-
-/**
- * Un criterio se califica de 1 a 4; `colorNota` espera la escala 1-5.
- *
- * Es el mismo reescalado que usa `notaDeCalificaciones` para la nota global, así
- * que el color de un criterio y el de la nota final significan lo mismo.
- */
-const enEscala5 = (valor) => 1 + (Number(valor) - 1) * (4 / 3)
 
 /** Cómo se presenta cada estado de la evaluación. */
 const ESTADOS = {
@@ -58,8 +50,11 @@ const NOTAS = [
   { key: 'nota_final', label: 'Final', fuerte: true },
 ]
 
-function Rubrica({ respuestas }) {
-  const calificados = RUBRICA_CRITERIOS.filter((c) => respuestas?.[c.id])
+function Rubrica({ respuestas, periodo }) {
+  // `aEscala5` es el mismo paso que usa la nota global, así que el color de un
+  // criterio y el de la nota final significan lo mismo.
+  const { criterios, maximo, aEscala5 } = rubricaDelPeriodo(periodo)
+  const calificados = criterios.filter((c) => respuestas?.[c.id])
 
   if (!calificados.length) {
     return (
@@ -89,12 +84,12 @@ function Rubrica({ respuestas }) {
             <span
               className={cn(
                 'mt-2 shrink-0 text-lg font-bold tabular-nums sm:mt-0',
-                colorNota(enEscala5(valor))
+                colorNota(aEscala5(valor))
               )}
-              title="Nota del criterio, sobre 4"
+              title={`Nota del criterio, sobre ${maximo}`}
             >
               {valor}
-              <span className="text-xs font-normal text-muted-foreground"> /4</span>
+              <span className="text-xs font-normal text-muted-foreground"> /{maximo}</span>
             </span>
           </li>
         )
@@ -178,7 +173,7 @@ function TarjetaEvaluacion({ auditoria, abiertaPorDefecto }) {
 
           <div>
             <h3 className="mb-2 text-sm font-semibold">Matriz de rúbrica</h3>
-            <Rubrica respuestas={auditoria.rubrica_respuestas} />
+            <Rubrica respuestas={auditoria.rubrica_respuestas} periodo={auditoria.periodo} />
           </div>
 
           {auditoria.observaciones_generales && (

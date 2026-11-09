@@ -1,8 +1,12 @@
 /**
  * Rúbrica de evaluación de auditores (según `docs/Rubrica.xlsx`).
  *
- * Seis criterios con el mismo peso, calificados de 1 a 4. Cada nivel lleva su
- * descripción para que el evaluador vea qué significa cada nota.
+ * Seis criterios con el mismo peso. Cada nivel lleva su descripción para que el
+ * evaluador vea qué significa cada nota.
+ *
+ * Hay dos versiones y manda el periodo de la evaluación (`rubricaDelPeriodo`):
+ * hasta 2025 se califica de 1 a 4 y la nota se reescala a 5; desde 2026 se
+ * califica directamente de 1 a 5.
  */
 
 /**
@@ -15,7 +19,7 @@
  */
 
 /** @type {CriterioRubrica[]} */
-export const RUBRICA_CRITERIOS = [
+const CRITERIOS_HASTA_2025 = [
   {
     id: 'c1',
     nombre: '1. Identificación del Informe',
@@ -112,21 +116,70 @@ export const RUBRICA_CRITERIOS = [
   },
 ]
 
+/** Cada nivel de la escala hasta 2025 y su nota desde 2026: el nombre no cambia. */
+const NOTA_DESDE_2026 = { 4: 5, 3.8: 4.5, 3.5: 4, 3.3: 3.5, 3: 3, 2: 2, 1: 1 }
+
+/** El criterio 2 deja de valorar el alcance: solo el objetivo. */
+const OBJETIVO_DESDE_2026 = {
+  nombre: '2. Objetivo de la Auditoría',
+  descripcion: 'Claridad en la definición del objetivo, en coherencia con el programa de auditoría.',
+  niveles: {
+    5: 'Excelente: Objetivo completamente definido, con redacción clara, precisa y coherente, muestra lineamientos personalizados.',
+    4.5: 'Destacable: Objetivo definido, con redacción clara y relación coherente al programa, se atreve a plasmar varios lineamientos.',
+    4: 'Muy bueno: Objetivo presente, aunque mejorable en claridad o profundidad, intenta atreverse a mostrar propios lineamientos.',
+    3.5: 'Óptimo: Objetivo abordado con redacción menos precisa, se atreve poco a mostrar propios lineamientos.',
+    3: 'Aceptable: Objetivo definido, aunque con redacción mejorable.',
+    2: 'Deficiente: Objetivo poco claro o no vinculado al programa.',
+    1: 'Insuficiente: Objetivo no definido.',
+  },
+}
+
+/** @type {CriterioRubrica[]} */
+const CRITERIOS_DESDE_2026 = CRITERIOS_HASTA_2025.map((criterio) =>
+  criterio.id === 'c2'
+    ? { ...criterio, ...OBJETIVO_DESDE_2026 }
+    : {
+        ...criterio,
+        niveles: Object.fromEntries(
+          Object.entries(criterio.niveles).map(([nota, texto]) => [NOTA_DESDE_2026[nota], texto])
+        ),
+      }
+)
+
+const PRIMER_ANIO_ESCALA_5 = 2026
+
+/**
+ * La rúbrica con la que se califica un periodo («2026-S1»).
+ *
+ * - `maximo`: la nota más alta de un criterio.
+ * - `aEscala5`: pasa una calificación de la rúbrica a la escala 1-5 de las
+ *   notas del sistema.
+ */
+export const rubricaDelPeriodo = (periodo) =>
+  Number.parseInt(periodo, 10) >= PRIMER_ANIO_ESCALA_5
+    ? { criterios: CRITERIOS_DESDE_2026, maximo: 5, aEscala5: Number }
+    : {
+        criterios: CRITERIOS_HASTA_2025,
+        maximo: 4,
+        aEscala5: (valor) => 1 + (Number(valor) - 1) * (4 / 3),
+      }
+
 /** Niveles de un criterio, de mayor a menor. */
 export const nivelesOrdenados = (criterio) =>
   Object.keys(criterio.niveles).sort((a, b) => Number(b) - Number(a))
 
 /**
- * Nota de la matriz: promedio de los criterios calificados en escala 1-4,
- * reescalado a 1-5. No hace falta calificarlos todos.
+ * Nota de la matriz sobre 5: promedio de los criterios calificados, con la
+ * escala de su periodo. No hace falta calificarlos todos; sin ninguno, 0.
  */
-export function notaDeCalificaciones(calificaciones = {}) {
-  const calificados = RUBRICA_CRITERIOS.filter((c) => calificaciones[c.id])
+export function notaDeCalificaciones(calificaciones = {}, periodo) {
+  const { criterios, aEscala5 } = rubricaDelPeriodo(periodo)
+  const calificados = criterios.filter((c) => calificaciones[c.id])
   if (!calificados.length) return 0
 
   const promedio =
     calificados.reduce((acc, c) => acc + parseFloat(calificaciones[c.id]), 0) / calificados.length
-  return 1 + (promedio - 1) * (4 / 3)
+  return aEscala5(promedio)
 }
 
 /** Color de una nota sobre 5. */

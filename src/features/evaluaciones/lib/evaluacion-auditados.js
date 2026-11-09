@@ -2,7 +2,7 @@
  * La evaluación de auditados: el formulario como datos.
  *
  * Es la «Propuesta Evaluación de Auditados»: el auditor valora, de 1 a 5, cómo
- * se portó el proceso que auditó en ocho aspectos. Los textos son los del
+ * se portó el proceso que auditó en nueve aspectos. Los textos son los del
  * documento; si el formato cambia, se cambia aquí y la pantalla lo sigue.
  *
  * La clave de cada aspecto es el nombre de su columna en
@@ -10,10 +10,13 @@
  */
 
 export const INTRODUCCION =
-  'La auditoría interna es una oportunidad para revisar cómo se están haciendo las cosas, reconocer lo que funciona bien e identificar aspectos que pueden fortalecerse. Por ello, esta valoración busca recoger de manera sencilla y objetiva la experiencia del proceso auditado durante el desarrollo de la auditoría, de forma que sus resultados aporten al mejoramiento de futuros ejercicios.'
+  'La auditoría interna es una oportunidad de aprendizaje y mejora que permite reconocer fortalezas e identificar aspectos por mejorar. En este sentido, es importante conocer la percepción del auditor sobre la disposición, el compromiso y la participación del líder y del equipo del proceso auditado durante su desarrollo. Esta valoración busca identificar oportunidades de mejora que contribuyan al fortalecimiento de futuros ejercicios de auditoría interna.'
 
 export const OBJETIVO =
-  'Valorar la forma en que el proceso auditado se prepara, participa y facilita el desarrollo de la auditoría interna, mediante criterios objetivos asociados con la disponibilidad, suministro de evidencias, interacción con el equipo auditor y atención de los resultados, con el propósito de identificar fortalezas y oportunidades de mejora que contribuyan al fortalecimiento del programa institucional de auditorías.'
+  'Valorar la disposición, participación y compromiso del proceso auditado durante el desarrollo de la auditoría interna, mediante criterios relacionados con la preparación, disponibilidad, suministro de información, interacción con el equipo auditor y apropiación de los resultados, con el propósito de identificar fortalezas y oportunidades de mejora para el fortalecimiento del programa institucional de auditorías.'
+
+export const GUIA_OBSERVACIONES =
+  'Registre los aspectos relevantes sobre la disposición, participación y compromiso del líder y su equipo, así como las situaciones que facilitaron o dificultaron el desarrollo de la auditoría.'
 
 /** De mejor a peor, como en el formato. */
 export const ESCALA = [
@@ -53,7 +56,7 @@ export const ASPECTOS = [
     clave: 'colaboracion',
     titulo: 'Colaboración y disposición durante la auditoría',
     descripcion:
-      'Se facilitó el desarrollo del ejercicio, se atendió los requerimientos del equipo auditor y se mantuvo una interacción respetuosa, receptiva y orientada al propósito de la auditoría además de aportar los documentos requerimientos y las firmas necesarias conforme al procedimiento de auditoría.',
+      'El líder y su equipo demostraron disposición, colaboración y actitud receptiva durante el desarrollo de la auditoría. Atendiendo los requerimientos en un ambiente de respeto y comunicación fluida.',
   },
   {
     clave: 'aclaraciones',
@@ -65,13 +68,19 @@ export const ASPECTOS = [
     clave: 'participacion_cierre',
     titulo: 'Participación en el cierre',
     descripcion:
-      'El líder y equipo del proceso participó en la reunión de cierre, atendió los resultados comunicados, presentó las aclaraciones que consideró pertinentes y evidenció disposición para analizar las oportunidades de mejora derivadas del ejercicio de auditoría.',
+      'El líder y su equipo participaron en el cierre, atendieron los resultados, presentaron las aclaraciones pertinentes y se evidenció disposición para analizar las oportunidades de mejora derivadas del ejercicio de auditoría.',
+  },
+  {
+    clave: 'gestion_documentacion',
+    titulo: 'Gestión de la documentación',
+    descripcion:
+      'Se atendieron oportunamente los requerimientos documentales y se facilitó la revisión y formalización de los registros necesarios conforme al procedimiento de auditoría.',
   },
   {
     clave: 'compromiso_mejora',
     titulo: 'Compromiso con la mejora',
     descripcion:
-      'Se mostró disposición para analizar los resultados de la auditoría, definir las acciones requeridas y asumir los compromisos derivados del ejercicio, incluyendo la formulación oportuna del plan de mejora y la concertación de las fechas de seguimiento.',
+      'El líder y su equipo demostraron disposición para dar continuidad a los compromisos de planes de mejora anteriores y asumir los derivados de la nueva auditoría, concertando las respectivas fechas de seguimiento.',
   },
 ]
 
@@ -129,23 +138,30 @@ const normalizar = (texto) =>
     .trim()
 
 /**
- * El proceso del cronograma en el que aparece la dependencia de la auditoría.
+ * El proceso de la auditoría, deducido de su dependencia: el auditor no lo
+ * escribe.
  *
  * Las auditorías generadas desde el programa salen de una línea del
  * cronograma, pero no guardan cuál: se reconoce por el nombre de la
- * dependencia, igual que al generarlas (`generar-auditorias/route.js`). Las
- * creadas a mano no tienen programa y devuelven `''`: el auditor lo escribe.
+ * dependencia, igual que al generarlas (`generar-auditorias/route.js`). Manda
+ * el programa de la propia auditoría; las creadas a mano no tienen programa y
+ * se buscan en los demás, en el orden en que llegue `cronograma`. Si la
+ * dependencia no aparece en ninguno devuelve `''` y el proceso queda en blanco.
  *
- * @param {{ dependencias?: { nombre?: string } }} informe
- * @param {Array<{ proceso: string, dependencias?: Array<{ auditado: string }> }>} cronograma
+ * @param {{ programa_auditoria_id?: number, dependencias?: { nombre?: string } }} informe
+ * @param {Array<{ programa_id: number, proceso: string, dependencias?: Array<{ auditado: string }> }>} cronograma
  */
 export function procesoDelPrograma(informe, cronograma) {
   const dependencia = normalizar(informe?.dependencias?.nombre)
   if (!dependencia || !cronograma?.length) return ''
 
-  const linea = cronograma.find((c) =>
+  const incluyeLaDependencia = (c) =>
     (c.dependencias ?? []).some((d) => normalizar(d.auditado) === dependencia)
-  )
+
+  const linea =
+    cronograma.find(
+      (c) => c.programa_id === informe.programa_auditoria_id && incluyeLaDependencia(c)
+    ) ?? cronograma.find(incluyeLaDependencia)
 
   return String(linea?.proceso ?? '').trim()
 }
@@ -167,7 +183,6 @@ export function validarEvaluacion(form) {
   const errores = {}
 
   if (!form.lider_proceso.trim()) errores.lider_proceso = 'Indica quién lidera el proceso.'
-  if (!form.proceso_auditado.trim()) errores.proceso_auditado = 'Indica el proceso auditado.'
 
   for (const { clave } of ASPECTOS) {
     if (!ESCALA.some((e) => e.valor === form[clave])) errores[clave] = 'Elige una valoración.'
@@ -181,14 +196,14 @@ export function aFila(form, informeId) {
   return {
     informe_id: informeId,
     lider_proceso: form.lider_proceso.trim(),
-    proceso_auditado: form.proceso_auditado.trim(),
+    proceso_auditado: form.proceso_auditado.trim() || null,
     ...Object.fromEntries(ASPECTOS.map((a) => [a.clave, form[a.clave]])),
     observaciones: form.observaciones.trim(),
     updated_at: new Date().toISOString(),
   }
 }
 
-/** Media de los ocho aspectos, con un decimal; `null` sin evaluación. */
+/** Media de los aspectos respondidos, con un decimal; `null` sin evaluación. */
 export function promedioEvaluacion(evaluacion) {
   if (!evaluacion) return null
 
@@ -209,7 +224,7 @@ const media = (valores) =>
 
 /**
  * La media de cada aspecto entre varias evaluaciones, en el orden del
- * formulario. `pregunta` es la etiqueta corta de la tabla (P1…P8).
+ * formulario. `pregunta` es la etiqueta corta de la tabla (P1, P2…).
  */
 export const promedioPorAspecto = (evaluaciones) =>
   ASPECTOS.map((aspecto, i) => ({
