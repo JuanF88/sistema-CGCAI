@@ -6,7 +6,6 @@ import { Eye } from 'lucide-react'
 import AppShell, { avatarFor } from '@/components/layout/AppShell'
 import { VISUALIZADOR_NAV } from '@/components/layout/navigation'
 
-import VistaTimeline from '@/features/auditorias/components/VistaTimeline'
 import VistaInformesAdmin from '@/features/auditorias/components/VistaInformesAdmin'
 import VistaEstadisticas from '@/features/estadisticas/components/VistaEstadisticas'
 import VistaAdministrarHallazgos from '@/features/hallazgos/components/VistaAdministrarHallazgos'
@@ -37,7 +36,6 @@ export default function VisualizadorDashboard({ usuario }) {
       }
     >
       {vista === 'malla' && <VistaInformesAdmin soloLectura />}
-      {vista === 'timeline' && usuario && <VistaTimeline usuario={usuario} soloLectura />}
       {vista === 'hallazgos' && <VistaAdministrarHallazgos soloLectura />}
       {vista === 'estadisticas' && <VistaEstadisticas soloLectura />}
     </AppShell>

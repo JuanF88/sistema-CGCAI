@@ -112,10 +112,10 @@ const BUCKETS_DOCUMENTO = {
   validaciones: BUCKETS.VALIDACIONES,
 }
 
-// `soloLectura` se acepta por coherencia con las demás vistas del panel del
-// visualizador, pero esta pantalla ya es de solo lectura: no ofrece ninguna
-// acción de escritura.
-export default function AuditoriasMallaControl() {
+// `soloLectura` (panel del visualizador) quita las dos acciones de la malla:
+// «Marcar» en la columna Ejecutada y «Avisar» en los documentos pendientes.
+// Los modales no hace falta quitarlos: solo se abren desde esos botones.
+export default function AuditoriasMallaControl({ soloLectura = false }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [auditorias, setAuditorias] = useState([])
@@ -641,14 +641,15 @@ export default function AuditoriasMallaControl() {
                       // La campana solo aparece donde hay algo que reclamar y
                       // existe un documento que reclamar.
                       const puedeAvisar = Boolean(
-                        ALERTA_POR_COLUMNA[col.key] && ag.pendientes?.length
+                        !soloLectura && ALERTA_POR_COLUMNA[col.key] && ag.pendientes?.length
                       )
 
                       // «Ejecutada» no se reclama, se marca; y se puede
                       // desmarcar, así que la celda es pulsable aunque esté
                       // completa. Sin la columna en la base no hay nada que
                       // guardar y no se ofrece.
-                      const puedeMarcar = col.key === 'ejecutada' && !sinColumnaEjecucion
+                      const puedeMarcar =
+                        !soloLectura && col.key === 'ejecutada' && !sinColumnaEjecucion
 
                       return (
                         <div
@@ -778,13 +779,15 @@ export default function AuditoriasMallaControl() {
                 className="h-3 w-3 rounded border border-dashed border-emerald-400 bg-emerald-50"
                 aria-hidden="true"
               />
-              «Ejecutada»: control manual, pasa el ratón por la celda para marcarla
+              {soloLectura
+                ? '«Ejecutada»: control manual'
+                : '«Ejecutada»: control manual, pasa el ratón por la celda para marcarla'}
             </span>
           </div>
         )}
       </section>
 
-      {sinColumnaEjecucion && (
+      {sinColumnaEjecucion && !soloLectura && (
         <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
           La columna «Ejecutada» todavía no existe en la base, así que sale en cero y no se puede
           marcar. Ejecuta <code className="font-mono">sql/ejecucion-auditorias.sql</code> y recarga.

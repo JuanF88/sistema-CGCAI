@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * Administración de auditorías (panel de admin y de visualizador).
+ * Administración de auditorías (panel de admin).
  *
  * Este archivo orquesta: carga los datos, aplica los filtros y arma las etapas.
  * Las piezas visuales están en `components/timeline/`. Con `soloLectura` se
@@ -808,21 +808,21 @@ export default function VistaTimeline({ usuario, soloLectura = false }) {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <InfoCard label="Total auditorías" value={kpis.total} tone="blue" />
-        <InfoCard
+        <InfoCard
           label="Planes enviados"
           value={kpis.plan}
           total={kpis.total}
           percent={pct(kpis.plan)}
           tone="purple"
         />
-        <InfoCard
+        <InfoCard
           label="Informes completos"
           value={kpis.informe}
           total={kpis.total}
           percent={pct(kpis.informe)}
           tone="green"
         />
-        <InfoCard
+        <InfoCard
           label="Validados"
           value={kpis.val}
           total={kpis.total}

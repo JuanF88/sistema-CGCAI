@@ -90,7 +90,6 @@ export const AUDITOR_NAV = [
 /** Panel del visualizador (solo lectura). */
 export const VISUALIZADOR_NAV = [
   { key: 'malla', label: 'Malla de Control', icon: FileText },
-  { key: 'timeline', label: 'Auditorías', icon: Home },
   { key: 'hallazgos', label: 'Hallazgos', icon: Eye },
   { key: 'estadisticas', label: 'Estadísticas', icon: BarChart },
 ]
