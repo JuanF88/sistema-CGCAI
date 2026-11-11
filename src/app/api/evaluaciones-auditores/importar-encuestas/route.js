@@ -99,39 +99,47 @@ export async function POST(request) {
         .trim()
     }
 
-    // Mapeo de respuestas textuales a números (escala 1-5)
+    // Respuestas textuales del formulario → escala 1-5 (0 = no aplica).
+    //
+    // El formulario usa «Deficiente», que no estaba en la lista. Como antes
+    // toda respuesta desconocida valía 0, un «Deficiente» contaba como «No
+    // aplica»: la encuesta se rechazaba por tener pocas respuestas o, peor, se
+    // importaba sin esa nota baja. Ahora lo desconocido devuelve `null` y se
+    // informa como error de la fila.
+    const RESPUESTAS = {
+      'excelente': 5,
+      'bueno': 4,
+      'aceptable': 3,
+      'deficiente': 2,
+      'malo': 2,
+      'muy deficiente': 1,
+      'muy malo': 1,
+      'no aplica': 0,
+      'n/a': 0,
+      'na': 0
+    }
+
+    // Para la coincidencia parcial («Bueno (4)», «Muy malo.»): primero las
+    // claves largas, para que «muy deficiente» no se quede en «deficiente», y
+    // sin las de menos de cuatro letras («na» está dentro de «buena»).
+    const CLAVES_PARCIALES = Object.keys(RESPUESTAS)
+      .filter((clave) => clave.length >= 4)
+      .sort((a, b) => b.length - a.length)
+
     const convertirRespuestaANumero = (respuesta) => {
-      if (!respuesta) return 0
-      
       const texto = normalizarTexto(respuesta)
-      
-      // Mapeo de valores textuales a escala numérica
-      const mapeo = {
-        'excelente': 5,
-        'bueno': 4,
-        'aceptable': 3,
-        'malo': 2,
-        'muy malo': 1,
-        'no aplica': 0,
-        'n/a': 0,
-        'na': 0
-      }
-      
-      // Buscar coincidencia exacta
-      if (mapeo[texto] !== undefined) return mapeo[texto]
-      
-      // Buscar coincidencia parcial
-      for (const [key, value] of Object.entries(mapeo)) {
-        if (texto.includes(key) || key.includes(texto)) {
-          return value
-        }
-      }
-      
-      // Si es número directo, usarlo
-      const num = parseInt(respuesta)
-      if (!isNaN(num) && num >= 0 && num <= 5) return num
-      
-      return 0
+      if (!texto) return 0
+
+      if (RESPUESTAS[texto] !== undefined) return RESPUESTAS[texto]
+
+      const clave = CLAVES_PARCIALES.find((c) => texto.includes(c))
+      if (clave) return RESPUESTAS[clave]
+
+      // Número directo
+      const num = Number(texto)
+      if (Number.isInteger(num) && num >= 0 && num <= 5) return num
+
+      return null
     }
 
     // Función de matching fuzzy mejorado
@@ -213,6 +221,47 @@ export async function POST(request) {
       })
     }
 
+    // Parecido entre la dependencia que escribe el evaluado y la de una
+    // evaluación. El formulario es texto libre: llegan tildes de menos
+    // («Area»), versiones cortas («Turismo» por «TURISMO PREGRADO») y erratas
+    // («Salud Untegral»). 0 = no se parecen; cuanto más alto, más seguro.
+    const PALABRAS_VACIAS = new Set(['de', 'del', 'la', 'las', 'los', 'el', 'y', 'en'])
+    const palabrasDe = (texto) =>
+      normalizarTexto(texto)
+        .replace(/[^a-z0-9ñ ]/g, ' ')
+        .split(' ')
+        .filter((p) => p.length > 2 && !PALABRAS_VACIAS.has(p))
+
+    const parecidoDependencia = (a, b) => {
+      const na = normalizarTexto(a)
+      const nb = normalizarTexto(b)
+      if (!na || !nb) return 0
+      if (na === nb) return 4
+      if (na.includes(nb) || nb.includes(na)) return 3
+
+      // Palabras en común: dos como mínimo y al menos el 60 % de las del
+      // nombre más corto. Una sola («gestión») no basta.
+      const pa = new Set(palabrasDe(a))
+      const pb = new Set(palabrasDe(b))
+      const comunes = [...pa].filter((p) => pb.has(p)).length
+      const proporcion = comunes / Math.min(pa.size, pb.size)
+      return comunes >= 2 && proporcion >= 0.6 ? 1 + proporcion : 0
+    }
+
+    /** La evaluación (de las del auditor en el periodo) que mejor encaja, o null. */
+    const evaluacionDeDependencia = (dependencia, evaluaciones) => {
+      let mejor = null
+      let puntaje = 0
+      for (const ev of evaluaciones ?? []) {
+        const p = parecidoDependencia(dependencia, ev.dependencia_auditada)
+        if (p > puntaje) {
+          mejor = ev
+          puntaje = p
+        }
+      }
+      return mejor
+    }
+
     // Mapeo de columnas según estructura real del Excel
     // Columnas clave:
     // - "Marca temporal"
@@ -284,6 +333,10 @@ export async function POST(request) {
             }
             
             if (fecha && !isNaN(fecha.getTime())) {
+              // Al segundo: el formulario no guarda milisegundos, pero leer el
+              // Excel puede dejar restos (08:40:28.352). Con ellos, la misma
+              // respuesta parecía otra y se insertaba repetida.
+              fecha = new Date(Math.round(fecha.getTime() / 1000) * 1000)
               fechaRespuesta = fecha.toISOString()
               
               // Calcular año y semestre desde la fecha de respuesta
@@ -328,11 +381,17 @@ export async function POST(request) {
 
         // Extraer respuestas a las 10 preguntas
         // Buscar columnas que contengan texto específico (orden de prioridad)
+        const noReconocidas = []
         const obtenerRespuesta = (posiblesNombres) => {
           for (const nombre of posiblesNombres) {
             const valor = row[nombre]
             if (valor !== undefined && valor !== null && valor !== '') {
-              return convertirRespuestaANumero(valor)
+              const numero = convertirRespuestaANumero(valor)
+              if (numero === null) {
+                noReconocidas.push(`P${nombre.split('.')[0]}: «${valor}»`)
+                return 0
+              }
+              return numero
             }
           }
           return 0
@@ -350,6 +409,13 @@ export async function POST(request) {
         const pregunta_9 = obtenerRespuesta(['9. El auditor propició un ambiente de cordialidad, respeto, empatía y actitud de mejora'])
         const pregunta_10 = obtenerRespuesta(['10. Se evidenció una adecuada coordinación por parte del equipo de auditores durante la visita'])
 
+        if (noReconocidas.length > 0) {
+          resultados.errores.push(
+            `Fila ${i + 2}: respuestas que no se reconocen (${noReconocidas.join(', ')}). Válidas: Excelente, Bueno, Aceptable, Deficiente, Muy deficiente, No aplica.`
+          )
+          continue
+        }
+
         // Validar que todas las respuestas estén en rango 0-5 (0 = no aplica)
         const preguntas = [pregunta_1, pregunta_2, pregunta_3, pregunta_4, pregunta_5, 
                            pregunta_6, pregunta_7, pregunta_8, pregunta_9, pregunta_10]
@@ -360,26 +426,57 @@ export async function POST(request) {
           continue
         }
 
-        // Validar que haya al menos 7 respuestas válidas (no 0)
+        // Respuestas con calificación (lo demás es «No aplica» o vacío).
+        //
+        // Desde 2026 «No aplica» no cuenta en la nota (ver
+        // `sql/encuestas-no-aplica.sql`), así que basta con una pregunta
+        // calificada. Hasta 2025 la nota dividía siempre entre 10 y cada «No
+        // aplica» restaba; por eso se exigían 7 y así se queda para esos años.
         const respuestasValidas = preguntas.filter(p => p > 0)
-        if (respuestasValidas.length < 7) {
-          resultados.errores.push(`Fila ${i + 2}: Solo ${respuestasValidas.length} respuestas válidas (mínimo 7 requeridas)`)
+        const minimoRespuestas = anioEncuesta >= 2026 ? 1 : 7
+        if (respuestasValidas.length < minimoRespuestas) {
+          resultados.errores.push(
+            minimoRespuestas === 1
+              ? `Fila ${i + 2}: todas las preguntas están en «No aplica» o vacías; no hay nada que calificar`
+              : `Fila ${i + 2}: Solo ${respuestasValidas.length} respuestas válidas (mínimo 7 requeridas)`
+          )
           continue
         }
 
         // UPSERT: Buscar si ya existe esta encuesta (evitar duplicados)
         // Criterio de unicidad: auditor_nombre + fecha_respuesta + evaluador_nombre
+        //
+        // La hora se compara con un segundo de margen, no exacta: las encuestas
+        // cargadas antes guardaban milisegundos y, comparando exacto, el cargue
+        // siguiente no las reconocía y las duplicaba. Tampoco `maybeSingle()`:
+        // con dos filas daba error, se tomaba como «no existe» y se insertaba
+        // una tercera.
         let encuesta = null
         let esActualizacion = false
-        
+
         if (fechaRespuesta && auditorNombre && evaluadorNombre) {
-          const { data: existente } = await supabaseAdmin
+          const instante = new Date(fechaRespuesta).getTime()
+          const { data: coincidencias, error: buscarError } = await supabaseAdmin
             .from('encuestas_auditores')
             .select('*')
             .eq('auditor_nombre', auditorNombre)
-            .eq('fecha_respuesta', fechaRespuesta)
             .eq('evaluador_nombre', evaluadorNombre)
-            .maybeSingle()
+            .gte('fecha_respuesta', new Date(instante - 1000).toISOString())
+            .lte('fecha_respuesta', new Date(instante + 1000).toISOString())
+            .order('created_at', { ascending: true })
+
+          if (buscarError) {
+            resultados.errores.push(`Fila ${i + 2}: no se pudo comprobar si ya estaba cargada - ${buscarError.message}`)
+            continue
+          }
+
+          if (coincidencias?.length > 1) {
+            resultados.errores.push(
+              `Fila ${i + 2}: la encuesta está ${coincidencias.length} veces en la base; se actualizó la primera. Conviene borrar las copias.`
+            )
+          }
+
+          const existente = coincidencias?.[0]
 
           if (existente) {
             // YA EXISTE: Actualizar respuestas
@@ -460,59 +557,15 @@ export async function POST(request) {
 
         // Solo actualizar evaluación si el auditor existe en la BD
         if (auditor && dependenciaAuditadaNombre) {
-          // Buscar evaluación existente para este auditor/periodo/dependencia
-          // Primero intentar match exacto
-          let { data: evaluacion } = await supabaseAdmin
+          // Evaluación del auditor en ese periodo a la que corresponde la
+          // dependencia que escribió el evaluado (texto libre del formulario).
+          const { data: todasEvaluaciones } = await supabaseAdmin
             .from('evaluaciones_auditores')
             .select('id, dependencia_auditada')
             .eq('auditor_id', auditor.auth_user_id)
             .eq('periodo', periodoEncuesta)
-            .eq('dependencia_auditada', dependenciaAuditadaNombre)
-            .maybeSingle()
 
-          // Si no hay match exacto, intentar fuzzy matching con todas las evaluaciones del auditor en ese periodo
-          if (!evaluacion) {
-            const { data: todasEvaluaciones } = await supabaseAdmin
-              .from('evaluaciones_auditores')
-              .select('id, dependencia_auditada')
-              .eq('auditor_id', auditor.auth_user_id)
-              .eq('periodo', periodoEncuesta)
-
-            if (todasEvaluaciones && todasEvaluaciones.length > 0) {
-              // Usar fuzzy matching para encontrar la dependencia más cercana
-              const normalizarTexto = (texto) => {
-                if (!texto) return ''
-                return texto
-                  .toLowerCase()
-                  .normalize("NFD")
-                  .replace(/[\u0300-\u036f]/g, "")
-                  .trim()
-              }
-
-              const depNormalizada = normalizarTexto(dependenciaAuditadaNombre)
-              
-              for (const ev of todasEvaluaciones) {
-                const evalDepNormalizada = normalizarTexto(ev.dependencia_auditada)
-                if (evalDepNormalizada === depNormalizada) {
-                  evaluacion = ev
-                  console.log(`✓ Match fuzzy encontrado: "${dependenciaAuditadaNombre}" → "${ev.dependencia_auditada}"`)
-                  break
-                }
-              }
-
-              // Si no hay match exacto, intentar match parcial
-              if (!evaluacion) {
-                for (const ev of todasEvaluaciones) {
-                  const evalDepNormalizada = normalizarTexto(ev.dependencia_auditada)
-                  if (evalDepNormalizada.includes(depNormalizada) || depNormalizada.includes(evalDepNormalizada)) {
-                    evaluacion = ev
-                    console.log(`✓ Match parcial encontrado: "${dependenciaAuditadaNombre}" → "${ev.dependencia_auditada}"`)
-                    break
-                  }
-                }
-              }
-            }
-          }
+          const evaluacion = evaluacionDeDependencia(dependenciaAuditadaNombre, todasEvaluaciones)
 
           if (!evaluacion) {
             console.log(`⚠ No se encontró evaluación para auditor ${auditorNombre}, periodo ${periodoEncuesta}, dependencia "${dependenciaAuditadaNombre}"`)
@@ -520,39 +573,25 @@ export async function POST(request) {
 
           // Si encontramos la evaluación, calcular promedio y actualizar
           if (evaluacion) {
-            // Usar el nombre de la dependencia de la evaluación encontrada (no del Excel)
-            // para calcular el promedio de todas las encuestas que matchean
-            const dependenciaEvaluacion = evaluacion.dependencia_auditada
-            
-            // Traemos todas las encuestas del auditor en el periodo y filtramos
-            // por fuzzy matching de dependencia (cubre también los exactos).
             const { data: todasEncuestas } = await supabaseAdmin
               .from('encuestas_auditores')
               .select('id, nota_calculada, dependencia_auditada')
               .eq('auditor_id', auditor.auth_user_id)
               .eq('periodo', periodoEncuesta)
 
-            // Filtrar por fuzzy matching
-            const normalizarTexto = (texto) => {
-              if (!texto) return ''
-              return texto
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .trim()
-            }
-
-            const depEvNormalizada = normalizarTexto(dependenciaEvaluacion)
-            const encuestasFiltradas = (todasEncuestas || []).filter(enc => {
-              const encDepNorm = normalizarTexto(enc.dependencia_auditada)
-              return encDepNorm === depEvNormalizada || 
-                     encDepNorm.includes(depEvNormalizada) || 
-                     depEvNormalizada.includes(encDepNorm)
-            })
+            // Cuentan las encuestas que, con la misma regla, caen en ESTA
+            // evaluación. Antes el promedio usaba otra comparación más laxa
+            // que la de arriba, y una encuesta podía sumar en una evaluación
+            // y no en otra según cuál se recalculara.
+            const encuestasFiltradas = (todasEncuestas || []).filter(
+              (enc) =>
+                enc.nota_calculada !== null &&
+                evaluacionDeDependencia(enc.dependencia_auditada, todasEvaluaciones)?.id === evaluacion.id
+            )
 
             let notaPromedioEncuestas = null
             if (encuestasFiltradas && encuestasFiltradas.length > 0) {
-              const suma = encuestasFiltradas.reduce((sum, e) => sum + (e.nota_calculada || 0), 0)
+              const suma = encuestasFiltradas.reduce((sum, e) => sum + Number(e.nota_calculada), 0)
               notaPromedioEncuestas = suma / encuestasFiltradas.length
             }
 
