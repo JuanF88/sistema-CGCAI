@@ -78,10 +78,14 @@ export const AUDITOR_NAV = [
   // va detrás de la línea de trabajo y no dentro de ella. Al salir de los pasos
   // del timeline el auditor se quedaba sin forma de generar el formato.
   { key: 'planes-mejora', label: 'Planes de Mejoramiento', icon: ClipboardCheck },
-  // «Evaluación de Auditados» (clave 'evaluacion-auditados') está oculta a los
-  // auditores por ahora: todavía no deben diligenciarla. Para abrirla, volver
-  // a poner aquí la entrada —con `icon: MessageSquareText, nuevo: true`— y
-  // descomentar su vista en `VistaActual.jsx`.
+  // Después del plan: el auditor valora al proceso que auditó una vez cerrada
+  // la auditoría. Solo ve sus propias auditorías.
+  {
+    key: 'evaluacion-auditados',
+    label: 'Evaluación de Auditados',
+    icon: MessageSquareText,
+    nuevo: true,
+  },
   { key: 'mi-dashboard', label: 'Mi Dashboard', icon: LayoutDashboard },
   { key: 'mis-evaluaciones', label: 'Mis Evaluaciones', icon: Award },
   { key: 'caja', label: 'Caja de Herramientas', icon: Wrench },
