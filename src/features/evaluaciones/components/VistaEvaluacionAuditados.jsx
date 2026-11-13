@@ -99,6 +99,13 @@ import {
 } from '@/features/evaluaciones/lib/evaluacion-auditados'
 import { exportarConsolidadoAuditados } from '@/features/evaluaciones/lib/exportar-excel'
 
+/**
+ * El auditor solo ve sus auditorías desde este año: la encuesta empezó en
+ * 2026 y no tiene sentido pedirle que valore auditorías de años cerrados. El
+ * administrador sigue viendo todas, con su selector de año.
+ */
+const PRIMER_ANIO_AUDITOR = 2026
+
 /** Orden de la tabla: primero lo que hay que hacer. */
 const ESTADOS = {
   pendiente: { etiqueta: 'Por diligenciar', tono: 'warning', orden: 0 },
@@ -160,7 +167,11 @@ export default function VistaEvaluacionAuditados({ usuario, todas = false }) {
         )
         .order('fecha_auditoria', { ascending: false, nullsFirst: false })
 
-      if (!todas) consulta = consulta.eq('usuario_id', usuario.usuario_id)
+      if (!todas) {
+        consulta = consulta
+          .eq('usuario_id', usuario.usuario_id)
+          .gte('fecha_auditoria', `${PRIMER_ANIO_AUDITOR}-01-01`)
+      }
 
       // Sin filtro por informe: RLS ya limita al auditor a las suyas, y al
       // administrador pedirlas por id le obligaría a mandar cientos en la URL.
